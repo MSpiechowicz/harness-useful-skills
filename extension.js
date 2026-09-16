@@ -1,7 +1,7 @@
 import { listSkills, runUpdate } from "./updater.js";
 
 const HELP = [
-  "Useful skills",
+  "Useful Skills",
   "/skill:ship-backlog-item — select an existing issue or backlog item and deliver a verified PR using GitHub CLI.",
   "/useful-skills list — list bundled skills.",
   "/useful-skills update check — check the latest stable release.",
@@ -22,7 +22,7 @@ async function select(ctx, title, choices, nested = false) {
 }
 
 export default function usefulSkills(pi) {
-  pi.setLabel("Useful skills");
+  pi.setLabel("Useful Skills");
   let busy = false;
   let startupScheduled = false;
 
@@ -38,16 +38,17 @@ export default function usefulSkills(pi) {
     }
     busy = true;
     try {
+      if (action === "install") notify(ctx, "Installing Useful Skills update via the OMP plugin pipeline…");
       const report = await runUpdate(action, { cwd: ctx.cwd });
       if (report.updated) {
-        notify(ctx, `Useful skills updated to ${report.currentVersion}. Restart OMP to load the extension and refreshed skills.`);
+        notify(ctx, `Useful Skills updated to ${report.currentVersion}. Restart OMP to load the extension and refreshed skills.`);
       } else if (report.updateAvailable) {
-        notify(ctx, `Useful skills update available: ${report.currentVersion} → ${report.latestVersion}. Run /useful-skills update install to update it, or /useful-skills update check to check again. Terminal: ./useful-skills update install.`, "warning");
+        notify(ctx, `Useful Skills update available: ${report.currentVersion} → ${report.latestVersion}. Run /useful-skills update install.`, "warning");
       } else if (!quiet) {
-        notify(ctx, `Useful skills ${report.currentVersion}: ${report.message || "No newer stable release available."}`);
+        notify(ctx, `Useful Skills ${report.currentVersion}: ${report.message || "No newer stable release available."}`);
       }
     } catch (error) {
-      if (!quiet) notify(ctx, `Useful skills update failed: ${error.message}`, "error");
+      if (!quiet) notify(ctx, `Useful Skills update failed: ${error.message}`, "error");
     } finally {
       busy = false;
     }
@@ -61,7 +62,7 @@ export default function usefulSkills(pi) {
       while (!command || command === "update") {
         if (!ctx.hasUI) { notify(ctx, HELP); return; }
         if (!command) {
-          command = await select(ctx, "Useful skills", [
+          command = await select(ctx, "Useful Skills", [
             { value: "list", label: "List" },
             { value: "update", label: "Update" },
             { value: "help", label: "Help" },
@@ -69,7 +70,7 @@ export default function usefulSkills(pi) {
           if (!command) return;
         }
         if (command === "update") {
-          const action = await select(ctx, "Useful skills · Update", [
+          const action = await select(ctx, "Useful Skills · Update", [
             { value: "check", label: "Check" },
             { value: "install", label: "Install" },
           ], true);

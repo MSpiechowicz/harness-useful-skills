@@ -70,8 +70,8 @@ export async function main(argv = process.argv.slice(2)) {
       const report = await runUpdate(argv[1], options);
       if (report.updated) console.log(report.message);
       else if (report.updateAvailable) {
-        console.log(`Update available: ${report.currentVersion} → ${report.latestVersion}.\nRun ./useful-skills update install to update, or ./useful-skills update check to check again.`);
-      } else console.log(`Useful skills ${report.currentVersion}: ${report.message || "No newer stable release available."}`);
+        console.log(`Update available: ${report.currentVersion} → ${report.latestVersion}.\nRun ./useful-skills update install.`);
+      } else console.log(`Useful Skills ${report.currentVersion}: ${report.message || "No newer stable release available."}`);
       return 0;
     }
 

@@ -78,7 +78,7 @@ Marketplace installation requires a published release. Before the first release,
 Open `/useful-skills` for the native menu:
 
 ```text
-Useful skills
+Useful Skills
   List
   Update
     Check
