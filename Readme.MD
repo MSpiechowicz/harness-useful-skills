@@ -16,20 +16,21 @@
 
 Useful Skills is an [Oh My Pi](https://github.com/can1357/oh-my-pi) extension that bundles practical, LLM-readable development workflows. Install it once through OMP's native marketplace; the extension and its skills are installed and upgraded together.
 
-The first collection covers taking an existing issue to a pull request, security reviews, performance investigations, and maintainability audits. Commands use OMP's native menus and notification styles rather than a separate terminal UI.
+The collection covers taking an existing issue to a pull request, committing and merging approved changes, security reviews, performance investigations, and maintainability audits. Commands use OMP's native menus and notification styles rather than a separate terminal UI.
 
 ## Included skills
 
 | Skill | Purpose | Delivery |
 | :--- | :--- | :--- |
 | [`ship-backlog-item`](skills/ship-backlog-item/SKILL.md) | Select an existing issue or backlog item, analyze it, create a branch, implement and verify the change | A focused pull request with verification evidence |
+| [`approve-changes`](skills/approve-changes/SKILL.md) | Verify approved work, commit it, push its branch, and merge through a PR while respecting checks and reviews | A confirmed merge, or an exact delivery blocker |
 | [`security-audit`](skills/security-audit/SKILL.md) | Trace trust boundaries, authorization, input handling, sensitive data, and supply-chain risks | Prioritized, evidence-backed findings and remediation |
 | [`performance-audit`](skills/performance-audit/SKILL.md) | Investigate algorithmic cost, allocation, I/O, concurrency, and resource growth | Measured bottlenecks, reproducible workloads, and tradeoffs |
 | [`code-audit`](skills/code-audit/SKILL.md) | Review file size, duplication, separation of concerns, coupling, and appropriate OOP | Actionable findings and repository-local quality instructions |
 
 **GitHub work uses GitHub CLI.** The skills require `gh` or `gh api` for GitHub issues, project backlogs, comments, and PRs—not browser automation or `--web`. Local backlog files are read directly.
 
-Skills are instructions for the assistant, not background automation. Installing the extension does not start an audit, edit a repository, push a branch, or open a PR.
+Skills are instructions for the assistant, not background automation. Installing the extension does not start an audit, edit a repository, push a branch, open a PR, or merge changes.
 
 ## Requirements
 
@@ -115,6 +116,7 @@ When OMP skill commands are enabled:
 
 ```text
 /skill:ship-backlog-item
+/skill:approve-changes
 /skill:security-audit
 /skill:performance-audit
 /skill:code-audit
@@ -124,18 +126,25 @@ You can provide a focused request:
 
 ```text
 /skill:ship-backlog-item Pick an unblocked bug from the existing backlog.
+/skill:approve-changes Commit, push, and merge the changes we just approved.
 /skill:security-audit Review authorization and file-upload boundaries.
 /skill:performance-audit Investigate startup latency with a representative workload.
 /skill:code-audit Audit the source and tests, and persist the quality rules.
 ```
 
-Alternatively, ask the assistant to use a skill by name. The model can read it through `skill://ship-backlog-item`, `skill://security-audit`, `skill://performance-audit`, or `skill://code-audit`.
+Alternatively, ask the assistant to use a skill by name. The model can read it through `skill://ship-backlog-item`, `skill://approve-changes`, `skill://security-audit`, `skill://performance-audit`, or `skill://code-audit`.
 
 ### Ship backlog item
 
 The workflow inspects existing issues or documented backlog sources, checks for duplicates and active work, selects one actionable item, and analyzes the code before editing. It creates an isolated branch, preserves unrelated changes, verifies the implementation, and uses `gh` to push the delivery through to a PR.
 
 A ready-for-review PR requires completed implementation and relevant verification. The skill does not merge PRs, force-push, take over another contributor's work, or silently substitute a draft for an incomplete change.
+
+### Approve changes
+
+Invoke `/skill:approve-changes` to deliver approved work end to end: verify the scoped changes, commit them, push the delivery branch, create or reuse its PR, and merge into the intended base. A narrower request, such as commit-only, limits the workflow accordingly.
+
+The skill preserves unrelated staged and unstaged work, checks outgoing commits and the full PR scope, and respects required CI, reviews, and branch protections. It does not force-push or bypass merge gates. Queued or auto-merge-pending work is reported as pending, not merged; completion requires GitHub confirmation.
 
 ### Audits and repository instructions
 
