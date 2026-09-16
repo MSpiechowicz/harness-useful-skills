@@ -1,0 +1,19 @@
+{
+  "name": "omp-useful-skills",
+  "owner": { "name": "MSpiechowicz" },
+  "metadata": { "description": "Practical development skills for Oh My Pi" },
+  "plugins": [
+    {
+      "name": "oh-my-pi-useful-skills",
+      "description": "Backlog delivery, security, performance, and code-quality workflows with native updates",
+      "version": "0.1.0",
+      "source": {
+        "source": "github",
+        "repo": "MSpiechowicz/oh-my-pi-useful-skills",
+        "ref": "v0.1.0"
+      },
+      "homepage": "https://github.com/MSpiechowicz/oh-my-pi-useful-skills",
+      "license": "GPL-3.0-only"
+    }
+  ]
+}

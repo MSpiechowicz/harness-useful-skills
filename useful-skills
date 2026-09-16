@@ -1,0 +1,89 @@
+#!/usr/bin/env node
+import { installPlugin, listSkills, runUpdate, UpdateError } from "./updater.js";
+
+const USAGE = `Usage:
+  ./useful-skills install [--scope user|project] [--profile PROFILE]
+  ./useful-skills update check|install [--profile PROFILE]
+  ./useful-skills list
+  ./useful-skills help
+
+Requires Node.js 22+ and OMP with marketplace support.
+Install bundles the extension and skills; restart OMP to discover them.
+Inside OMP: /useful-skills or /skill:ship-backlog-item
+GitHub access for ship-backlog-item requires an authenticated gh CLI.
+Source checkouts: git pull --ff-only. Use /useful-skills update install
+inside OMP to upgrade a marketplace installation.`;
+
+function usage(stream = process.stdout) {
+  stream.write(`${USAGE}\n`);
+}
+
+function renderSkills(skills) {
+  if (skills.length === 0) return "No bundled skills found.";
+  return ["Bundled skills:", ...skills.flatMap((skill) => [
+    `  ${skill.name} — ${skill.description}`,
+    `    Use ${skill.usage}`,
+  ])].join("\n");
+}
+
+function optionValue(argv, index, name) {
+  const value = argv[index + 1];
+  if (!value || value.startsWith("--")) throw new UpdateError(`${name} requires a value.`);
+  return value;
+}
+
+function parseOptions(argv, allowed) {
+  const options = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index];
+    if (argument === "--profile" || argument === "--scope") {
+      if (!allowed.has(argument)) throw new UpdateError(`${argument} is not valid for this command.`);
+      options[argument.slice(2)] = optionValue(argv, index, argument);
+      index += 1;
+      continue;
+    }
+    throw new UpdateError(`Unknown argument: ${argument}`);
+  }
+  return options;
+}
+
+export async function main(argv = process.argv.slice(2)) {
+  try {
+    if (argv.length === 1 && (argv[0] === "help" || argv[0] === "--help" || argv[0] === "-h")) {
+      usage();
+      return 0;
+    }
+
+    if (argv.length === 1 && argv[0] === "list") {
+      console.log(renderSkills(await listSkills()));
+      return 0;
+    }
+
+    if (argv[0] === "install") {
+      const options = parseOptions(argv.slice(1), new Set(["--scope", "--profile"]));
+      console.log((await installPlugin(options)).message);
+      return 0;
+    }
+
+    if (argv[0] === "update" && (argv[1] === "check" || argv[1] === "install")) {
+      const options = parseOptions(argv.slice(2), new Set(["--profile"]));
+      const report = await runUpdate(argv[1], options);
+      if (report.updated) console.log(report.message);
+      else if (report.updateAvailable) {
+        console.log(`Update available: ${report.currentVersion} → ${report.latestVersion}.\nRun ./useful-skills update install to update, or ./useful-skills update check to check again.`);
+      } else console.log(`Useful skills ${report.currentVersion}: ${report.message || "No newer stable release available."}`);
+      return 0;
+    }
+
+    throw new UpdateError("Expected install, list, update check, update install, or help.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`useful-skills: ${message.replace(/[\u0000-\u001f\u007f]/g, " ")}\n`);
+    usage(process.stderr);
+    return 2;
+  }
+}
+
+if (import.meta.url === new URL(process.argv[1], "file:").href) {
+  process.exitCode = await main();
+}
