@@ -82,8 +82,7 @@ export default function usefulSkills(pi) {
       else if (command === "list") {
         try {
           const skills = await listSkills();
-          notify(ctx, skills.map(skill => `${skill.name} — ${skill.description}\n${skill.usage}`).join("\n\n")
-            + "\n\nRestart OMP after updates. If a skill is missing, check skill filters and higher-precedence copies.");
+          notify(ctx, skills.map(skill => `${skill.name} — ${skill.description}\n${skill.usage}`).join("\n\n"));
         } catch (error) {
           notify(ctx, `Could not list bundled skills: ${error.message}`, "error");
         }
