@@ -10,11 +10,11 @@
     {
       "name": "oh-my-pi-useful-skills",
       "description": "Backlog delivery, security, performance, and code-quality workflows with native updates",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "source": {
         "source": "github",
         "repo": "MSpiechowicz/oh-my-pi-useful-skills",
-        "ref": "v0.1.1"
+        "ref": "v0.1.2"
       },
       "homepage": "https://github.com/MSpiechowicz/oh-my-pi-useful-skills",
       "license": "GPL-3.0-only"
