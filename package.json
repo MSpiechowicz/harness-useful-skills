@@ -1,7 +1,7 @@
 {
   "name": "oh-my-pi-useful-skills",
-  "version": "0.1.4",
-  "description": "Practical development skills with native Oh My Pi marketplace updates",
+  "version": "0.2.0",
+  "description": "OMP-native ECC engineering workflows and practical development skills",
   "type": "module",
   "private": true,
   "license": "GPL-3.0-only",

@@ -4,17 +4,17 @@
     "name": "MSpiechowicz"
   },
   "metadata": {
-    "description": "Practical development skills for Oh My Pi"
+    "description": "OMP-native ECC engineering workflows and practical development skills"
   },
   "plugins": [
     {
       "name": "oh-my-pi-useful-skills",
-      "description": "Backlog delivery, security, performance, and code-quality workflows with native updates",
-      "version": "0.1.4",
+      "description": "OMP-native ECC engineering workflows, safety, memory, and practical development skills",
+      "version": "0.2.0",
       "source": {
         "source": "github",
         "repo": "MSpiechowicz/oh-my-pi-useful-skills",
-        "ref": "v0.1.4"
+        "ref": "v0.2.0"
       },
       "homepage": "https://github.com/MSpiechowicz/oh-my-pi-useful-skills",
       "license": "GPL-3.0-only"

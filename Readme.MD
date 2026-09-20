@@ -8,37 +8,37 @@
 [![Latest release](https://img.shields.io/github/v/release/MSpiechowicz/oh-my-pi-useful-skills)](https://github.com/MSpiechowicz/oh-my-pi-useful-skills/releases/latest)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-[Installation](#installation) · [Skills](#included-skills) · [Commands](#commands) · [Updates](#updates) · [Development](#development)
+[Installation](#installation) · [Resource pack](#included-resource-pack) · [Commands](#commands) · [Updates](#updates) · [Development](#development)
 
 </div>
 
 ---
 
-Useful Skills is an [Oh My Pi](https://github.com/can1357/oh-my-pi) extension that bundles practical, LLM-readable development workflows. Install it once through OMP's native marketplace; the extension and its skills are installed and upgraded together.
+Useful Skills is an [Oh My Pi](https://github.com/can1357/oh-my-pi) plugin that combines the original practical development workflows with the reusable resource catalog from [Everything Claude Code (ECC)](https://github.com/affaan-m/ECC). The port is OMP-only: OMP discovers the skills, commands, agents, and rules, while the extension translates ECC lifecycle behavior to native OMP events.
 
-The collection covers taking an existing issue to a pull request, committing and merging approved changes, security reviews, performance investigations, and maintainability audits. Commands use OMP's native menus and notification styles rather than a separate terminal UI.
+The pack includes the original backlog, delivery, security, performance, and code-quality workflows plus the ECC engineering, testing, research, language, frontend, operations, and agent workflows. It does not install or execute adapters, hooks, scripts, MCP configuration, or runtime support for another harness.
+## Included resource pack
 
-## Included skills
-
-| Skill | Purpose | Delivery |
+| Surface | Contents | OMP entry point |
 | :--- | :--- | :--- |
-| [`ship-backlog-item`](skills/ship-backlog-item/SKILL.md) | Select an existing issue or backlog item, analyze it, create a branch, implement and verify the change | A focused pull request with verification evidence |
-| [`approve-changes`](skills/approve-changes/SKILL.md) | Verify approved work, commit it, push its branch, and merge through a PR while respecting checks and reviews | A confirmed merge, or an exact delivery blocker |
-| [`security-audit`](skills/security-audit/SKILL.md) | Trace trust boundaries, authorization, input handling, sensitive data, and supply-chain risks | Prioritized, evidence-backed findings and remediation |
-| [`performance-audit`](skills/performance-audit/SKILL.md) | Investigate algorithmic cost, allocation, I/O, concurrency, and resource growth | Measured bottlenecks, reproducible workloads, and tradeoffs |
-| [`code-audit`](skills/code-audit/SKILL.md) | Review file size, duplication, separation of concerns, coupling, and appropriate OOP | Actionable findings and repository-local quality instructions |
+| Useful Skills | Backlog delivery, approved-change delivery, security, performance, and code-quality workflows | `/skill:<name>` |
+| ECC skills | The vendored ECC skill catalog and supporting references | `/skill:<name>` |
+| ECC commands | Prompt workflows for planning, review, verification, research, and delivery | `/<command>` |
+| ECC agents | Specialist role prompts for OMP `task` delegation | `/ecc list agents` |
+| ECC rules | Common engineering rules plus OMP compatibility guidance | Loaded by the plugin and extension |
 
-**GitHub work uses GitHub CLI.** The skills require `gh` or `gh api` for GitHub issues, project backlogs, comments, and PRs—not browser automation or `--web`. Local backlog files are read directly.
+The catalog is discoverable from the installed files; it is not duplicated in a registry. Use `/ecc list skills [query]`, `/ecc list commands [query]`, `/ecc list agents [query]`, or `/ecc list rules [query]`.
 
-Skills are instructions for the assistant, not background automation. Installing the extension does not start an audit, edit a repository, push a branch, open a PR, or merge changes.
+Skills are instructions for the assistant, not background automation. Installing the plugin does not start an audit, edit a repository, push a branch, open a PR, or merge changes.
 
 ## Requirements
 
 - A current OMP installation with native marketplace support and `omp plugin list --json`.
 - Node.js **22 or newer** for the terminal launcher.
 - Git and network access for marketplace installation and updates.
-- An authenticated [GitHub CLI](https://cli.github.com/) for skills that access GitHub. Run `gh auth status` to check access.
-- Python **3.10 or newer** only for developing or running the release automation—not for using the extension.
+- An authenticated [GitHub CLI](https://cli.github.com/) for workflows that access GitHub. Run `gh auth status` to check access.
+- An OMP-configured memory backend is optional; `/ecc-memory` reports when none is active.
+- Python **3.10 or newer** only for developing or running the release automation—not for using the plugin.
 
 There are no npm dependencies to install.
 
@@ -76,27 +76,33 @@ Marketplace installation requires a published release. Before the first release,
 
 ### Inside OMP
 
-Open `/useful-skills` for the native menu:
+Open `/ecc` for the OMP-native catalog and workflow menu:
 
 ```text
-Useful Skills
-  List
+ECC for Oh My Pi
+  List skills
+  List commands
+  List agents
+  List rules
+  Doctor
+  Memory
   Update
-    Check
-    Install
   Help
 ```
 
-Use arrow keys to navigate, Enter to select, Escape to cancel, and Left to return from the update submenu. The menu inherits OMP's active theme and uses its built-in info, warning, and error notifications.
-
 | Command | Action |
 | :--- | :--- |
-| `/useful-skills` | Open the menu |
-| `/useful-skills list` | List bundled skills and invocation commands |
+| `/ecc` or `/useful-skills` | Open the menu |
+| `/ecc list [skills\|commands\|agents\|rules] [query]` | Browse the installed catalog |
+| `/ecc doctor` or `/ecc-doctor` | Inspect resource counts, rules, safety, and memory |
+| `/ecc-memory status` | Show the configured OMP memory backend |
+| `/ecc-memory search <query>` | Search native OMP memory |
+| `/ecc-memory save <fact>` | Save a durable fact to native OMP memory |
 | `/useful-skills update check` | Check the latest stable GitHub release |
 | `/useful-skills update install` | Upgrade the active marketplace installation |
 | `/useful-skills help` | Show command guidance |
 
+The extension reinforces ECC's portable engineering rules in `before_agent_start`, blocks only high-confidence catastrophic shell inputs, and redacts common secret shapes from tool results. OMP's normal approval flow remains authoritative for other destructive operations.
 ### In a terminal
 
 ```bash
@@ -108,7 +114,7 @@ Use arrow keys to navigate, Enter to select, Escape to cancel, and Left to retur
 
 The updater protects source checkouts: `update install` must run from the **installed package's launcher**, or use `/useful-skills update install` inside OMP. To update a development checkout, use `git pull --ff-only`. Updating the checkout alone does not upgrade a separate marketplace installation.
 
-Update and install commands inherit `OMP_PROFILE` or `PI_PROFILE`; the terminal launcher also accepts `--profile NAME`. Project-scoped operations use the current working directory.
+Update and install commands inherit `OMP_PROFILE`; the terminal launcher also accepts `--profile NAME`. Project-scoped operations use the current working directory.
 
 ## Using the skills
 
@@ -118,21 +124,21 @@ When OMP skill commands are enabled:
 /skill:ship-backlog-item
 /skill:approve-changes
 /skill:security-audit
-/skill:performance-audit
-/skill:code-audit
+/skill:tdd-workflow
+/skill:verification-loop
+/skill:unified-memory
 ```
 
-You can provide a focused request:
+Find a focused workflow without memorizing the catalog:
 
 ```text
-/skill:ship-backlog-item Pick an unblocked bug from the existing backlog.
-/skill:approve-changes Commit, push, and merge the changes we just approved.
-/skill:security-audit Review authorization and file-upload boundaries.
-/skill:performance-audit Investigate startup latency with a representative workload.
-/skill:code-audit Audit the source and tests, and persist the quality rules.
+/ecc list skills security
+/ecc list skills frontend
+/ecc list commands review
+/ecc list agents architect
 ```
 
-Alternatively, ask the assistant to use a skill by name. The model can read it through `skill://ship-backlog-item`, `skill://approve-changes`, `skill://security-audit`, `skill://performance-audit`, or `skill://code-audit`.
+Alternatively, ask the assistant to use a skill by name. The model can read it through `skill://<name>` and can resolve related files from that skill directory. ECC examples that mention another harness are guidance content only; translate their tool names to OMP's `read`, `grep`, `glob`, `edit`, `write`, `task`, `hub`, `todo`, `browser`, and `memory` surfaces.
 
 ### Ship backlog item
 
@@ -170,7 +176,7 @@ If an existing `AGENTS.md` is present, the skill adds a relative reference when 
 
 ## Updates
 
-Interactive startup schedules a background check for the latest stable GitHub release. If the active marketplace installation is behind, OMP shows a warning with the installed and available versions and the command to install the update:
+Interactive startup schedules a quiet background check for the latest stable GitHub release. If the active marketplace installation is behind, OMP shows a warning with the installed and available versions and the command to install the update:
 
 ```text
 /useful-skills update install
@@ -178,9 +184,9 @@ Interactive startup schedules a background check for the latest stable GitHub re
 
 **Checks never install code automatically.** Startup lookup failures stay quiet; an explicit check reports errors. Installation remains an explicit user action.
 
-An update refreshes only this marketplace, upgrades the active plugin in its existing scope, and checks the resulting installed version. Disabled, shadowed, ambiguous, mismatched, or source-checkout installations are not silently rewritten. A user/project skill with the same name is never overwritten to force discovery.
+An update refreshes only this marketplace, upgrades the active plugin in its existing scope, and checks the resulting installed version. Disabled, shadowed, ambiguous, mismatched, or source-checkout installations are not silently rewritten.
 
-Restart OMP after an update to refresh the loaded extension and skill metadata.
+Restart OMP after an update to refresh the loaded extension and the full ECC resource catalog.
 
 ### Native recovery commands
 
@@ -211,20 +217,24 @@ Release jobs have `contents: write`; validation jobs remain read-only. Repositor
 # Preview the package without installing a release
 omp -e .
 
-# List bundled skills without running OMP
-./useful-skills list
+# Browse the OMP-native catalog without running OMP
+./useful-skills list skills
+./useful-skills list commands review
+./useful-skills list agents architect
+./useful-skills list rules testing
 
 # Run behavior and release-transaction regressions
 node --test
 python -m unittest discover -s test -p 'test_*.py'
 
-# Check the extension entrypoint
+# Check the extension entrypoints
 node --check extension.js
+node --check ecc-runtime.js
 ```
 
-Add a skill at `skills/<name>/SKILL.md` with explicit `name` and single-line `description` frontmatter. The list command discovers these files automatically; no second skill registry is maintained. Keep supporting templates inside the corresponding skill directory and reference them through `skill://<name>/...`.
+Add a skill at `skills/<name>/SKILL.md` with explicit `name` and single-line `description` frontmatter. Add prompt commands under `commands/`, agent role prompts under `agents/`, and rules under `rules/`. The catalog commands discover these files automatically; no second registry is maintained. Keep supporting templates inside the corresponding skill directory and reference them through `skill://<name>/...`.
 
-Read [the repository quality guidance](.agents/CODE_QUALITY.md) before contributing. Keep the marketplace and package versions synchronized; let release automation perform version bumps.
+The canonical ECC source and MIT terms are recorded in [`NOTICE-ECC.txt`](NOTICE-ECC.txt). Read [the repository quality guidance](.agents/CODE_QUALITY.md) before contributing. Keep the marketplace and package versions synchronized; let release automation perform future version bumps.
 
 ## Troubleshooting
 
