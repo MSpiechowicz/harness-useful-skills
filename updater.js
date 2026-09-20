@@ -168,7 +168,7 @@ function normalizedOptions(options = {}) {
   if (!options || typeof options !== "object") {
     throw new UpdateError("Update options must be an object.");
   }
-  const profile = options.profile ?? process.env.OMP_PROFILE ?? process.env.PI_PROFILE;
+  const profile = options.profile ?? process.env.OMP_PROFILE;
   if (profile !== undefined && (typeof profile !== "string" || profile.length === 0)) {
     throw new UpdateError("OMP profile must be a non-empty string.");
   }
