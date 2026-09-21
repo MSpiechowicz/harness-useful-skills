@@ -8,7 +8,7 @@
 [![Latest release](https://img.shields.io/github/v/release/MSpiechowicz/oh-my-pi-useful-skills)](https://github.com/MSpiechowicz/oh-my-pi-useful-skills/releases/latest)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
-[Installation](#installation) · [Resource pack](#included-resource-pack) · [Commands](#commands) · [Updates](#updates) · [Development](#development)
+[Installation](#installation) · [Resource pack](#included-resource-pack) · [Commands](#commands) · [Plugin updates](#plugin-updates) · [ECC upstream source sync](#ecc-upstream-source-sync) · [Development](#development)
 
 </div>
 
@@ -87,6 +87,8 @@ ECC for Oh My Pi
   Doctor
   Memory
   Update
+  Upstream check
+  Upstream sync
   Help
 ```
 
@@ -100,6 +102,8 @@ ECC for Oh My Pi
 | `/ecc-memory save <fact>` | Save a durable fact to native OMP memory |
 | `/useful-skills update check` | Check the latest stable GitHub release |
 | `/useful-skills update install` | Upgrade the active marketplace installation |
+| `/ecc upstream check [ref]` or `/useful-skills upstream check [ref]` | Resolve the ECC upstream ref (default `main`) and report its immutable revision |
+| `/ecc upstream sync [ref]` or `/useful-skills upstream sync [ref]` | Three-way merge supported ECC Markdown from a clean development checkout |
 | `/useful-skills help` | Show command guidance |
 
 The extension reinforces ECC's portable engineering rules in `before_agent_start`, blocks only high-confidence catastrophic shell inputs, and redacts common secret shapes from tool results. OMP's normal approval flow remains authoritative for other destructive operations.
@@ -109,10 +113,14 @@ The extension reinforces ECC's portable engineering rules in `before_agent_start
 ./useful-skills list
 ./useful-skills update check
 ./useful-skills update install
+./useful-skills upstream check
+./useful-skills upstream sync main
 ./useful-skills help
 ```
 
-The updater protects source checkouts: `update install` must run from the **installed package's launcher**, or use `/useful-skills update install` inside OMP. To update a development checkout, use `git pull --ff-only`. Updating the checkout alone does not upgrade a separate marketplace installation.
+`update check` and `update install` are **plugin-update** commands: they check or upgrade this project's published OMP marketplace package. The updater protects source checkouts: `update install` must run from the **installed package's launcher**, or use `/useful-skills update install` inside OMP. Updating a development checkout does not upgrade a separate marketplace installation.
+
+Use `upstream check|sync [ref]` for the separate ECC-source workflow. The optional ref is exactly one argument and defaults to `main`.
 
 Update and install commands inherit `OMP_PROFILE`; the terminal launcher also accepts `--profile NAME`. Project-scoped operations use the current working directory.
 
@@ -174,7 +182,7 @@ Existing repository-specific guidance is preserved. Generated and vendored files
 
 If an existing `AGENTS.md` is present, the skill adds a relative reference when needed. Arbitrary `.agents/*.md` files are not universally auto-loaded by LLM tools; without an entrypoint, explicitly ask the assistant to read the file. This repository's own copy is at [`.agents/CODE_QUALITY.md`](.agents/CODE_QUALITY.md).
 
-## Updates
+## Plugin updates
 
 Interactive startup schedules a quiet background check for the latest stable GitHub release. If the active marketplace installation is behind, OMP shows a warning with the installed and available versions and the command to install the update:
 
@@ -197,6 +205,22 @@ omp plugin upgrade oh-my-pi-useful-skills@omp-useful-skills --scope user
 ```
 
 Use the appropriate profile and `--scope project` when applicable. An enabled project installation takes precedence over the corresponding user installation.
+
+## ECC upstream source sync
+
+ECC source sync is a deliberate development-checkout operation, not a marketplace plugin update. From the root of a clone of this repository:
+
+```bash
+./useful-skills upstream check
+./useful-skills upstream sync
+```
+
+`upstream check [ref]` resolves the selected upstream ref (default `main`) to an immutable SHA and reports the pinned baseline, candidate revision, and an upstream package version when it is available. It does not execute upstream code.
+
+`upstream sync [ref]` fetches source only and performs a three-way merge of ECC-owned Markdown under `skills/`, `commands/`, `agents/`, and `rules/`. The five local skills—`ship-backlog-item`, `approve-changes`, `security-audit`, `performance-audit`, and `code-audit`—are preserved. Sync requires a clean Git worktree and is refused for an installed package root; run it from a development checkout instead.
+
+If a merge conflicts, sync leaves the working Markdown files and `ecc-upstream.json` baseline unchanged. A successful sync records the new provenance baseline, but never creates a commit, pushes a branch, or upgrades the marketplace plugin.
+
 
 ## Release automation
 
@@ -244,7 +268,8 @@ The canonical ECC source and MIT terms are recorded in [`NOTICE-ECC.txt`](NOTICE
 | A skill is missing | Check skill enablement, include/ignore filters, and higher-precedence same-named skills |
 | `/skill:…` is unavailable | Enable OMP skill commands or ask the assistant to read the `skill://…` resource |
 | Update refuses a source checkout | Use the command inside the installed OMP extension; update development checkouts with Git |
-| Native install or upgrade fails | Run the native recovery commands to inspect OMP's detailed error output |
+| Upstream sync refuses the package root | Run `./useful-skills upstream sync [ref]` from a clean development checkout, not an installed marketplace package |
+| Upstream sync reports conflicts | Resolve the source differences in the checkout, then retry; no working Markdown or provenance baseline was changed |
 | No release is available | Publish the first release through GitHub Actions; use `omp -e .` for local preview |
 | GitHub-backed skill cannot inspect work | Check `gh auth status`, repository access, and any required GitHub Projects permissions |
 

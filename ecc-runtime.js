@@ -3,12 +3,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const PACKAGE_ROOT = path.dirname(fileURLToPath(import.meta.url));
-export const ECC_UPSTREAM = Object.freeze({
-  repository: "affaan-m/ECC",
-  version: "2.2.2",
-  commit: "934195f955cf0da847d59fcd6f68856bce112d8b",
-  url: "https://github.com/affaan-m/ECC",
-});
+export async function readUpstreamProvenance({ root = PACKAGE_ROOT } = {}) {
+  const provenance = JSON.parse(await readFile(path.join(root, "ecc-upstream.json"), "utf8"));
+  if (provenance.repository !== "affaan-m/ECC" || !/^[a-f0-9]{40}$/.test(provenance.revision)) {
+    throw new Error("Invalid ECC upstream provenance.");
+  }
+  return provenance;
+}
 
 export const PORTABLE_RULE_FILES = Object.freeze([
   "coding-style.md",

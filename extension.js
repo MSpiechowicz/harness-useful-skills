@@ -1,10 +1,11 @@
 import { runUpdate } from "./updater.js";
+import { runUpstream } from "./upstream-sync.js";
 import {
-  ECC_UPSTREAM,
   PACKAGE_ROOT,
   dangerousCommandReason,
   listResources,
   loadPortableRules,
+  readUpstreamProvenance,
   redactToolResultContent,
   resourceInventory,
   safetyEnabled,
@@ -17,7 +18,8 @@ const HELP = [
   "/ecc doctor — inspect the installed OMP resource pack and native integrations.",
   "/ecc memory status|search <query>|save <fact> — use OMP's configured memory backend.",
   "/useful-skills update check|install — check or install marketplace updates.",
-  "Terminal: ./useful-skills list | ./useful-skills update check | ./useful-skills update install",
+  "/ecc upstream check|sync [ref] — check or merge ECC Markdown source in a clean development checkout.",
+  "Terminal: ./useful-skills list | ./useful-skills update check | ./useful-skills upstream check|sync [ref]",
   "This package ships only the Oh My Pi integration; restart OMP after updates.",
 ].join("\n");
 
@@ -79,7 +81,7 @@ function memoryHelp() {
 export default function usefulSkills(pi) {
   pi.setLabel("Useful Skills · ECC");
   let busy = false;
-  let startupScheduled = false;
+  let upstreamBusy = false;
   let rulesPromise;
 
   function notify(ctx, message, level = "info") {
@@ -113,8 +115,34 @@ export default function usefulSkills(pi) {
     }
   }
 
+  async function upstream(action, ref, ctx) {
+    if (upstreamBusy) {
+      notify(ctx, "An ECC upstream operation is already running.", "warning");
+      return;
+    }
+    upstreamBusy = true;
+    try {
+      const report = await runUpstream(action, { root: PACKAGE_ROOT, ...(ref ? { ref } : {}) });
+      notify(ctx, report.message);
+    } catch (error) {
+      notify(ctx, `ECC upstream ${action} failed: ${error instanceof Error ? error.message : String(error)}`, "error");
+    } finally {
+      upstreamBusy = false;
+    }
+  }
+
+  async function upstreamCommand(args, ctx) {
+    const [action, ref, ...extra] = args.trim().split(/\s+/);
+    if (!["check", "sync"].includes(action) || extra.length > 0) {
+      notify(ctx, "Usage: /ecc upstream check|sync [ref]", "warning");
+      return;
+    }
+    await upstream(action, ref, ctx);
+  }
+
   async function doctor(ctx) {
     try {
+      const provenance = await readUpstreamProvenance({ root: PACKAGE_ROOT });
       const inventory = await resourceInventory({ root: PACKAGE_ROOT });
       let memory;
       if (ctx.memory) {
@@ -126,7 +154,7 @@ export default function usefulSkills(pi) {
       }
       notify(ctx, [
         "ECC for Oh My Pi",
-        `Upstream: ${ECC_UPSTREAM.repository} ${ECC_UPSTREAM.version} @ ${ECC_UPSTREAM.commit.slice(0, 12)}`,
+        `Upstream: ${provenance.repository}${provenance.version ? ` ${provenance.version}` : ""} @ ${provenance.revision.slice(0, 12)}`,
         `Resources: ${inventory.skills} skills, ${inventory.commands} commands, ${inventory.agents} agents, ${inventory.rules} rules`,
         "Extension: before-agent rules, destructive-command guard, tool-result secret redaction",
         `Safety guard: ${safetyEnabled() ? "enabled" : "disabled by OMP_ECC_SAFETY"}`,
@@ -209,6 +237,8 @@ export default function usefulSkills(pi) {
         { value: "doctor", label: "Doctor" },
         { value: "memory status", label: "Memory" },
         { value: "update", label: "Update" },
+        { value: "upstream check", label: "Upstream check" },
+        { value: "upstream sync", label: "Upstream sync" },
         { value: "help", label: "Help" },
       ]);
       if (command === "update") {
@@ -234,16 +264,20 @@ export default function usefulSkills(pi) {
       await update(command.slice(7), ctx);
       return;
     }
+    if (command === "upstream" || command.startsWith("upstream ")) {
+      await upstreamCommand(command.slice("upstream".length), ctx);
+      return;
+    }
     if (command === "memory" || command.startsWith("memory ")) {
       await memoryCommand(command.slice("memory".length), ctx);
       return;
     }
-    const listMatch = /^(?:list|catalog)(?:\\s+(skills|commands|agents|rules))?(?:\\s+(.+))?$/.exec(command);
+    const listMatch = /^(?:list|catalog)(?:\s+(skills|commands|agents|rules))?(?:\s+(.+))?$/.exec(command);
     if (listMatch) {
       await listCatalog(listMatch[1] ?? "skills", listMatch[2] ?? "", ctx);
       return;
     }
-    notify(ctx, "Usage: /ecc [list [skills|commands|agents|rules] [query]|doctor|memory status|update check|update install|help]", "warning");
+    notify(ctx, "Usage: /ecc [list [skills|commands|agents|rules] [query]|doctor|memory status|update check|update install|upstream check|sync [ref]|help]", "warning");
   }
 
   pi.registerCommand("useful-skills", {
