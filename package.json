@@ -1,6 +1,6 @@
 {
   "name": "oh-my-pi-useful-skills",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "OMP-native ECC engineering workflows and practical development skills",
   "type": "module",
   "private": true,
