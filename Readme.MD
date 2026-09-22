@@ -249,7 +249,7 @@ The linked PR uses `Closes #N` when it fully resolves the issue and targets the 
 
 ## Updates and releases
 
-`update check` is quiet/read-only at interactive startup; explicit failures are reported. `update install` retains native active-install ownership, scope/profile, and stable-version checks. Only the active unambiguous marketplace installation is upgraded. Restart OMP afterward.
+`update check` is quiet/read-only at interactive startup; explicit failures are reported. `update install` immediately announces that Useful Skills is updating through OMP's native plugin manager, then reports the result. It retains native active-install ownership, scope/profile, and stable-version checks. Only the active unambiguous marketplace installation is upgraded. Restart OMP afterward.
 
 The existing single-plugin release transaction is unchanged: CI checks precede the atomic package/marketplace version commit and branch/tag push by `release.py`. No publication is performed merely by implementing a plan. Python 3.10+ is needed for release-development checks, not normal plugin installation.
 
