@@ -42,6 +42,8 @@ These are prompt instructions, **not enforced stage transitions**. They cannot g
 | `us-check-security` | Read-only trust-boundary audit or post-correctness security review |
 | `us-check-performance` | Measured representative performance audit, not speculative optimization |
 | `us-check-code-quality` | Evidence-backed cohesion/duplication audit and explicit guidance merge |
+| `us-improve-codebase-architecture` | Read-only architectural opportunities, then approved focused refactoring |
+| `us-improve-code-coverage` | Measured coverage gaps, then approved behavior-focused test improvements |
 | `us-ship-backlog-item` | Select actionable backlog work and feed it into the same development flow |
 | `us-open-pr` | Explicitly authorized reviewed feature-branch PR delivery |
 | `us-approve-work` | Explicitly authorized commit and fast-forward direct push to `main` |
@@ -53,6 +55,8 @@ Direct invocation uses OMP's actual syntax:
 /skill:us-check-security
 /skill:us-check-performance
 /skill:us-check-code-quality
+/skill:us-improve-codebase-architecture
+/skill:us-improve-code-coverage
 /skill:us-ship-backlog-item
 /skill:us-open-pr
 /skill:us-approve-work
@@ -112,6 +116,40 @@ The extension adds one short discovery hint, retains independent catastrophic-co
 
 ## Agent-invoked memory
 
+### Recommended setup: local memory alongside Graphify
+
+Use **Mnemopi** for durable facts, decisions, and lessons. It stores memories in local SQLite databases and supports the native save/search operations used by Useful Skills. Graphify remains responsible for code relationships; the two backends complement each other and use separate storage.
+
+For a lightweight, project-isolated setup, copy these commands into your terminal:
+
+```bash
+omp config set memory.backend mnemopi
+omp config set mnemopi.scoping per-project
+omp config set mnemopi.autoRetain false
+omp config set mnemopi.noEmbeddings true
+omp config set mnemopi.llmMode none
+```
+
+This enables explicit memory saves and full-text search without automatically retaining conversation turns, loading embedding models, or making memory-related LLM calls. Full-text search matches words rather than providing embedding-based semantic similarity. These settings configure OMP's native backend; Useful Skills does not change them automatically.
+
+If you use a named profile, apply every command to that profile—for example, `omp --profile work config set memory.backend mnemopi`. Restart OMP after configuring it. Then run this **inside OMP**, not in your shell:
+
+```text
+/memory diagnose
+```
+
+Ask the assistant to check memory status and verify a small save/search round trip. The native backend should report `mnemopi`, not `off`; a save is successful only when storage is confirmed.
+
+| `us_memory` action | Backend and purpose |
+| --- | --- |
+| `build` / `query` | Graphify: refresh or query the code graph |
+| `save` / `search` | Mnemopi: store or retrieve durable facts |
+| `status` | Check both native memory and Graphify |
+
+Enabling Mnemopi does not replace or rebuild Graphify. Searching saved facts does not search the code graph, and rebuilding the graph does not update saved facts. Existing fallback `notes.md` files are not imported automatically. With native memory set to `off`, Graphify still works, but native saves/searches are unavailable.
+
+### Tool contract and managed graph storage
+
 The model follows `us-memory` automatically; the user need not run Graphify or a memory command. The essential `us_memory` tool exposes only:
 
 ```text
@@ -121,6 +159,8 @@ The model follows `us-memory` automatically; the user need not run Graphify or a
 { action: "search", query: "..." }
 { action: "save", content: "..." }
 ```
+
+Unused `query` and `content` fields may be omitted or set to `null` when a provider requires every schema property. For example, `{ action: "status", query: null, content: null }` is valid. Active payloads must still be non-empty text; unknown fields and non-null payloads belonging to another action are rejected.
 
 `status` is read-only. `search/save` adapt the current native OMP backend, reporting unavailable/failed/queued outcomes honestly. Secret-shaped facts are rejected **before** native storage, not merely redacted afterward. Only actual storage is reported as saved. This detector is a backstop, not a guarantee.
 
@@ -146,6 +186,12 @@ Narrative facts complement Graphify's code relationships. With no native backend
 ## Focused audits and delivery
 
 Security/performance audits default to read-only local investigation. No production probing, automatic fixes, or implicit profiler installation. Explicit code-quality invocation merges [the quality template](skills/us-check-code-quality/CODE_QUALITY.md) into `.agents/CODE_QUALITY.md`, preserving project-specific guidance; it does not authorize application edits.
+
+`us-improve-codebase-architecture` investigates architectural friction and presents evidence-backed candidates with before/after diagrams, tradeoffs, and a recommendation. It respects existing domain language and architectural decisions. Selecting a candidate leads into the existing research, clarification, and plan-approval process; discovery alone does not authorize refactoring or documentation edits.
+
+`us-improve-code-coverage` measures existing coverage and prioritizes uncovered public behavior, branches, and failure paths. Test changes require plan approval and before/after results use the same measurement scope. Missing coverage tooling is reported, not silently installed; empty projects do not acquire invented tests. The skill does not lower thresholds, hide uncovered code, or silently fix production bugs.
+
+Both skills reuse the owned implementation, correctness/security review, and memory guidance after approval. They add no runtime dependency or separate workflow executor.
 
 `us-open-pr` inspects all outgoing history/diffs, preserves unrelated staged/worktree changes, pushes the reviewed feature head, creates or reuses the exact head/base PR, and verifies URL and head SHA. It never silently rebases, force-pushes, changes destination, or merges.
 

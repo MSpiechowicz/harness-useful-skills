@@ -21,6 +21,8 @@ Call only these argument variants:
 - `{ action: "search", query: "..." }` to search configured native memory.
 - `{ action: "save", content: "..." }` to save one durable, secret-free native-memory fact (maximum 16,384 characters).
 
+If the provider requires every schema property, pass `null` for unused `query` and `content` fields instead of inventing placeholder text. For example, `{ action: "build", query: null, content: null }` and `{ action: "save", query: null, content: "..." }` are valid. The active text field must remain non-empty; do not send unknown fields or a non-null inactive payload.
+
 Read returned `backend`, `paths`, results, and `error`; do not describe a requested operation as successful until its observed result says so. The tool resolves the current workspace and profile, keeps graph output and fallback notes outside the checkout, and prepares pinned Graphify dependencies only for an explicit `build` or `query`. It does not choose a workflow, call a worker, approve work, or perform another memory action implicitly.
 
 ## During research

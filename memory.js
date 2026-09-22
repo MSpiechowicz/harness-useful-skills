@@ -5,15 +5,15 @@ const MAX_QUERY_CHARS = 4_096;
 const MAX_SAVE_CHARS = 16_384;
 
 // Keep root properties explicit: provider serializers do not preserve root-only unions.
-// executeMemory enforces the exact action variants at the runtime boundary.
+// Nullable payloads remain expressible when providers require every schema property.
 export const MEMORY_PARAMETERS = {
   type: "object",
   additionalProperties: false,
   required: ["action"],
   properties: {
     action: { type: "string", enum: ["status", "build", "query", "search", "save"] },
-    query: { type: "string", minLength: 1, maxLength: MAX_QUERY_CHARS, description: "Required only for query or search; omit for other actions." },
-    content: { type: "string", minLength: 1, maxLength: MAX_SAVE_CHARS, description: "Required only for save; omit for other actions. Secret-free durable fact." },
+    query: { type: ["string", "null"], minLength: 1, maxLength: MAX_QUERY_CHARS, description: "Required non-empty text for query/search. For other actions omit or pass null." },
+    content: { type: ["string", "null"], minLength: 1, maxLength: MAX_SAVE_CHARS, description: "Required secret-free durable fact for save. For other actions omit or pass null." },
   },
 };
 
@@ -140,31 +140,34 @@ export async function executeMemory(args, { cwd, agentDir, memory, signal } = {}
   } catch (error) {
     return { ok: false, backend: "us_memory", paths: undefined, error: errorMessage(error) };
   }
-  if (!validObject(args) || typeof args.action !== "string") {
+  if (!validObject(args) || !Object.hasOwn(args, "action") || typeof args.action !== "string") {
     return invalidArguments(paths, "Memory arguments require one supported action.");
+  }
+  const payload = args.action === "query" || args.action === "search" ? "query" : args.action === "save" ? "content" : undefined;
+  for (const key of Object.keys(args)) {
+    if (key === "action") continue;
+    if (key !== "query" && key !== "content") {
+      return invalidArguments(paths, "Memory arguments contain an unknown field.");
+    }
+    if (key !== payload && args[key] != null) {
+      return invalidArguments(paths, "Unused memory payload fields must be omitted or null.");
+    }
+  }
+  if (payload) {
+    const error = validateText(Object.hasOwn(args, payload) ? args[payload] : undefined, payload, payload === "query" ? MAX_QUERY_CHARS : MAX_SAVE_CHARS);
+    if (error) return invalidArguments(paths, error);
   }
   switch (args.action) {
     case "status":
-      if (Object.keys(args).length !== 1) return invalidArguments(paths, "status accepts no additional arguments.");
       return memoryStatus({ cwd, agentDir, memory, paths });
     case "build":
-      if (Object.keys(args).length !== 1) return invalidArguments(paths, "build accepts no additional arguments.");
       return buildGraph({ cwd, agentDir, signal });
-    case "query": {
-      if (Object.keys(args).length !== 2) return invalidArguments(paths, "query accepts only action and query.");
-      const error = validateText(args.query, "query", MAX_QUERY_CHARS);
-      return error ? invalidArguments(paths, error) : queryGraph({ cwd, agentDir, query: args.query, signal });
-    }
-    case "search": {
-      if (Object.keys(args).length !== 2) return invalidArguments(paths, "search accepts only action and query.");
-      const error = validateText(args.query, "query", MAX_QUERY_CHARS);
-      return error ? invalidArguments(paths, error) : nativeSearch(memory, args.query, paths);
-    }
-    case "save": {
-      if (Object.keys(args).length !== 2) return invalidArguments(paths, "save accepts only action and content.");
-      const error = validateText(args.content, "content", MAX_SAVE_CHARS);
-      return error ? invalidArguments(paths, error) : nativeSave(memory, args.content, paths);
-    }
+    case "query":
+      return queryGraph({ cwd, agentDir, query: args.query, signal });
+    case "search":
+      return nativeSearch(memory, args.query, paths);
+    case "save":
+      return nativeSave(memory, args.content, paths);
     default:
       return invalidArguments(paths, `Unsupported memory action: ${args.action}.`);
   }

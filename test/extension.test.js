@@ -67,6 +67,28 @@ test("the registered memory tool performs explicit native actions, not startup h
   assert.equal(invalid.isError, true);
 });
 
+test("registered memory saves remain searchable with nullable transport fields", async t => {
+  const f = await fixture(t);
+  const facts = [];
+  f.ctx.memory = {
+    save: async ({ content }) => { facts.push(content); return { backend: "local", stored: 1 }; },
+    search: async query => {
+      const items = facts.filter(content => content.includes(query)).map(content => ({ content }));
+      return { backend: "local", count: items.length, items };
+    },
+  };
+  const memory = f.tools.get("us_memory");
+  const save = await memory.execute("save", { action: "save", query: null, content: "Keep fixture dimensions in meters." }, undefined, undefined, f.ctx);
+  assert.equal(save.details.ok, true);
+  const search = await memory.execute("search", { action: "search", query: "meters", content: null }, undefined, undefined, f.ctx);
+  assert.equal(search.details.ok, true);
+  assert.deepEqual(search.details.observation.items, [{ content: "Keep fixture dimensions in meters." }]);
+  const rejected = await memory.execute("secret", { action: "save", query: null, content: "token=" + "x".repeat(24) }, undefined, undefined, f.ctx);
+  assert.equal(rejected.isError, true);
+  assert.match(rejected.details.error, /secret-shaped/i);
+  assert.deepEqual(facts, ["Keep fixture dimensions in meters."]);
+});
+
 test("memory approval tiers keep observation readable and mutations gated", async t => {
   const f = await fixture(t);
   const approval = f.tools.get("us_memory").approval;

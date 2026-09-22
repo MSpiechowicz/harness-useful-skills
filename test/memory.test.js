@@ -67,6 +67,38 @@ test("native status distinguishes disabled backend from healthy availability", a
   }
 });
 
+test("nullable inactive payloads preserve status and query behavior", async t => {
+  const ctx = await fixture(t, {
+    status: async () => ({ backend: "local", active: true }),
+    search: async () => ({ backend: "local", count: 0, items: [] }),
+  });
+  const status = await executeMemory({ action: "status", query: null, content: null }, ctx);
+  assert.equal(status.ok, true);
+  assert.equal(status.graph.available, false);
+  const search = await executeMemory({ action: "search", query: "units", content: null }, ctx);
+  assert.equal(search.ok, true);
+  assert.deepEqual(search.observation.items, []);
+  const query = await executeMemory({ action: "query", query: "units", content: null }, ctx);
+  assert.equal(query.ok, false);
+  assert.match(query.error, /No active graph/);
+});
+
+test("conflicting payloads and unknown fields never reach storage", async t => {
+  let calls = 0;
+  const ctx = await fixture(t, {
+    save: async () => { calls++; return { backend: "local", stored: 1 }; },
+  });
+  for (const args of [
+    { action: "save", content: "Use meters.", query: "units" },
+    { action: "save", content: "Use meters.", extra: null },
+    { action: "save", content: "Use meters.", extra: undefined },
+    { action: "save", content: null, query: null },
+    { action: "save", content: " ", query: null },
+    { action: "save", content: "Use meters.", query: "" },
+  ]) assert.equal((await executeMemory(args, ctx)).ok, false);
+  assert.equal(calls, 0);
+});
+
 test("search accepts a real empty result but not a disabled backend", async t => {
   const ctx = await fixture(t);
   for (const backend of ["off", "local"]) {
