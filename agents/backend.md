@@ -1,5 +1,5 @@
 ---
-name: us-backend
+name: backend
 description: Implements bounded approved backend server, API, and storage work packages.
 model: ["@backend", "@implementation"]
 spawns: false

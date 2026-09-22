@@ -1,6 +1,6 @@
 # Native implementation work-package brief
 
-Load `skill://us-concise` before responding. This brief assigns exactly one approved, classified work package to its selected native worker: frontend uses `us-frontend` (`@frontend`, then `@implementation`), backend uses `us-backend` (`@backend`, then `@implementation`), and genuinely neither uses `task` (normally `@implementation`). `task.agentModelOverrides[agentName]` always wins; agent frontmatter and configured roles do not prove the observed running model. The parent selects the classification and worker; the worker must not select or claim a model. Perform only the assigned task. Do not launch the full workflow, delegate again, publish, commit, push, merge, open a PR, or alter files outside this assignment.
+Load `skill://us-concise` before responding. This brief assigns exactly one approved, classified work package to its selected native worker: frontend uses `frontend` (`@frontend`, then `@implementation`), backend uses `backend` (`@backend`, then `@implementation`), and genuinely neither uses `task` (normally `@implementation`). `task.agentModelOverrides[agentName]` always wins; agent frontmatter and configured roles do not prove the observed running model. The parent selects the classification and worker; the worker must not select or claim a model. Perform only the assigned task. Do not launch the full workflow, delegate again, publish, commit, push, merge, open a PR, or alter files outside this assignment.
 
 ## Objective
 

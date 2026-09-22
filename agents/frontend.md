@@ -1,5 +1,5 @@
 ---
-name: us-frontend
+name: frontend
 description: Implements bounded approved frontend UI, UX, and client work packages.
 model: ["@frontend", "@implementation"]
 spawns: false

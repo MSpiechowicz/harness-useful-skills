@@ -7,7 +7,7 @@ description: Use automatically after clarification and source research to turn a
 
 Load `skill://us-concise`. Use evidence from `skill://us-research` and settled decisions from `skill://us-grill-me`; inspect additional source only to close a concrete gap. A plan is a human-readable handoff, not a workflow database.
 
-Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `skill://us-workflow`; that guidance does not launch the workflow. Ordinary installed startup supplies the narrowly scoped session-local policy required for the bounded planner stage, so no host override, prompt file, or extra startup flag is needed. The parent must first complete research and own scope, decomposition, and integration in the active session workspace; it never selects a repository globally. It then dispatches the advertised native `us-planner` worker to draft a bounded implementation plan from that evidence. Existing mappings remain authoritative. The registration declares `model: @plan`; `task.agentModelOverrides.us-planner` takes precedence, and OMP uses its native fallback only after frontmatter. Neither configuration nor frontmatter proves the running worker's model. Do not pass a model, switch models, or edit user configuration. Report configured routing separately from actual worker/model metadata when available. Stronger host policy can still prohibit the stage.
+Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `skill://us-workflow`; that guidance does not launch the workflow. Ordinary installed startup supplies the narrowly scoped session-local policy required for the bounded planner stage, so no host override, prompt file, or extra startup flag is needed. The parent must first complete research and own scope, decomposition, and integration in the active session workspace; it never selects a repository globally. It then dispatches the advertised native `planner` worker to draft a bounded implementation plan from that evidence. Existing mappings remain authoritative. The registration declares `model: @plan`; `task.agentModelOverrides.planner` takes precedence, and OMP uses its native fallback only after frontmatter. Neither configuration nor frontmatter proves the running worker's model. Do not pass a model, switch models, or edit user configuration. Report configured routing separately from actual worker/model metadata when available. Stronger host policy can still prohibit the stage.
 
 ## Inputs
 
@@ -15,13 +15,13 @@ Require the requested outcome, research brief, repository conventions, current c
 
 ## Dispatch and integrate one actionable plan
 
-Give `us-planner` the requested outcome, research brief, repository conventions, constraints, proposed work-package boundaries, and unresolved risks. Its draft is read-only: it does not edit, delegate, launch a workflow, or request approval. The parent checks it against current evidence, resolves factual conflicts, and integrates it into one complete plan.
+Give `planner` the requested outcome, research brief, repository conventions, constraints, proposed work-package boundaries, and unresolved risks. Its draft is read-only: it does not edit, delegate, launch a workflow, or request approval. The parent checks it against current evidence, resolves factual conflicts, and integrates it into one complete plan.
 
 State:
 
 - acceptance criteria and non-goals observable by a user or consumer;
 - exact files to create or change, relevant symbols, interfaces/contracts, data migration or dependency effects, and callers that must move together;
-- ordered work packages with ownership boundaries and a frontend, backend, or genuinely neither classification: frontend uses `us-frontend` with `@frontend` then `@implementation`, backend uses `us-backend` with `@backend` then `@implementation`, and only genuinely neither work—such as documentation or tooling—uses `task`/`@implementation`; split mixed packages where coherent, retain dependencies serial, and run only ready disjoint packages in parallel;
+- ordered work packages with ownership boundaries and a frontend, backend, or genuinely neither classification: frontend uses `frontend` with `@frontend` then `@implementation`, backend uses `backend` with `@backend` then `@implementation`, and only genuinely neither work—such as documentation or tooling—uses `task`/`@implementation`; split mixed packages where coherent, retain dependencies serial, and run only ready disjoint packages in parallel;
 - meaningful behavioral verification for each changed surface, including an empty project; missing existing scripts is not permission to omit verification;
 - test changes only where a plausible behavioral regression needs lasting coverage, plus a throwaway smoke path where that is more appropriate;
 - correctness and security review scope, repair path, documentation/cleanup impact, risks, and explicit unresolved decisions.
@@ -40,4 +40,4 @@ Record the research evidence, configured planner route and any observed worker m
 
 ## Failure behavior
 
-If `us-planner` is absent, prohibited by a stronger host policy, or its required role selector cannot resolve, report the exact limitation. Do not invent an agent or model, silently draft the planner's work in the parent, or describe a fallback as successful `us-planner` routing. If research evidence conflicts or the plan would require undeclared scope, surface the conflict and return to research or the user. Do not edit code while awaiting approval.
+If `planner` is absent, prohibited by a stronger host policy, or its required role selector cannot resolve, report the exact limitation. Do not invent an agent or model, silently draft the planner's work in the parent, or describe a fallback as successful `planner` routing. If research evidence conflicts or the plan would require undeclared scope, surface the conflict and return to research or the user. Do not edit code while awaiting approval.

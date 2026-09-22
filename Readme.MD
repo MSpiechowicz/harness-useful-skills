@@ -57,7 +57,7 @@ flowchart TD
 
 Verification failures return to implementation. Repairs repeat verification and **both** reviews. Three unsuccessful repair rounds or repeated no progress stop the loop; memory failures prevent claiming the full workflow complete. Publication is a separate, explicitly authorized action—not the next automatic step.
 
-The parent owns the objective, research scope, native todo list, acceptance, approval, and integration. Research uses a read-only worker; after the parent completes research, the native `us-planner` worker drafts a bounded plan. The plan classifies each implementation package as frontend, backend, or genuinely neither. After approval, frontend packages use `us-frontend`, backend packages use `us-backend`, and only genuinely neither packages—such as documentation or tooling—use native `task`; every class includes a single package when applicable. Mixed packages split at that boundary where coherent, and dependencies remain serial. Independent ready packages run in parallel only with disjoint ownership. Existing session plans/transcripts support interruption recovery.
+The parent owns the objective, research scope, native todo list, acceptance, approval, and integration. Research uses a read-only worker; after the parent completes research, the native `planner` worker drafts a bounded plan. The plan classifies each implementation package as frontend, backend, or genuinely neither. After approval, frontend packages use `frontend`, backend packages use `backend`, and only genuinely neither packages—such as documentation or tooling—use native `task`; every class includes a single package when applicable. Mixed packages split at that boundary where coherent, and dependencies remain serial. Independent ready packages run in parallel only with disjoint ownership. Existing session plans/transcripts support interruption recovery.
 
 With ordinary startup after installation, the extension adds a session-local policy alongside its discovery hint; each is added independently and at most once. Only when a relevant `us-*` workflow requires a native stage, the policy permits that required stage. It covers the bounded planner draft after parent research and the selected native implementation worker after approval, including a single package. The parent uses only the active session workspace; the policy never selects a repository globally. It neither authorizes general extra delegation nor starts a workflow, dispatches workers, builds Graphify, or writes workflow state at session open.
 
@@ -100,19 +100,19 @@ No extension-command wrapper is installed for each skill. Add a matching `skills
 
 ## Native model configuration
 
-Useful Skills bundles native `us-planner`, `us-frontend`, and `us-backend` agents; it does not add a model router or workflow executor. Ordinary installed startup needs no role mapping, global host override, prompt file, or extra flag for the session-local workflow-stage policy. Existing OMP mappings remain authoritative. If you want to choose distinct mappings, use OMP's native roles in the active profile, project configuration, overlays, or runtime options; Useful Skills never changes them.
+Useful Skills bundles native `planner`, `frontend`, and `backend` agents; it does not add a model router or workflow executor. Ordinary installed startup needs no role mapping, global host override, prompt file, or extra flag for the session-local workflow-stage policy. Existing OMP mappings remain authoritative. If you want to choose distinct mappings, use OMP's native roles in the active profile, project configuration, overlays, or runtime options; Useful Skills never changes them.
 
 Open `/model`, then the **Roles** view, to optionally assign and persist role mappings. This example uses only OpenAI Codex selectors; availability depends on your OMP model catalog and credentials, not on this table.
 
 | Role | Native task agent | Example model |
 | --- | --- | --- |
 | `research` | `scout` | `openai-codex/gpt-5.6-luna:xhigh` |
-| `frontend` | `us-frontend` | `openai-codex/gpt-5.6-terra:high` |
-| `backend` | `us-backend` | `openai-codex/gpt-5.6-terra:high` |
+| `frontend` | `frontend` | `openai-codex/gpt-5.6-terra:high` |
+| `backend` | `backend` | `openai-codex/gpt-5.6-terra:high` |
 | `implementation` | `task` (genuinely neither frontend nor backend) | `openai-codex/gpt-5.6-terra:high` |
 | `review` | `reviewer` | `openai-codex/gpt-6-astra:medium` |
 | `security` | `security-reviewer` | `openai-codex/gpt-5.6-sol:high` |
-| `plan` | `us-planner` (bundled, read-only) | `openai-codex/gpt-6-astra:high` |
+| `plan` | `planner` (bundled, read-only) | `openai-codex/gpt-6-astra:high` |
 
 ```yaml
 modelRoles:
@@ -127,17 +127,17 @@ modelRoles:
 task:
   agentModelOverrides:
     scout: "@research"
-    us-frontend: "@frontend"
-    us-backend: "@backend"
+    frontend: "@frontend"
+    backend: "@backend"
     task: "@implementation"
     reviewer: "@review"
     security-reviewer: "@security"
-    us-planner: "@plan"
+    planner: "@plan"
 ```
 
-Native dispatch selects an **agent type**, not a model. For every dispatched agent, `task.agentModelOverrides[agentName]` always wins; otherwise OMP uses the agent's `model` frontmatter and then its native fallback. Role aliases such as `@review` resolve through `modelRoles`. `us-frontend` and `us-backend` prioritize `@frontend` and `@backend` respectively, then `@implementation`; `us-planner` declares `model: "@plan"`. These optional mappings and frontmatter do not prove the running worker's model. Do not edit user configuration automatically.
+Native dispatch selects an **agent type**, not a model. For every dispatched agent, `task.agentModelOverrides[agentName]` always wins; otherwise OMP uses the agent's `model` frontmatter and then its native fallback. Role aliases such as `@review` resolve through `modelRoles`. `frontend` and `backend` prioritize `@frontend` and `@backend` respectively, then `@implementation`; `planner` declares `model: "@plan"`. These optional mappings and frontmatter do not prove the running worker's model. Do not edit user configuration automatically.
 
-Loading a skill or defining a role does not execute that role's model. The installed extension's session-local policy permits the relevant stage only: `us-plan` dispatches a bounded `us-planner` draft after parent research, and `us-implement` dispatches `us-frontend`, `us-backend`, or `task` after approval according to the package classification, including a single package. The parent integrates the plan and requests approval before implementation. Report configured routing separately from actual worker/model metadata when it is available.
+Loading a skill or defining a role does not execute that role's model. The installed extension's session-local policy permits the relevant stage only: `us-plan` dispatches a bounded `planner` draft after parent research, and `us-implement` dispatches `frontend`, `backend`, or `task` after approval according to the package classification, including a single package. The parent integrates the plan and requests approval before implementation. Report configured routing separately from actual worker/model metadata when it is available.
 
 After ordinary installation and restart, the package advertises its native agents and adds its session-local policy without extra configuration. If an agent is absent, no allowed configured/frontmatter/native route resolves, runtime metadata is unavailable, or stronger host policy prohibits delegation, report the specific limitation rather than silently doing the work in the parent or claiming the requested model ran. A permitted fallback must be identified with its actual routing; it is not proof of the requested role's execution. See [Native model routing](skills/us-workflow/SKILL.md#native-model-routing) for the shared guidance; loading it does not launch the workflow.
 
@@ -267,7 +267,7 @@ The linked PR uses `Closes #N` when it fully resolves the issue and targets the 
 
 ## Updates and releases
 
-`update check` is quiet/read-only at interactive startup; explicit failures are reported. `update install` immediately announces that Useful Skills is updating through OMP's native plugin manager, then reports the result. It retains native active-install ownership, scope/profile, and stable-version checks. Only the active unambiguous marketplace installation is upgraded. Restart OMP afterward.
+`update check` is quiet/read-only at interactive startup; explicit failures are reported. `update install` immediately announces that Useful Skills is updating through OMP's native plugin manager, then reports the result. It retains native active-install ownership, scope/profile, and stable-version checks. Only the active unambiguous marketplace installation is upgraded. After a published release, installed copies receive the new agents only after **Update → Install** and restart.
 
 The existing single-plugin release transaction is unchanged: CI checks precede the atomic package/marketplace version commit and branch/tag push by `release.py`. No publication is performed merely by implementing a plan. Python 3.10+ is needed for release-development checks, not normal plugin installation.
 
