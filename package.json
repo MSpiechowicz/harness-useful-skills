@@ -12,6 +12,7 @@
     "update": "node ./useful-skills update"
   },
   "omp": {
-    "extensions": ["./extension.js"]
+    "extensions": ["./extension.js"],
+    "agents": ["./agents"]
   }
 }

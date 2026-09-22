@@ -41,8 +41,8 @@ Ask naturally: “I want to build a rocket simulator.” `us-workflow` guides th
 flowchart TD
     request["Request"] --> clarify["Clarify choices"]
     clarify --> research["Research"]
-    research --> plan["Plan + approval"]
-    plan --> implement["Implement"]
+    research --> plan["Planner worker + approval"]
+    plan --> implement["Implementation workers"]
     implement --> verify["Verify behavior"]
     verify --> correctness["Correctness review"]
     correctness --> security["Security review"]
@@ -57,7 +57,7 @@ flowchart TD
 
 Verification failures return to implementation. Repairs repeat verification and **both** reviews. Three unsuccessful repair rounds or repeated no progress stop the loop; memory failures prevent claiming the full workflow complete. Publication is a separate, explicitly authorized action—not the next automatic step.
 
-The parent owns the objective, native todo list, plan, acceptance, and integration. Research uses a read-only worker. Independent ready work uses native parallel `task` calls with disjoint ownership; shared files and real dependencies stay serial. Existing session plans/transcripts support interruption recovery.
+The parent owns the objective, research scope, native todo list, acceptance, approval, and integration. Research uses a read-only worker; the native `us-planner` worker drafts the scoped implementation plan. After approval, native `task` workers implement even a single work package. Independent ready packages run in parallel with disjoint ownership; shared files and real dependencies stay serial. Existing session plans/transcripts support interruption recovery.
 
 These are prompt instructions, **not enforced stage transitions**. They cannot guarantee model compliance. Ordinary explanations and explicitly focused audits do not start the full development workflow. Plan approval does not authorize publication.
 
@@ -66,8 +66,8 @@ These are prompt instructions, **not enforced stage transitions**. They cannot g
 | `us-workflow` | Natural build/fix/change/refactor requests; composes the development flow |
 | `us-grill-me` | Consequential unresolved product/engineering choices; inspect before asking |
 | `us-research` | Current code, callers, conventions, documentation, and memory before planning |
-| `us-plan` | Concrete acceptance, interfaces, ownership, verification, and one approval |
-| `us-implement` | Approved implementation and in-scope repair; native independent workers |
+| `us-plan` | Native planner dispatch, concrete acceptance and ownership, one approval |
+| `us-implement` | Approved implementation and repairs through native `task` workers |
 | `us-review` | Fresh evidence-based correctness review against acceptance |
 | `us-memory` | Automatic research recall and verified-completion graph/fact updates |
 | `us-concise` | Caveman-lite context/prose guidance; preserves technical meaning and exact text |
@@ -98,7 +98,7 @@ No extension-command wrapper is installed for each skill. Add a matching `skills
 
 ## Native model configuration
 
-Useful Skills does not add a model router or agent catalog. Configure OMP's native role aliases in the active profile/global config—normally `~/.omp/agent/config.yml`; use `omp config path` if the active profile relocates that directory. A repository can override them in `<repo>/.omp/config.yml`. Project settings override global settings; CLI overlays and runtime options override both.
+Useful Skills bundles one native read-only agent, `us-planner`; it does not add a model router or workflow executor. Configure OMP's native role aliases in the active profile/global config—normally `~/.omp/agent/config.yml`; use `omp config path` if the active profile relocates that directory. A repository can override them in `<repo>/.omp/config.yml`. Project settings override global settings; CLI overlays and runtime options override both.
 
 Open `/model`, then the **Roles** view, to assign and persist role mappings. This example uses only OpenAI Codex selectors; availability depends on your OMP model catalog and credentials, not on this table.
 
@@ -108,7 +108,7 @@ Open `/model`, then the **Roles** view, to assign and persist role mappings. Thi
 | `implementation` | `task` | `openai-codex/gpt-5.6-terra:high` |
 | `review` | `reviewer` | `openai-codex/gpt-6-astra:medium` |
 | `security` | `security-reviewer` | `openai-codex/gpt-5.6-sol:high` |
-| `plan` | Parent-owned planning; no worker agent | `openai-codex/gpt-6-astra:high` |
+| `plan` | `us-planner` (bundled, read-only) | `openai-codex/gpt-6-astra:high` |
 
 ```yaml
 modelRoles:
@@ -124,11 +124,16 @@ task:
     task: "@implementation"
     reviewer: "@review"
     security-reviewer: "@security"
+    us-planner: "@plan"
 ```
 
-Native `task` dispatch selects an **agent type**, not a model. For a dispatched agent, model selection is `task.agentModelOverrides` first, then that agent's `model` frontmatter, then OMP's native fallback (the parent’s active model and its configured/default fallback). Role aliases such as `@review` resolve through `modelRoles`. If a mapping is absent, preserve native fallback and report the limitation—do not edit user configuration automatically.
+Native `task` dispatch selects an **agent type**, not a model. For a dispatched agent, model selection is `task.agentModelOverrides` first, then that agent's `model` frontmatter, then OMP's native fallback (the parent’s active model and its configured/default fallback). Role aliases such as `@review` resolve through `modelRoles`. The bundled `us-planner` declares `model: "@plan"`, so its override above is optional; an existing user override wins. Do not edit user configuration automatically.
 
-Planning remains parent-owned: the `plan` role configures planning, but it has no native task-agent mapping, and loading `us-plan` does not switch the session model. See [Native model routing](skills/us-workflow/SKILL.md#native-model-routing) for the shared workflow guidance; loading that guidance does not launch the workflow.
+Loading a skill or defining a role does not execute that role's model. `us-plan` explicitly dispatches `us-planner`; `us-implement` explicitly dispatches `task`, including for a single package and in-scope repairs. The parent integrates the plan and requests approval before implementation. Report configured routing separately from observed worker/model metadata.
+
+Load the package directory and restart OMP so `us-planner` is advertised. If an agent is absent, a role cannot resolve, or stronger host policy prohibits delegation, report the specific limitation rather than silently doing the work in the parent or claiming the requested model ran. A permitted fallback must be identified with its actual routing; it is not proof of the requested role's execution. See [Native model routing](skills/us-workflow/SKILL.md#native-model-routing) for the shared guidance; loading it does not launch the workflow.
+
+Some hosts require parent-only planning or prohibit delegating a single work package. Those higher-priority policies still block the corresponding stage; this package cannot override them. Adjusting such host policy requires a separate user-authorized configuration change. Restarting OMP enables discovery but does not remove a policy conflict.
 
 ## Management and optional library
 
