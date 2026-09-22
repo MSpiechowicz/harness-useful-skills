@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -32,6 +32,58 @@ async function fixture(t, hasUI = true) {
   };
   return { root, commands, events, tools, messages, timers, ctx };
 }
+
+test("install reports progress before completion without duplicating a busy operation", async t => {
+  const bin = await mkdtemp(path.join(os.tmpdir(), "us-update-bin-"));
+  const originalPath = process.env.PATH;
+  t.after(async () => {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    await rm(bin, { recursive: true, force: true });
+  });
+  await writeFile(path.join(bin, "omp"), `#!${process.execPath}
+if (process.argv.slice(-3).join(" ") !== "plugin list --json") process.exit(1);
+console.log(JSON.stringify({ marketplace: [] }));
+`, { mode: 0o755 });
+  process.env.PATH = bin;
+  t.mock.method(globalThis, "fetch", async () => new Response(null, { status: 404 }));
+
+  for (const hasUI of [true, false]) {
+    await t.test(hasUI ? "interactive" : "headless", async t => {
+      const f = await fixture(t, hasUI);
+      const handler = f.commands.get("useful-skills").handler;
+      const install = handler("update install", f.ctx);
+      try {
+        assert.equal(f.messages.length, 1, "progress must be visible while install is pending");
+        assert.match(f.messages[0].message, /updating.*useful skills/i);
+        if (hasUI) assert.equal(f.messages[0].level, "info");
+        else assert.deepEqual(f.messages[0].options, { triggerTurn: false });
+        await handler("update install", f.ctx);
+        assert.equal(f.messages.length, 2, "busy request must not emit another progress notice");
+        assert.match(f.messages[1].message, /already running/i);
+      } finally {
+        await install;
+      }
+      assert.match(f.messages.at(-1).message, /update failed.*source checkouts are never overwritten/i);
+
+      f.messages.length = 0;
+      const retry = handler("update install", f.ctx);
+      assert.match(f.messages[0]?.message ?? "", /updating.*useful skills/i);
+      await retry;
+
+      f.messages.length = 0;
+      const check = handler("update check", f.ctx);
+      assert.deepEqual(f.messages, [], "check must not announce an installation");
+      await check;
+      assert.doesNotMatch(f.messages.at(-1).message, /updating/i);
+      f.messages.length = 0;
+      await f.events.get("session_start")({}, f.ctx);
+      if (hasUI) await f.timers[0]();
+      assert.deepEqual(f.messages, [], "startup without an available update must remain quiet");
+      assert.deepEqual(await readdir(f.root), []);
+    });
+  }
+});
 
 test("startup and prompts only advertise skills, without memory or workflow side effects", async t => {
   const f = await fixture(t);

@@ -38,6 +38,7 @@ export default function usefulSkills(pi) {
     }
     busy = true;
     try {
+      if (action === "install") notify(ctx, "Updating Useful Skills through OMP's native plugin manager…");
       const report = await runUpdate(action, { cwd: ctx.cwd, profile: process.env.OMP_PROFILE });
       if (report.updated) notify(ctx, `Useful Skills updated to ${report.currentVersion}. Restart OMP to load the update.`);
       else if (report.updateAvailable) notify(ctx, `Useful Skills update available: ${report.currentVersion} → ${report.latestVersion}. Run /useful-skills update install.`, "warning");
