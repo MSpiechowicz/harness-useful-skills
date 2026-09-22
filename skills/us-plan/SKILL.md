@@ -7,6 +7,8 @@ description: Use automatically after clarification and source research to turn a
 
 Load `skill://us-concise`. Use the evidence from `skill://us-research` and settled decisions from `skill://us-grill-me`; inspect additional source only to close a concrete gap. A plan is a human-readable handoff, not a workflow database.
 
+Planning remains parent-owned. The configured `modelRoles.plan` is available through OMP's native planning selection; loading this skill does not activate that selection, switch models, or imply a planner worker. If another stage later needs a worker, load the **Native model routing** guidance in `skill://us-workflow` first; loading that guidance does not launch the workflow.
+
 ## Inputs
 
 Require the requested outcome, research brief, repository conventions, current constraints, and unresolved risks. If an essential consequence remains unknown, return to `skill://us-grill-me` or mark the smallest experiment needed; do not hide an assumption.

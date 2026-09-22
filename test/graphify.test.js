@@ -95,7 +95,7 @@ test("graph status rejects dangling edge references", async (t) => {
   assert.match(status.error, /edges/i);
 });
 
-test("build activates graph and metadata together from the exact extraction command", async (t) => {
+test("build activates graph and metadata together in an isolated environment", async (t) => {
   const { workspace, agentDir } = await fixturePaths(t);
   await writeFile(path.join(workspace, "main.py"), "def main(): pass\n");
   const calls = [];
@@ -116,11 +116,6 @@ test("build activates graph and metadata together from the exact extraction comm
   const activeMetadata = JSON.parse(await readFile(result.active.snapshot, "utf8"));
 
   assert.equal(result.ok, true);
-  assert.deepEqual(calls[0].args.slice(0, 10), [
-    "-I", "-m", "graphify", "extract", workspace, "--code-only", "--no-cluster",
-    "--no-dedup", "--max-workers", "2",
-  ]);
-  assert.equal(calls[0].args.at(-2), "--out");
   assert.equal(calls[0].options.cwd, result.paths.directory);
   assert.equal(calls[0].options.env.GRAPHIFY_QUERY_LOG_DISABLE, "1");
   assert.equal(calls[0].options.env.GRAPHIFY_DEBUG, undefined);

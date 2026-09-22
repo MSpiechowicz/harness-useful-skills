@@ -15,8 +15,10 @@ Start with the requested behavior, known constraints, the current checkout, and 
 
 1. Perform a bounded initial scope read: locate the likely implementation, callers, tests, configuration, project guidance, and relevant documentation. Follow actual data/control flow rather than isolated snippets.
 2. Load `skill://us-memory` automatically and follow its **During research** procedure before dispatching a worker. Pass only bounded relevant evidence onward. Its strict plan/read-only restrictions remain authoritative; unavailable memory does not block source inspection.
-3. Dispatch one read-only reconnaissance worker after the initial scope read. Use native `scout` only if advertised; otherwise use the advertised general-purpose worker. Give it `skill://us-research/references/scout-brief.md`, bounded retrieved evidence, and the request. The worker reports implementations/callers, conventions, evidence, and uncertainty; it does not edit, plan, or launch a workflow.
-4. Compare worker findings with source. Resolve disagreements by tracing current code. Identify existing reusable patterns, constraints, dependencies, affected interfaces, behavioral checks, and risks.
+3. Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `skill://us-workflow`; loading that guidance does not launch the workflow.
+
+4. Dispatch one read-only reconnaissance worker after the initial scope read. Use native `scout` only if advertised; otherwise use the advertised general-purpose worker. Give it `skill://us-research/references/scout-brief.md`, bounded retrieved evidence, and the request. The worker reports implementations/callers, conventions, evidence, and uncertainty; it does not edit, plan, or launch a workflow.
+5. Compare worker findings with source. Resolve disagreements by tracing current code. Identify existing reusable patterns, constraints, dependencies, affected interfaces, behavioral checks, and risks.
 
 ## Completion evidence
 

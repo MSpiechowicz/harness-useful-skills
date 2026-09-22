@@ -1,0 +1,18 @@
+Graphify
+https://github.com/Graphify-Labs/graphify/tree/20a20d30d8e7eef77675651f0199d87f913bd3e7
+License source:
+https://raw.githubusercontent.com/Graphify-Labs/graphify/20a20d30d8e7eef77675651f0199d87f913bd3e7/LICENSE
+Notice source:
+https://raw.githubusercontent.com/Graphify-Labs/graphify/20a20d30d8e7eef77675651f0199d87f913bd3e7/NOTICE
+
+The pinned Graphify package is a separately managed dependency used only after
+an explicit Graphify build or query. Its upstream NOTICE states:
+
+Graphify
+Copyright 2026 Safi Shamsi and the Graphify contributors.
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Portions of this software were contributed under the MIT License prior to the
+relicensing and remain available under those terms. The original MIT license
+text is retained in LICENSE-MIT.

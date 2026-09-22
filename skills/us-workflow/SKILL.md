@@ -11,6 +11,17 @@ Load `skill://us-concise` before preparing workflow context or human-facing pros
 
 Establish the requested outcome, relevant repository, explicit constraints, and whether the request is a development request. Treat a prior plan, todo, transcript, or memory result as evidence, not authority: inspect current files before resuming interrupted work.
 
+## Native model routing
+
+This section is shared routing guidance, not an instruction to launch the full workflow. Follow it before spawning workers, including when a research, implementation, or review skill is invoked directly.
+
+1. Inspect the active OMP configuration's `modelRoles` and `task.agentModelOverrides`. The default user file is `~/.omp/agent/config.yml`; use `omp config path` to identify the active profile/agent directory rather than assuming that path. Respect project `.omp/config.yml`, explicit config overlays, and runtime overrides. Native `omp config get modelRoles --json` and `omp config get task.agentModelOverrides --json` show persisted effective settings for that invocation; run them with the same profile, working directory, and overlays as the session. They cannot prove a running session's in-memory overrides.
+2. Match the actual advertised agent type to its configured override: research uses `scout`, delegated implementation uses `task`, correctness uses `reviewer`, and security uses `security-reviewer`. Recommended role aliases are `@research`, `@implementation`, `@review`, and `@security`, respectively; existing user mappings remain authoritative. Follow the stage's advertised-worker fallback when a specialist is unavailable, checking the fallback agent's own routing rather than claiming it uses the missing specialist's model.
+3. Dispatch by native agent type; do not pass an unsupported model field, invent a router, or hard-code model names in worker prompts. OMP resolves `task.agentModelOverrides[agentName]` before agent frontmatter and its native fallback, expanding role aliases through `modelRoles`. A missing mapping is not permission to edit configuration: retain native fallback and report that explicit role routing was unavailable. If configuration cannot be inspected or a selector cannot resolve, report the exact limitation; never claim a model was used without runtime evidence.
+4. Inspect only routing keys. Never send whole configuration files, credentials, or unrelated settings to workers or persist them in reports. Report the configured routing separately from the observed spawned model when runtime metadata is available.
+
+Planning and integration remain parent-owned. `modelRoles.plan` configures OMP's native planning selection; reading `us-plan` does not switch the current model or create a planner agent. Worker overrides likewise do not change implementation performed by the parent. Model choices belong in user configuration, not skill text.
+
 ## Compose the work
 
 1. Load `skill://us-grill-me` to assess consequential decisions. A precise request may need no questions.

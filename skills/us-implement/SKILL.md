@@ -18,10 +18,12 @@ Implement only approved tasks and repairs that satisfy their acceptance. The app
 ## Work method
 
 1. Reuse the repository's established implementation and test patterns. For a bug or genuinely uncertain new behavior, establish a behavioral regression that fails before the fix and passes after it. Do not retain tests that merely pin wording, source text, mocks, forwarding, or incidental implementation details.
-2. Use native `task`/`hub` only for genuinely independent, ready tasks with disjoint owned files and settled interfaces. Dispatch those tasks together. Keep overlapping files, shared manifests, and dependent interfaces serial. Use only worker kinds advertised by the native tool; a general-purpose worker may carry a role brief when needed.
-3. Give every implementation worker `skill://us-implement/references/implementation-brief.md`. Assign explicit file ownership and inputs. A worker must not launch the full workflow, publish work, or edit outside its assignment.
-4. Inspect worker output and changed source before accepting it. A worker's completion claim is evidence to check, not proof.
-5. Verify the combined changed surface after the parallel wave settles. Exercise the actual UI, CLI, API, job, or other changed surface when possible; otherwise use a focused smoke script and report that limitation. Keep a lasting test only when it protects a plausible consumer-visible regression.
+2. Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `skill://us-workflow`; loading that guidance does not launch the workflow.
+
+3. Use native `task`/`hub` only for genuinely independent, ready tasks with disjoint owned files and settled interfaces. Dispatch those tasks together. Keep overlapping files, shared manifests, and dependent interfaces serial. Use only worker kinds advertised by the native tool; a general-purpose worker may carry a role brief when needed.
+4. Give every implementation worker `skill://us-implement/references/implementation-brief.md`. Assign explicit file ownership and inputs. A worker must not launch the full workflow, publish work, or edit outside its assignment.
+5. Inspect worker output and changed source before accepting it. A worker's completion claim is evidence to check, not proof.
+6. Verify the combined changed surface after the parallel wave settles. Exercise the actual UI, CLI, API, job, or other changed surface when possible; otherwise use a focused smoke script and report that limitation. Keep a lasting test only when it protects a plausible consumer-visible regression.
 
 Use review findings to perform in-scope repairs. After repair, rerun affected verification and return to `skill://us-review` followed by `skill://us-check-security`; the reviews must be fresh.
 

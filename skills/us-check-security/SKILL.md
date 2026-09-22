@@ -16,6 +16,8 @@ Load `skill://us-concise` before preparing context or findings. This skill audit
 
 ## Independent review
 
+Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `skill://us-workflow`; loading that guidance does not launch the workflow.
+
 For a workflow security review, request a fresh read-only reviewer after correctness review has completed. Use the advertised native `security-reviewer` worker when available; otherwise use the advertised general-purpose worker with the role brief below. Use native task delegation only when the current tool advertises it. A reviewer report is evidence, not permission to change code.
 
 Read `skill://us-check-security/references/security-reviewer-brief.md` and fill every bracketed field. If a worker cannot be dispatched, perform the same bounded analysis yourself and report that limitation; in the development workflow, author self-review does not satisfy the independent-review requirement. Pass material findings to `skill://us-implement` for in-scope repair, then obtain a new correctness review and a new security review after the repair. Do not loop indefinitely: after three unsuccessful repair rounds or repeated no-progress findings, preserve the work and explain the blocker.

@@ -7,6 +7,7 @@ import test from "node:test";
 import { createGraphify, workspaceMemoryPaths } from "../graphify.js";
 
 const validGraph = { nodes: [{ id: "main", source_file: "main.py" }], edges: [] };
+const externalNode = { id: "os", label: "os", file_type: "concept", type: "external", external: true, source_file: "" };
 
 async function fixture(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "us-graph-boundary-"));
@@ -136,6 +137,12 @@ const malformedGraphs = [
   ["empty node id", { nodes: [{ id: "", source_file: "main.py" }], edges: [] }, /unique.*ids/i],
   ["duplicate node ids", { nodes: [validGraph.nodes[0], validGraph.nodes[0]], edges: [] }, /unique.*ids/i],
   ["missing source", { nodes: [{ id: "main" }], edges: [] }, /source_file.*non-empty/i],
+  ["untyped external node", { nodes: [{ ...externalNode, type: "code" }], edges: [] }, /source_file.*non-empty/i],
+  ["external node without concept type", { nodes: [{ ...externalNode, file_type: "code" }], edges: [] }, /source_file.*non-empty/i],
+  ["non-boolean external marker", { nodes: [{ ...externalNode, external: "true" }], edges: [] }, /source_file.*non-empty/i],
+  ["external node missing source field", { nodes: [{ ...externalNode, source_file: undefined }], edges: [] }, /source_file.*non-empty/i],
+  ["external node escaping workspace", { nodes: [{ ...externalNode, source_file: "../outside.py" }], edges: [] }, /escapes the workspace/i],
+  ["external node with credential source", { nodes: [{ ...externalNode, source_file: ".env" }], edges: [] }, /credential-shaped/i],
   ["null edge", { ...validGraph, edges: [null] }, /edges.*reference/i],
   ["missing relation", { ...validGraph, edges: [{ source: "main", target: "main" }] }, /edges.*relation/i],
 ];
@@ -173,6 +180,32 @@ test("empty extraction with links activates a valid zero-source snapshot", async
   assert.equal(status.available, true);
   assert.deepEqual([status.snapshot.nodes, status.snapshot.edges, status.snapshot.sources], [0, 0, 0]);
   assert.deepEqual(JSON.parse(await readFile(status.active.graph, "utf8")), { nodes: [], links: [] });
+});
+
+test("external imports survive publication without being counted as local sources", async (t) => {
+  const f = await fixture(t);
+  const contents = {
+    nodes: [...validGraph.nodes, externalNode],
+    edges: [{ source: "main", target: "os", relation: "imports" }],
+  };
+  const graphify = service({ runProcess: async (_file, args) => extract(args, contents) });
+  const result = await graphify.buildGraph(f.options);
+  assert.equal(result.ok, true, result.error);
+  const status = await graphify.graphStatus(f.options);
+  assert.equal(status.available, true);
+  assert.deepEqual([status.snapshot.nodes, status.snapshot.edges, status.snapshot.sources], [2, 1, 1]);
+  assert.deepEqual(JSON.parse(await readFile(status.active.graph, "utf8")), contents);
+});
+
+test("unresolved AST references remain in the graph without a local source", async (t) => {
+  const f = await fixture(t);
+  const reference = { id: "Path", label: "Path", file_type: "code", source_file: "", source_location: "", _origin: "ast" };
+  const contents = { nodes: [...validGraph.nodes, reference], edges: [{ source: "main", target: "Path", relation: "references" }] };
+  const graphify = service({ runProcess: async (_file, args) => extract(args, contents) });
+  const result = await graphify.buildGraph(f.options);
+  assert.equal(result.ok, true, result.error);
+  assert.equal(result.snapshot.sources, 1);
+  assert.deepEqual(JSON.parse(await readFile(result.active.graph, "utf8")), contents);
 });
 
 test("failed dependency status does not conceal a readable snapshot or trigger setup", async (t) => {

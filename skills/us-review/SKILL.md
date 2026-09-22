@@ -13,6 +13,8 @@ Require the approved plan and acceptance, implementation evidence, changed files
 
 ## Request an independent review
 
+Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `skill://us-workflow`; loading that guidance does not launch the workflow.
+
 Use native `reviewer` only if advertised; otherwise dispatch the advertised general-purpose worker with a correctness-review role. Give it `skill://us-review/references/reviewer-brief.md`. The reviewer must be fresh with respect to the implementation and inspect current source, actual callers, edge conditions, errors, and whether verification proves the stated acceptance.
 
 Sort findings by material impact. Each finding includes severity, confidence, exact file and line/symbol, evidence or a safe reproduction, consumer impact, and concrete repair direction. Distinguish confirmed acceptance failures from risks, missing evidence, and minor suggestions. “No findings” means no issue was found in the reviewed scope, not that the code is universally correct.

@@ -60,6 +60,40 @@ Direct invocation uses OMP's actual syntax:
 
 No extension-command wrapper is installed for each skill. Add a matching `skills/us-example/SKILL.md` with a concrete single-line frontmatter `description`; native shallow discovery and the catalog need no JavaScript registry update. Keep substantial checklists/worker briefs in skill-local references linked through `skill://us-<name>`.
 
+## Native model configuration
+
+Useful Skills does not add a model router or agent catalog. Configure OMP's native role aliases in the active profile/global config—normally `~/.omp/agent/config.yml`; use `omp config path` if the active profile relocates that directory. A repository can override them in `<repo>/.omp/config.yml`. Project settings override global settings; CLI overlays and runtime options override both.
+
+Open `/model`, then the **Roles** view, to assign and persist role mappings. This example uses only OpenAI Codex selectors; availability depends on your OMP model catalog and credentials, not on this table.
+
+| Role | Native task agent | Example model |
+| --- | --- | --- |
+| `research` | `scout` | `openai-codex/gpt-5.6-luna:xhigh` |
+| `implementation` | `task` | `openai-codex/gpt-5.6-terra:high` |
+| `review` | `reviewer` | `openai-codex/gpt-6-astra:medium` |
+| `security` | `security-reviewer` | `openai-codex/gpt-5.6-sol:high` |
+| `plan` | Parent-owned planning; no worker agent | `openai-codex/gpt-6-astra:high` |
+
+```yaml
+modelRoles:
+  research: openai-codex/gpt-5.6-luna:xhigh
+  implementation: openai-codex/gpt-5.6-terra:high
+  review: openai-codex/gpt-6-astra:medium
+  security: openai-codex/gpt-5.6-sol:high
+  plan: openai-codex/gpt-6-astra:high
+
+task:
+  agentModelOverrides:
+    scout: "@research"
+    task: "@implementation"
+    reviewer: "@review"
+    security-reviewer: "@security"
+```
+
+Native `task` dispatch selects an **agent type**, not a model. For a dispatched agent, model selection is `task.agentModelOverrides` first, then that agent's `model` frontmatter, then OMP's native fallback (the parent’s active model and its configured/default fallback). Role aliases such as `@review` resolve through `modelRoles`. If a mapping is absent, preserve native fallback and report the limitation—do not edit user configuration automatically.
+
+Planning remains parent-owned: the `plan` role configures planning, but it has no native task-agent mapping, and loading `us-plan` does not switch the session model. See [Native model routing](skills/us-workflow/SKILL.md#native-model-routing) for the shared workflow guidance; loading that guidance does not launch the workflow.
+
 ## Management and optional library
 
 ```text
@@ -105,6 +139,8 @@ Memory lives outside the checkout:
 
 The tool returns actual graph, snapshot, and fallback `notes.md` paths. Fresh code-only extraction replaces a graph only after successful validation, preserving the previous graph on failure. Builds are limited to 120 seconds; queries to 10 seconds, 4,096 input characters, and 8 KiB returned text. Generated/credential paths and outside-root symlinks are excluded; unsupported inputs are not claimed as covered. Isolated Python imports, a trusted cwd, and a minimal environment reduce project interference; they are **not** a same-user filesystem/network sandbox.
 
+Extraction uses Graphify's finalized graph, including local community analysis, rather than its raw `--no-cluster` output; code-only mode still makes no semantic LLM calls. External import concepts and unresolved AST references remain in the graph without being counted as local source files. Every nonempty `source_file` still undergoes validation. An empty directory currently produces an upstream extraction error rather than a published empty snapshot.
+
 Narrative facts complement Graphify's code relationships. With no native backend, the agent uses native file tools to preserve concise secret-free notes at the returned path. Never store credentials, personal data, transcripts, or tool dumps. Fallback-note safety is instruction-guided, not tool-enforced. Important recalled facts must be rechecked against current source. Memory failure does not undo verified implementation, but prevents claiming the entire workflow completed.
 
 ## Focused audits and delivery
@@ -144,4 +180,14 @@ Record packages, skills, rules, tools, and advertised agents before prompting. `
 
 ## Attribution
 
-[upstreams.lock.json](upstreams.lock.json) records exact reviewed prompt-source pins. [NOTICE-ECC.txt](NOTICE-ECC.txt) preserves ECC, Superpowers, Matt Pocock skills, Caveman, and Graphify attribution. Upstream prompt sources are not workflow dependencies or runtime auto-sync targets. Caveman reuse is lite skill guidance only, not its engine. No Anvil code, configuration, histories, or installed extension is changed. This repository remains [GPL-3.0-only](LICENSE); third-party portions retain their stated licenses.
+[upstreams.lock.json](upstreams.lock.json) records exact source pins and upstream license URLs. Attribution and license text are separated by repository:
+
+| Upstream repository | Resources used here | License files |
+| --- | --- | --- |
+| [Everything Claude Code](https://github.com/affaan-m/ECC) | Archived optional resources in `skills/us-library/references/ecc/` and reviewed prompt practices | [MIT license and attribution](licenses/ecc/LICENSE.txt) |
+| [Superpowers](https://github.com/obra/superpowers) | Reviewed prompt practices informing adapted workflow guidance; not a runtime dependency | [MIT license and attribution](licenses/superpowers/LICENSE.txt) |
+| [Matt Pocock skills](https://github.com/mattpocock/skills) | Reviewed prompt practices informing adapted skill guidance; not a runtime dependency | [MIT license and attribution](licenses/mattpocock-skills/LICENSE.txt) |
+| [Caveman](https://github.com/juliusbrussee/caveman) | Concise-prose guidance in `skills/us-concise/`; no engine-linked runtime | [MIT license, attribution, and scope](licenses/caveman/LICENSE.txt) |
+| [Graphify](https://github.com/Graphify-Labs/graphify) | Separately managed `graphifyy` dependency for explicit graph builds and queries | [Apache-2.0 license](licenses/graphify/LICENSE.txt), [retained MIT license](licenses/graphify/LICENSE-MIT.txt), and [NOTICE](licenses/graphify/NOTICE.txt) |
+
+Upstream prompt sources are not workflow dependencies or runtime auto-sync targets. Caveman's engine-linked directories have separate BSL-1.1 terms and are not included here. Graphify's upstream NOTICE refers to `LICENSE` and `LICENSE-MIT`; their copies here use the `.txt` filenames linked above. No Anvil code, configuration, histories, or installed extension is changed. This repository remains [GPL-3.0-only](LICENSE); third-party portions retain their stated licenses.

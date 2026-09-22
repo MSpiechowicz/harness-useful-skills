@@ -66,6 +66,13 @@ async function regularFile(file, description) {
   return details;
 }
 
+// Import concepts and unresolved AST references have no local source file.
+function isSourceLessReference(node) {
+  if (node.source_file !== "" || typeof node.label !== "string" || !node.label) return false;
+  return (node.external === true && node.type === "external" && node.file_type === "concept")
+    || (node._origin === "ast" && node.file_type === "code" && node.source_location === "");
+}
+
 function sourcePolicyError(sourceFile, workspace) {
   if (typeof sourceFile !== "string" || !sourceFile) return "Graph node source_file must be a non-empty string.";
   const sourcePath = path.resolve(workspace, sourceFile);
@@ -101,6 +108,7 @@ function graphValidationError(contents, workspace) {
   for (const node of contents.nodes) {
     if (!isObject(node) || typeof node.id !== "string" || !node.id || ids.has(node.id)) return "Graphify graph nodes must have unique non-empty string ids.";
     ids.add(node.id);
+    if (isSourceLessReference(node)) continue;
     const sourceError = sourcePolicyError(node.source_file, workspace);
     if (sourceError) return sourceError;
   }
@@ -328,7 +336,7 @@ export function createGraphify(overrides = {}) {
       await mkdir(staging, { mode: PRIVATE_MODE });
       const result = await runtime.runProcess(
         dependencies.python,
-        ["-I", "-m", "graphify", "extract", paths.workspace, "--code-only", "--no-cluster", "--no-dedup", "--max-workers", "2", "--out", staging],
+        ["-I", "-m", "graphify", "extract", paths.workspace, "--code-only", "--no-dedup", "--max-workers", "2", "--out", staging],
         {
           cwd: paths.directory,
           env: { ...environment.environment, GRAPHIFY_OUT: "graphify-out", GRAPHIFY_QUERY_LOG_DISABLE: "1", PYTHONNOUSERSITE: "1", PYTHONSAFEPATH: "1" },
@@ -345,7 +353,10 @@ export function createGraphify(overrides = {}) {
       assertBuildActive(deadline);
       if (!stagedGraph.available) throw new Error(stagedGraph.error ?? "Graphify did not produce a graph.");
       const graphHash = createHash("sha256").update(stagedGraph.text).digest("hex");
-      const sourceFiles = new Set(stagedGraph.contents.nodes.map((node) => node.source_file));
+      const sourceFiles = new Set();
+      for (const node of stagedGraph.contents.nodes) {
+        if (!isSourceLessReference(node)) sourceFiles.add(node.source_file);
+      }
       for (const sourceFile of sourceFiles) {
         assertBuildActive(deadline);
         const sourceError = await validateSource(sourceFile, paths.workspace);
