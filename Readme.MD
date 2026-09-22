@@ -76,7 +76,7 @@ These are prompt instructions, **not enforced stage transitions**. They cannot g
 | `us-check-code-quality` | Evidence-backed cohesion/duplication audit and explicit guidance merge |
 | `us-improve-codebase-architecture` | Read-only architectural opportunities, then approved focused refactoring |
 | `us-improve-code-coverage` | Measured coverage gaps, then approved behavior-focused test improvements |
-| `us-ship-backlog-item` | Select actionable backlog work and feed it into the same development flow |
+| `us-ship-backlog-item` | One item, isolated feature branch, reviewed linked PR, and Done only after confirmed merge |
 | `us-open-pr` | Explicitly authorized reviewed feature-branch PR delivery |
 | `us-approve-work` | Explicitly authorized commit and fast-forward direct push to `main` |
 | `us-library` | Explicit, bounded consultation of optional ECC reference material |
@@ -238,6 +238,10 @@ Security/performance audits default to read-only local investigation. No product
 `us-improve-code-coverage` measures existing coverage and prioritizes uncovered public behavior, branches, and failure paths. Test changes require plan approval and before/after results use the same measurement scope. Missing coverage tooling is reported, not silently installed; empty projects do not acquire invented tests. The skill does not lower thresholds, hide uncovered code, or silently fix production bugs.
 
 Both skills reuse the owned implementation, correctness/security review, and memory guidance after approval. They add no runtime dependency or separate workflow executor.
+
+`us-ship-backlog-item` distinguishes read-only selection from explicit shipment. A request to ship an item (or an explicit skill invocation without narrower limits) authorizes the reviewed feature-branch/PR delivery and that item's status updates, but still requires implementation-plan approval. It creates a safely isolated branch before edits, tracks **In progress → In review**, and hands reviewed delivery to `us-open-pr` without asking for the same PR authorization twice. Requests only to inspect/select or implement an item do not implicitly authorize publication.
+
+The linked PR uses `Closes #N` when it fully resolves the issue and targets the default branch; other cases retain a non-closing reference and an explicit completion limitation. **Done requires confirmed merge of the correct PR**, not PR creation, green CI, or closure without merge. Existing project automation may complete tracking; otherwise a later invocation verifies the merge and updates the selected issue/item. Skills do not run after a session ends, configure automation, merge PRs, or silently overwrite conflicting human status changes. Missing project access or status mappings are reported, not treated as success. Local-only backlog entries receive no fabricated GitHub issue.
 
 `us-open-pr` inspects all outgoing history/diffs, preserves unrelated staged/worktree changes, pushes the reviewed feature head, creates or reuses the exact head/base PR, and verifies URL and head SHA. It never silently rebases, force-pushes, changes destination, or merges.
 
