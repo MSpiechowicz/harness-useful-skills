@@ -1,42 +1,42 @@
 #!/usr/bin/env node
 import { installPlugin, runUpdate, UpdateError } from "./updater.js";
-import { listResources } from "./ecc-runtime.js";
+import { formatResources, listResources, parseCatalogArguments, resourceInventory, safetyEnabled } from "./resources.js";
 
 const USAGE = `Usage:
   ./useful-skills install [--scope user|project] [--profile PROFILE]
   ./useful-skills update check|install [--profile PROFILE]
-  ./useful-skills list [skills|commands|agents|rules] [query]
+  ./useful-skills list [query]
+  ./useful-skills library list [skills|commands|agents|rules] [query]
+  ./useful-skills doctor
 
 Requires Node.js 22+ and OMP with marketplace support.
-Install bundles the OMP extension, skills, commands, agents, and rules; restart OMP to discover them.
-Inside OMP: /ecc, /useful-skills, or /skill:ship-backlog-item
-GitHub access for ship-backlog-item requires an authenticated gh CLI.
-Source checkouts: git pull --ff-only. Use /useful-skills update install
-inside OMP to upgrade a marketplace installation.`;
+Owned us-* skills are selected by description or /skill:us-<name>.
+ECC is opt-in reference material; no Anvil dependency or startup workflow.
+Development uses one plan approval; publication requires an explicit request.
+Graphify setup is lazy on the agent's us_memory build/query, not installation.
+Load the package directory (omp -e .), not extension.js alone.
+Source checkouts: git pull --ff-only. Marketplace updates require restart.`;
 
 function usage(stream = process.stdout) {
   stream.write(`${USAGE}\n`);
 }
 
-function renderResources(kind, resources, query) {
-  if (resources.length === 0) return `No ${kind} match${query ? `ing ${JSON.stringify(query)}` : ""}.`;
-  return [
-    `ECC ${kind} (${resources.length}):`,
-    ...resources.flatMap((resource) => [
-      `  ${resource.name}${resource.description ? ` — ${resource.description}` : ""}`,
-      `    Use ${resource.usage ?? resource.path}`,
-    ]),
-  ].join("\n");
+async function listCommand(argv) {
+  const { kind, query, source } = parseCatalogArguments(argv);
+  const resources = await listResources(kind, { query, source });
+  console.log(formatResources(kind, resources, query, source));
 }
 
-async function listCommand(argv) {
-  const kind = argv[0] || "skills";
-  if (!["skills", "commands", "agents", "rules"].includes(kind)) {
-    throw new UpdateError("List kind must be skills, commands, agents, or rules.");
-  }
-  const query = argv.slice(1).join(" ").trim();
-  const resources = await listResources(kind, { query });
-  console.log(renderResources(kind, resources, query));
+async function doctor() {
+  const [core, library] = await Promise.all([resourceInventory(), resourceInventory({ source: "library" })]);
+  console.log([
+    "Useful Skills — owned skills, optional library, Anvil-free",
+    `Core: ${JSON.stringify(core)}`,
+    `Library references: ${JSON.stringify(library)}`,
+    `Safety guard: ${safetyEnabled() ? "enabled" : "disabled"}`,
+    "Use /useful-skills doctor in OMP for current profile memory status.",
+    "No dependencies installed or graphs built by this check.",
+  ].join("\n"));
 }
 
 /*
@@ -71,8 +71,13 @@ export async function main(argv = process.argv.slice(2)) {
       return 0;
     }
 
-    if (argv[0] === "list") {
-      await listCommand(argv.slice(1));
+    if (argv[0] === "list" || argv[0] === "library") {
+      await listCommand(argv);
+      return 0;
+    }
+
+    if (argv.length === 1 && argv[0] === "doctor") {
+      await doctor();
       return 0;
     }
 
@@ -92,7 +97,7 @@ export async function main(argv = process.argv.slice(2)) {
       return 0;
     }
 
-    throw new UpdateError("Expected install, list, update check, update install, or help.");
+    throw new UpdateError("Expected install, list, library list, doctor, update check, update install, or help.");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`useful-skills: ${message.replace(/[\u0000-\u001f\u007f]/g, " ")}\n`);

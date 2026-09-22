@@ -1,7 +1,7 @@
 {
   "name": "oh-my-pi-useful-skills",
   "version": "0.2.2",
-  "description": "OMP-native ECC engineering workflows and practical development skills",
+  "description": "Owned skill-led development workflows and OMP-native memory support",
   "type": "module",
   "private": true,
   "license": "GPL-3.0-only",
@@ -12,7 +12,6 @@
     "update": "node ./useful-skills update"
   },
   "omp": {
-    "extensions": ["./extension.js"],
-    "skills": "./skills"
+    "extensions": ["./extension.js"]
   }
 }

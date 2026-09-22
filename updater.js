@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -61,45 +61,6 @@ async function packageVersion(root) {
   }
 }
 
-function frontmatterField(contents, field) {
-  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(contents)?.[1];
-  const value = frontmatter && new RegExp(`^${field}:\\s*(.+?)\\s*$`, "m").exec(frontmatter)?.[1];
-  if (!value) return undefined;
-  const quoted = /^(["'])(.*)\1$/.exec(value);
-  return quoted ? quoted[2] : value;
-}
-
-/**
- * Discover bundled skills from their SKILL.md frontmatter so the launcher and
- * extension stay current when a skill is added without a second registry.
- */
-export async function listSkills({ root = PACKAGE_ROOT } = {}) {
-  const skillsRoot = path.join(path.resolve(root), "skills");
-  let entries;
-  try {
-    entries = await readdir(skillsRoot, { withFileTypes: true });
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    throw new UpdateError(`Cannot read bundled skills: ${detail}`);
-  }
-
-  const skills = await Promise.all(entries
-    .filter((entry) => entry.isDirectory())
-    .map(async (entry) => {
-      let contents;
-      try {
-        contents = await readFile(path.join(skillsRoot, entry.name, "SKILL.md"), "utf8");
-      } catch {
-        return undefined;
-      }
-      const name = frontmatterField(contents, "name");
-      const description = frontmatterField(contents, "description");
-      if (!name || !description) return undefined;
-      return { name, description, usage: `/skill:${name}` };
-    }));
-
-  return skills.filter(Boolean).sort((left, right) => left.name.localeCompare(right.name));
-}
 
 /** Read the latest published stable GitHub release without following redirects. */
 export async function latestRelease(fetcher = fetch) {

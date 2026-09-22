@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Pinned provenance for reviewed prompt sources and the managed Graphify dependency. These sources are not runtime auto-sync targets or workflow dependencies, except Graphify when its separately pinned managed setup is explicitly invoked.",
+  "sources": [
+    {
+      "name": "Everything Claude Code",
+      "repository": "https://github.com/affaan-m/ECC",
+      "commit": "934195f955cf0da847d59fcd6f68856bce112d8b",
+      "source": "https://github.com/affaan-m/ECC/tree/934195f955cf0da847d59fcd6f68856bce112d8b",
+      "license": "MIT",
+      "licenseSource": "https://raw.githubusercontent.com/affaan-m/ECC/934195f955cf0da847d59fcd6f68856bce112d8b/LICENSE",
+      "role": "Archived optional reference material and reviewed prompt practices",
+      "runtimeDependency": false
+    },
+    {
+      "name": "Superpowers",
+      "repository": "https://github.com/obra/superpowers",
+      "commit": "5bf4e78011075bcfc0dc295f0724994cd123ee71",
+      "source": "https://github.com/obra/superpowers/tree/5bf4e78011075bcfc0dc295f0724994cd123ee71",
+      "license": "MIT",
+      "licenseSource": "https://raw.githubusercontent.com/obra/superpowers/5bf4e78011075bcfc0dc295f0724994cd123ee71/LICENSE",
+      "role": "Reviewed prompt practices",
+      "runtimeDependency": false
+    },
+    {
+      "name": "Matt Pocock skills",
+      "repository": "https://github.com/mattpocock/skills",
+      "commit": "c55ee46073ed923f86ce59a5eb3b6d895095d1b7",
+      "source": "https://github.com/mattpocock/skills/tree/c55ee46073ed923f86ce59a5eb3b6d895095d1b7",
+      "license": "MIT",
+      "licenseSource": "https://raw.githubusercontent.com/mattpocock/skills/c55ee46073ed923f86ce59a5eb3b6d895095d1b7/LICENSE",
+      "role": "Reviewed prompt practices",
+      "runtimeDependency": false
+    },
+    {
+      "name": "Caveman",
+      "repository": "https://github.com/juliusbrussee/caveman",
+      "commit": "2fd153c67988e980fb0b2455c90832159a6a5a25",
+      "source": "https://github.com/juliusbrussee/caveman/tree/2fd153c67988e980fb0b2455c90832159a6a5a25",
+      "license": "MIT for the reviewed skills/adoption surface; engine-linked directories have separate BSL-1.1 terms",
+      "licenseSource": "https://raw.githubusercontent.com/juliusbrussee/caveman/2fd153c67988e980fb0b2455c90832159a6a5a25/LICENSING.md",
+      "role": "Reviewed concise-prose prompt guidance only; no Caveman runtime is included",
+      "runtimeDependency": false
+    },
+    {
+      "name": "Graphify",
+      "repository": "https://github.com/Graphify-Labs/graphify",
+      "commit": "20a20d30d8e7eef77675651f0199d87f913bd3e7",
+      "source": "https://github.com/Graphify-Labs/graphify/tree/20a20d30d8e7eef77675651f0199d87f913bd3e7",
+      "package": "graphifyy==0.9.65",
+      "license": "Apache-2.0",
+      "licenseSource": "https://raw.githubusercontent.com/Graphify-Labs/graphify/20a20d30d8e7eef77675651f0199d87f913bd3e7/LICENSE",
+      "noticeSource": "https://raw.githubusercontent.com/Graphify-Labs/graphify/20a20d30d8e7eef77675651f0199d87f913bd3e7/NOTICE",
+      "role": "Pinned managed dependency for an explicitly invoked Graphify build or query",
+      "runtimeDependency": true
+    }
+  ]
+}
