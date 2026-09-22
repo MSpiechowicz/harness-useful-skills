@@ -1,6 +1,18 @@
 # Useful Skills for Oh My Pi
 
-Owned `us-*` skills for development, focused audits, delivery, and project memory. OMP discovers their descriptions; the model selects and follows the relevant instructions using native tools and workers. No Anvil dependency, custom workflow executor, model router, phase database, or stop-hook continuation loop.
+**From a natural-language request to reviewed, verified work.**
+
+Owned `us-*` skills for development, focused audits, delivery, and project memory. OMP discovers their descriptions; the model follows the relevant instructions using native tools and workers.
+
+| Develop | Inspect | Deliver | Remember |
+| --- | --- | --- | --- |
+| Clarify, research, approve, implement, review | Focused security, performance, and quality audits | Explicitly authorized PR or direct-main delivery | Durable facts alongside code relationships |
+
+**Start here:** [Installation](#installation) · [Workflow & skills](#skill-led-development) · [Model configuration](#native-model-configuration) · [Memory](#agent-invoked-memory)
+
+**Reference:** [Management](#management-and-optional-library) · [Audits & delivery](#focused-audits-and-delivery) · [Updates](#updates-and-releases) · [Development](#development-and-verification) · [Attribution](#attribution)
+
+No Anvil dependency, custom workflow executor, model router, phase database, or stop-hook continuation loop.
 
 ## Installation
 
@@ -23,9 +35,29 @@ omp -e /absolute/path/to/oh-my-pi-useful-skills
 
 ## Skill-led development
 
-Ask naturally: “I want to build a rocket simulator.” `us-workflow` guides the agent to clarify consequential choices, research current source with a read-only worker, produce a plan, request **one implementation approval**, implement, verify, obtain fresh correctness and security reviews, repair findings, summarize, and update memory. Precise requests can require zero clarification questions. Small changes scale the depth without omitting research, reviews, or memory.
+Ask naturally: “I want to build a rocket simulator.” `us-workflow` guides the following development flow. Precise requests can require zero clarification questions. Small changes scale the depth without omitting research, reviews, or memory.
 
-The parent owns the objective, native todo list, plan, acceptance, and integration. Independent ready work uses native parallel `task` calls with disjoint ownership; shared files and real dependencies stay serial. Existing session plans/transcripts support interruption recovery. Three unsuccessful repair rounds or repeated no-progress findings produce an honest blocker, not an infinite loop.
+```mermaid
+flowchart TD
+    request["Request"] --> clarify["Clarify choices"]
+    clarify --> research["Research"]
+    research --> plan["Plan + approval"]
+    plan --> implement["Implement"]
+    implement --> verify["Verify behavior"]
+    verify --> correctness["Correctness review"]
+    correctness --> security["Security review"]
+    security --> outcome{"Findings?"}
+    outcome -->|No| summary["Summarize"]
+    summary --> memory["Refresh graph<br/>Update memory"]
+    outcome -->|Yes| limit{"Repair limit?"}
+    limit -->|No| repair["Repair<br/>approved scope"]
+    repair --> verify
+    limit -->|Reached| blocked["Keep work<br/>Report blocker"]
+```
+
+Verification failures return to implementation. Repairs repeat verification and **both** reviews. Three unsuccessful repair rounds or repeated no progress stop the loop; memory failures prevent claiming the full workflow complete. Publication is a separate, explicitly authorized action—not the next automatic step.
+
+The parent owns the objective, native todo list, plan, acceptance, and integration. Research uses a read-only worker. Independent ready work uses native parallel `task` calls with disjoint ownership; shared files and real dependencies stay serial. Existing session plans/transcripts support interruption recovery.
 
 These are prompt instructions, **not enforced stage transitions**. They cannot guarantee model compliance. Ordinary explanations and explicitly focused audits do not start the full development workflow. Plan approval does not authorize publication.
 
@@ -115,6 +147,20 @@ Broad ECC skills, commands, agents, rules, and supporting files live under `skil
 The extension adds one short discovery hint, retains independent catastrophic-command protection and common secret-pattern output redaction, and performs quiet read-only update checks. Opening a session never starts a model workflow, dispatches workers, builds memory, or reviews code. `OMP_ECC_SAFETY=off` remains the existing catastrophic-guard opt-out; redaction is not a complete secret detector or a filesystem sandbox.
 
 ## Agent-invoked memory
+
+**Two complementary stores, one agent-facing tool.** Facts explain decisions; the code graph maps relationships. Neither replaces the other.
+
+```mermaid
+flowchart TD
+    agent["Agent follows us-memory"] --> tool["us_memory"]
+    tool -->|search / save| native["Native OMP memory backend"]
+    native --> facts["Mnemopi recommended<br/>Facts, decisions, lessons"]
+    tool -->|build / query| graphify["Graphify"]
+    graphify --> code["Code relationship graph<br/>Project-scoped storage outside checkout"]
+    tool -->|status| status["Read-only status of both backends"]
+```
+
+Graphify setup is lazy: only an explicit `build` or `query` prepares its managed dependencies. Opening a session does not install dependencies, build a graph, or start a workflow. With native memory unavailable, the agent can maintain fallback notes using file tools; `us_memory` does not silently save them.
 
 ### Recommended setup: local memory alongside Graphify
 
