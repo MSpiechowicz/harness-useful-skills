@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { promisify } from "node:util";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -9,9 +11,9 @@ import { formatResources, parseCatalogArguments } from "../resources.js";
 const exec = promisify(execFile);
 const launcher = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../useful-skills");
 
-async function cli(args) {
+async function cli(args, options = {}) {
   try {
-    return { code: 0, ...await exec(process.execPath, [launcher, ...args], { timeout: 10_000 }) };
+    return { code: 0, ...await exec(process.execPath, [launcher, ...args], { timeout: 10_000, ...options }) };
   } catch (error) {
     return { code: error.code, stdout: error.stdout, stderr: error.stderr };
   }
@@ -37,11 +39,18 @@ test("launcher spaced-query parsing matches extension string parsing", () => {
   assert.match(formatResources("skills", [], "absent"), /No skills matching "absent"/);
 });
 
-test("launcher doctor and help are passive and errors have nonzero exit status", async () => {
-  const doctor = await cli(["doctor"]);
+test("launcher doctor and help stay passive, omit retired naming, and report argument errors", async t => {
+  const workspace = await mkdtemp(path.join(os.tmpdir(), "us-doctor-"));
+  t.after(() => rm(workspace, { recursive: true, force: true }));
+  const doctor = await cli(["doctor"], { cwd: workspace });
+  assert.deepEqual(await readdir(workspace), []);
   assert.equal(doctor.code, 0);
-  assert.match(doctor.stdout, /No dependencies installed or graphs built/);
-  assert.equal((await cli(["--help"])).code, 0);
+  assert.match(doctor.stdout, /Read-only: no setup, installation, or build/);
+  assert.match(doctor.stdout, /terminal cannot inspect/i);
+  assert.doesNotMatch(doctor.stdout, /anvil/i);
+  const help = await cli(["--help"]);
+  assert.equal(help.code, 0);
+  assert.doesNotMatch(help.stdout, /anvil/i);
   assert.equal((await cli(["unknown"])).code, 2);
   assert.equal((await cli(["install", "--scope"])).code, 2);
   assert.equal((await cli(["update", "check", "--scope", "user"])).code, 2);

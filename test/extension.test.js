@@ -17,6 +17,8 @@ async function fixture(t, hasUI = true) {
   const tools = new Map();
   const messages = [];
   const timers = [];
+  const selectResponses = [];
+  const selections = [];
   usefulSkills({
     setLabel() {},
     pi: { getAgentDir: () => agentDir },
@@ -27,10 +29,16 @@ async function fixture(t, hasUI = true) {
   });
   const ctx = {
     cwd: root, hasUI,
-    ui: { notify: (message, level) => messages.push({ message, level }), select: async () => undefined },
+    ui: {
+      notify: (message, level) => messages.push({ message, level }),
+      select: async (title, choices) => {
+        selections.push({ title, choices });
+        return selectResponses.shift();
+      },
+    },
     setTimeout: callback => timers.push(callback),
   };
-  return { root, commands, events, tools, messages, timers, ctx };
+  return { root, commands, events, tools, messages, timers, selectResponses, selections, ctx };
 }
 
 test("install reports progress before completion without duplicating a busy operation", async t => {
@@ -76,6 +84,20 @@ console.log(JSON.stringify({ marketplace: [] }));
       assert.deepEqual(f.messages, [], "check must not announce an installation");
       await check;
       assert.doesNotMatch(f.messages.at(-1).message, /updating/i);
+      if (hasUI) {
+        f.messages.length = 0;
+        f.selectResponses.push("Update", "Install");
+        await handler("", f.ctx);
+        assert.deepEqual(f.selections.slice(-2), [
+          { title: "Useful Skills", choices: ["List", "Libraries", "Doctor", "Update", "Help"] },
+          { title: "Update", choices: ["Check", "Install"] },
+        ]);
+        assert.match(f.messages[0].message, /updating.*useful skills/i);
+        f.messages.length = 0;
+        f.selectResponses.push("Update", "Check");
+        await handler("", f.ctx);
+        assert.doesNotMatch(f.messages.at(-1).message, /updating/i);
+      }
       f.messages.length = 0;
       await f.events.get("session_start")({}, f.ctx);
       if (hasUI) await f.timers[0]();
@@ -162,9 +184,25 @@ test("catalog accepts whitespace queries, reference URIs, and no obsolete aliase
   assert.doesNotMatch(f.messages.at(-1).message, /\/skill:tdd-workflow/);
   await handler("memory save nope", f.ctx);
   assert.match(f.messages.at(-1).message, /Expected list/);
-  await handler("doctor", f.ctx);
-  assert.match(f.messages.at(-1).message, /no setup\/build/);
   assert.deepEqual(await readdir(f.root), []);
+});
+
+test("doctor formats fresh, disabled, and failed memory states for consumers", async t => {
+  const f = await fixture(t);
+  const handler = f.commands.get("useful-skills").handler;
+
+  await handler("doctor", f.ctx);
+  assert.match(f.messages.at(-1).message, /Native: Unavailable/);
+  assert.match(f.messages.at(-1).message, /Graph: Not built/);
+  assert.doesNotMatch(f.messages.at(-1).message, /"native"|\/profile\//);
+
+  f.ctx.memory = { status: async () => ({ backend: "off", active: false }) };
+  await handler("doctor", f.ctx);
+  assert.match(f.messages.at(-1).message, /Native: Disabled/);
+
+  f.ctx.memory = { status: async () => { throw new Error("profile unavailable"); } };
+  await handler("doctor", f.ctx);
+  assert.match(f.messages.at(-1).message, /Native: Error — Native memory status failed: profile unavailable/);
 });
 
 test("headless help does not start another model turn; menu cancellation is inert", async t => {
@@ -176,6 +214,13 @@ test("headless help does not start another model turn; menu cancellation is iner
   const count = f.messages.length;
   await f.commands.get("useful-skills").handler("", { ...f.ctx, hasUI: true });
   assert.equal(f.messages.length, count);
+  f.selectResponses.push("Update");
+  await f.commands.get("useful-skills").handler("", { ...f.ctx, hasUI: true });
+  assert.equal(f.messages.length, count);
+  assert.deepEqual(f.selections.slice(-2), [
+    { title: "Useful Skills", choices: ["List", "Libraries", "Doctor", "Update", "Help"] },
+    { title: "Update", choices: ["Check", "Install"] },
+  ]);
   await f.commands.get("useful-skills").handler("help", f.ctx);
   assert.match(f.messages.at(-1).message, /\/skill:us-/);
 });
