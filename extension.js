@@ -1,3 +1,4 @@
+import { formatDoctor } from "./doctor.js";
 import { runUpdate } from "./updater.js";
 import { executeMemory, MEMORY_PARAMETERS } from "./memory.js";
 import {
@@ -14,7 +15,7 @@ const HELP = [
   "/useful-skills doctor — inspect resources and memory availability without setup.",
   "/useful-skills update check|install — check or install marketplace updates.",
   "Memory: the agent follows us-memory and calls us_memory; native /memory is unchanged.",
-  "Graphify setup is lazy on build/query. No startup workflow or Anvil dependency.",
+  "Graphify setup is lazy on build/query. No startup workflow dependency.",
   "Terminal: ./useful-skills list | doctor | library list [query] | update check|install",
 ].join("\n");
 
@@ -55,22 +56,22 @@ export default function usefulSkills(pi) {
       resourceInventory(), resourceInventory({ source: "library" }),
       executeMemory({ action: "status" }, { cwd: ctx.cwd, agentDir: pi.pi.getAgentDir(), memory: ctx.memory }),
     ]);
-    notify(ctx, [
-      "Useful Skills — skill-led, Anvil-free",
-      `Core: ${core.skills} skills; ${core.agents} bundled agent overrides; ${core.rules} injected rules.`,
-      `Optional ECC references: ${library.skills} skills, ${library.commands} commands, ${library.agents} agents, ${library.rules} rules.`,
-      `Safety guard: ${safetyEnabled() ? "enabled" : "disabled by OMP_ECC_SAFETY"}; tool-result redaction enabled.`,
-      `Memory status (no setup/build): ${JSON.stringify(memory)}`,
-    ].join("\n"));
+    notify(ctx, formatDoctor({ core, library, safety: safetyEnabled(), memory }));
   }
 
   async function workbench(args, ctx) {
     try {
       let command = args.trim();
       if (!command && ctx.hasUI) {
-        const choices = ["list", "library list", "doctor", "update check", "update install", "help"];
-        command = await ctx.ui.select("Useful Skills", choices);
-        if (!command) return;
+        const choice = await ctx.ui.select("Useful Skills", ["List", "Libraries", "Doctor", "Update", "Help"]);
+        if (!choice) return;
+        if (choice === "Update") {
+          const action = await ctx.ui.select("Update", ["Check", "Install"]);
+          if (!action) return;
+          command = `update ${action.toLowerCase()}`;
+        } else {
+          command = { List: "list", Libraries: "library list", Doctor: "doctor", Help: "help" }[choice];
+        }
       }
       if (!command || command === "help") return notify(ctx, HELP);
       if (command === "doctor") return await doctor(ctx);

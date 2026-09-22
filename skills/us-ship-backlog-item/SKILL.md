@@ -28,7 +28,7 @@ Shipping does not authorize merging, enabling auto-merge, direct-main delivery, 
 
 State the exact issue URL or local file/heading, selection rationale, acceptance criteria, affected area, non-goals, dependencies, and expected verification scenario. Inspect the relevant code, callers, tests, and conventions enough to identify genuine unresolved decisions. Record the user's actual delivery authorization, target repository/base, branch naming convention, selected project/item or local status location, and available status mappings. Never use names alone to guess a project, issue, or field ID.
 
-Then load `skill://us-workflow` and pass this evidence as its request context. `us-workflow` remains the single process for clarification, research, one plan approval, implementation, review, security review, verification, summary, and memory. Do not duplicate those stages here or require an Anvil workflow.
+Then load `skill://us-workflow` and pass this evidence as its request context. `us-workflow` remains the single process for clarification, research, one plan approval, implementation, review, security review, verification, summary, and memory. Do not duplicate those stages here or require an external workflow harness.
 
 ## Prepare the feature branch after approval
 

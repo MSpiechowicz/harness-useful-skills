@@ -15,6 +15,6 @@ Load `skill://us-concise` before presenting a result. This library is opt-in sou
 
 ## Translate, do not transplant
 
-Summarize only the relevant practical guidance and map it to the owned `us-*` skills and native OMP tools. Do not invoke, install, link to, or recreate legacy ECC command wrappers, agent catalogs, Anvil, a scheduler, a state machine, or a custom executor. Preserve the boundary: explicit user authorization is still required for edits, delivery, external access, and publication.
+Summarize only the relevant practical guidance and map it to the owned `us-*` skills and native OMP tools. Do not invoke, install, link to, or recreate legacy ECC command wrappers, agent catalogs, external workflow harnesses, a scheduler, a state machine, or a custom executor. Preserve the boundary: explicit user authorization is still required for edits, delivery, external access, and publication.
 
 Cite the exact archived URI consulted and note that it is optional reference material. If no relevant archive entry can be identified, say so and continue with the owned/native conventions rather than guessing a path.

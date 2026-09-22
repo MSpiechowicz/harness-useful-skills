@@ -142,6 +142,10 @@ Planning remains parent-owned: the `plan` role configures planning, but it has n
 
 The terminal launcher supports the same catalog/update operations, plus `install` and `help`. `/ecc`, `/ecc-doctor`, and `/ecc-memory` aliases are removed. OMP's native `/memory` remains unchanged.
 
+Run `/useful-skills` without arguments for **List**, **Libraries**, **Doctor**, **Update**, and **Help**. **Update** opens a second menu with **Check** and **Install**; cancelling either menu performs no operation. Typed commands remain unchanged.
+
+Doctor shows a compact report of resources, safety, native memory, and Graphify readiness instead of raw JSON. Disabled native memory and a graph that is not built are availability states, not proof of a failed installation. Genuine status failures remain visible. The terminal doctor cannot inspect OMP's current memory integration and directs you to the in-session command. Neither doctor installs dependencies, enables memory, builds graphs, or writes workspace files.
+
 Broad ECC skills, commands, agents, rules, and supporting files live under `skills/us-library/references/ecc/`. They are **not active skills, injected rules, or native worker overrides**. On an explicit library request, the agent reads only relevant references, for example `skill://us-library/references/ecc/skills/security-audit/SKILL.md`, and translates useful guidance into owned/native conventions. It must not activate legacy workflows or another harness.
 
 The extension adds one short discovery hint, retains independent catastrophic-command protection and common secret-pattern output redaction, and performs quiet read-only update checks. Opening a session never starts a model workflow, dispatches workers, builds memory, or reviews code. `OMP_ECC_SAFETY=off` remains the existing catastrophic-guard opt-out; redaction is not a complete secret detector or a filesystem sandbox.

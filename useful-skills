@@ -1,7 +1,7 @@
 #!/usr/bin/env node
+import { formatDoctor } from "./doctor.js";
 import { installPlugin, runUpdate, UpdateError } from "./updater.js";
 import { formatResources, listResources, parseCatalogArguments, resourceInventory, safetyEnabled } from "./resources.js";
-
 const USAGE = `Usage:
   ./useful-skills install [--scope user|project] [--profile PROFILE]
   ./useful-skills update check|install [--profile PROFILE]
@@ -11,7 +11,7 @@ const USAGE = `Usage:
 
 Requires Node.js 22+ and OMP with marketplace support.
 Owned us-* skills are selected by description or /skill:us-<name>.
-ECC is opt-in reference material; no Anvil dependency or startup workflow.
+ECC is opt-in reference material; no startup workflow.
 Development uses one plan approval; publication requires an explicit request.
 Graphify setup is lazy on the agent's us_memory build/query, not installation.
 Load the package directory (omp -e .), not extension.js alone.
@@ -29,14 +29,7 @@ async function listCommand(argv) {
 
 async function doctor() {
   const [core, library] = await Promise.all([resourceInventory(), resourceInventory({ source: "library" })]);
-  console.log([
-    "Useful Skills — owned skills, optional library, Anvil-free",
-    `Core: ${JSON.stringify(core)}`,
-    `Library references: ${JSON.stringify(library)}`,
-    `Safety guard: ${safetyEnabled() ? "enabled" : "disabled"}`,
-    "Use /useful-skills doctor in OMP for current profile memory status.",
-    "No dependencies installed or graphs built by this check.",
-  ].join("\n"));
+  console.log(formatDoctor({ core, library, safety: safetyEnabled() }));
 }
 
 /*
