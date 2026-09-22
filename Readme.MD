@@ -16,14 +16,14 @@ No Anvil dependency, custom workflow executor, model router, phase database, or 
 
 ## Installation
 
-Requires OMP with marketplace support and Node.js **22+**. No npm dependencies or build step.
+Requires OMP with marketplace support and Node.js **22+**. No npm dependencies, build step, host configuration, prompt file, or startup flag is required.
 
 ```bash
 omp plugin marketplace add MSpiechowicz/oh-my-pi-useful-skills
 omp plugin install oh-my-pi-useful-skills@omp-useful-skills --scope user
 ```
 
-Restart OMP after installation or update. Use `--scope project` for a project installation, or pass `--profile NAME` to both commands for an isolated profile. Plugin identity remains `oh-my-pi-useful-skills@omp-useful-skills`.
+Restart OMP after installation or update. Ordinary startup with the installed package adds the discovery hint and narrowly scoped session-local workflow-stage policy. Use `--scope project` for a project installation, or pass `--profile NAME` to both commands for an isolated profile. Plugin identity remains `oh-my-pi-useful-skills@omp-useful-skills`.
 
 For local development, load the **package directory**, not the extension file alone:
 
@@ -57,9 +57,11 @@ flowchart TD
 
 Verification failures return to implementation. Repairs repeat verification and **both** reviews. Three unsuccessful repair rounds or repeated no progress stop the loop; memory failures prevent claiming the full workflow complete. Publication is a separate, explicitly authorized action—not the next automatic step.
 
-The parent owns the objective, research scope, native todo list, acceptance, approval, and integration. Research uses a read-only worker; the native `us-planner` worker drafts the scoped implementation plan. After approval, native `task` workers implement even a single work package. Independent ready packages run in parallel with disjoint ownership; shared files and real dependencies stay serial. Existing session plans/transcripts support interruption recovery.
+The parent owns the objective, research scope, native todo list, acceptance, approval, and integration. Research uses a read-only worker; after the parent completes research, the native `us-planner` worker drafts a bounded plan. The plan classifies each implementation package as frontend, backend, or genuinely neither. After approval, frontend packages use `us-frontend`, backend packages use `us-backend`, and only genuinely neither packages—such as documentation or tooling—use native `task`; every class includes a single package when applicable. Mixed packages split at that boundary where coherent, and dependencies remain serial. Independent ready packages run in parallel only with disjoint ownership. Existing session plans/transcripts support interruption recovery.
 
-These are prompt instructions, **not enforced stage transitions**. They cannot guarantee model compliance. Ordinary explanations and explicitly focused audits do not start the full development workflow. Plan approval does not authorize publication.
+With ordinary startup after installation, the extension adds a session-local policy alongside its discovery hint; each is added independently and at most once. Only when a relevant `us-*` workflow requires a native stage, the policy permits that required stage. It covers the bounded planner draft after parent research and the selected native implementation worker after approval, including a single package. The parent uses only the active session workspace; the policy never selects a repository globally. It neither authorizes general extra delegation nor starts a workflow, dispatches workers, builds Graphify, or writes workflow state at session open.
+
+These are prompt instructions, **not enforced stage transitions**. They cannot guarantee model compliance or override stronger safety constraints, existing mappings, permissions, approval boundaries, or publication rules. Ordinary explanations and explicitly focused audits do not start the full development workflow. Plan approval does not authorize publication.
 
 | Skill | Selection and responsibility |
 | --- | --- |
@@ -67,7 +69,7 @@ These are prompt instructions, **not enforced stage transitions**. They cannot g
 | `us-grill-me` | Consequential unresolved product/engineering choices; inspect before asking |
 | `us-research` | Current code, callers, conventions, documentation, and memory before planning |
 | `us-plan` | Native planner dispatch, concrete acceptance and ownership, one approval |
-| `us-implement` | Approved implementation and repairs through native `task` workers |
+| `us-implement` | Approved implementation and repairs through classified native frontend, backend, or generic workers |
 | `us-review` | Fresh evidence-based correctness review against acceptance |
 | `us-memory` | Automatic research recall and verified-completion graph/fact updates |
 | `us-concise` | Caveman-lite context/prose guidance; preserves technical meaning and exact text |
@@ -98,14 +100,16 @@ No extension-command wrapper is installed for each skill. Add a matching `skills
 
 ## Native model configuration
 
-Useful Skills bundles one native read-only agent, `us-planner`; it does not add a model router or workflow executor. Configure OMP's native role aliases in the active profile/global config—normally `~/.omp/agent/config.yml`; use `omp config path` if the active profile relocates that directory. A repository can override them in `<repo>/.omp/config.yml`. Project settings override global settings; CLI overlays and runtime options override both.
+Useful Skills bundles native `us-planner`, `us-frontend`, and `us-backend` agents; it does not add a model router or workflow executor. Ordinary installed startup needs no role mapping, global host override, prompt file, or extra flag for the session-local workflow-stage policy. Existing OMP mappings remain authoritative. If you want to choose distinct mappings, use OMP's native roles in the active profile, project configuration, overlays, or runtime options; Useful Skills never changes them.
 
-Open `/model`, then the **Roles** view, to assign and persist role mappings. This example uses only OpenAI Codex selectors; availability depends on your OMP model catalog and credentials, not on this table.
+Open `/model`, then the **Roles** view, to optionally assign and persist role mappings. This example uses only OpenAI Codex selectors; availability depends on your OMP model catalog and credentials, not on this table.
 
 | Role | Native task agent | Example model |
 | --- | --- | --- |
 | `research` | `scout` | `openai-codex/gpt-5.6-luna:xhigh` |
-| `implementation` | `task` | `openai-codex/gpt-5.6-terra:high` |
+| `frontend` | `us-frontend` | `openai-codex/gpt-5.6-terra:high` |
+| `backend` | `us-backend` | `openai-codex/gpt-5.6-terra:high` |
+| `implementation` | `task` (genuinely neither frontend nor backend) | `openai-codex/gpt-5.6-terra:high` |
 | `review` | `reviewer` | `openai-codex/gpt-6-astra:medium` |
 | `security` | `security-reviewer` | `openai-codex/gpt-5.6-sol:high` |
 | `plan` | `us-planner` (bundled, read-only) | `openai-codex/gpt-6-astra:high` |
@@ -113,6 +117,8 @@ Open `/model`, then the **Roles** view, to assign and persist role mappings. Thi
 ```yaml
 modelRoles:
   research: openai-codex/gpt-5.6-luna:xhigh
+  frontend: openai-codex/gpt-5.6-terra:high
+  backend: openai-codex/gpt-5.6-terra:high
   implementation: openai-codex/gpt-5.6-terra:high
   review: openai-codex/gpt-6-astra:medium
   security: openai-codex/gpt-5.6-sol:high
@@ -121,19 +127,22 @@ modelRoles:
 task:
   agentModelOverrides:
     scout: "@research"
+    us-frontend: "@frontend"
+    us-backend: "@backend"
     task: "@implementation"
     reviewer: "@review"
     security-reviewer: "@security"
     us-planner: "@plan"
 ```
 
-Native `task` dispatch selects an **agent type**, not a model. For a dispatched agent, model selection is `task.agentModelOverrides` first, then that agent's `model` frontmatter, then OMP's native fallback (the parent’s active model and its configured/default fallback). Role aliases such as `@review` resolve through `modelRoles`. The bundled `us-planner` declares `model: "@plan"`, so its override above is optional; an existing user override wins. Do not edit user configuration automatically.
+Native dispatch selects an **agent type**, not a model. For every dispatched agent, `task.agentModelOverrides[agentName]` always wins; otherwise OMP uses the agent's `model` frontmatter and then its native fallback. Role aliases such as `@review` resolve through `modelRoles`. `us-frontend` and `us-backend` prioritize `@frontend` and `@backend` respectively, then `@implementation`; `us-planner` declares `model: "@plan"`. These optional mappings and frontmatter do not prove the running worker's model. Do not edit user configuration automatically.
 
-Loading a skill or defining a role does not execute that role's model. `us-plan` explicitly dispatches `us-planner`; `us-implement` explicitly dispatches `task`, including for a single package and in-scope repairs. The parent integrates the plan and requests approval before implementation. Report configured routing separately from observed worker/model metadata.
+Loading a skill or defining a role does not execute that role's model. The installed extension's session-local policy permits the relevant stage only: `us-plan` dispatches a bounded `us-planner` draft after parent research, and `us-implement` dispatches `us-frontend`, `us-backend`, or `task` after approval according to the package classification, including a single package. The parent integrates the plan and requests approval before implementation. Report configured routing separately from actual worker/model metadata when it is available.
 
-Load the package directory and restart OMP so `us-planner` is advertised. If an agent is absent, a role cannot resolve, or stronger host policy prohibits delegation, report the specific limitation rather than silently doing the work in the parent or claiming the requested model ran. A permitted fallback must be identified with its actual routing; it is not proof of the requested role's execution. See [Native model routing](skills/us-workflow/SKILL.md#native-model-routing) for the shared guidance; loading it does not launch the workflow.
+After ordinary installation and restart, the package advertises its native agents and adds its session-local policy without extra configuration. If an agent is absent, no allowed configured/frontmatter/native route resolves, runtime metadata is unavailable, or stronger host policy prohibits delegation, report the specific limitation rather than silently doing the work in the parent or claiming the requested model ran. A permitted fallback must be identified with its actual routing; it is not proof of the requested role's execution. See [Native model routing](skills/us-workflow/SKILL.md#native-model-routing) for the shared guidance; loading it does not launch the workflow.
 
-Some hosts require parent-only planning or prohibit delegating a single work package. Those higher-priority policies still block the corresponding stage; this package cannot override them. Adjusting such host policy requires a separate user-authorized configuration change. Restarting OMP enables discovery but does not remove a policy conflict.
+
+Some hosts require parent-only planning or prohibit delegating a single work package. Those higher-priority policies still block the corresponding stage; this package cannot override them. Report the conflict; do not treat installation, restart, or a host-configuration change as a bypass.
 
 ## Management and optional library
 
@@ -153,7 +162,7 @@ Doctor shows a compact report of resources, safety, native memory, and Graphify 
 
 Broad ECC skills, commands, agents, rules, and supporting files live under `skills/us-library/references/ecc/`. They are **not active skills, injected rules, or native worker overrides**. On an explicit library request, the agent reads only relevant references, for example `skill://us-library/references/ecc/skills/security-audit/SKILL.md`, and translates useful guidance into owned/native conventions. It must not activate legacy workflows or another harness.
 
-The extension adds one short discovery hint, retains independent catastrophic-command protection and common secret-pattern output redaction, and performs quiet read-only update checks. Opening a session never starts a model workflow, dispatches workers, builds memory, or reviews code. `OMP_ECC_SAFETY=off` remains the existing catastrophic-guard opt-out; redaction is not a complete secret detector or a filesystem sandbox.
+The extension adds one short discovery hint and one narrowly scoped, session-local workflow-stage policy, each independently deduplicated; it retains independent catastrophic-command protection and common secret-pattern output redaction, and performs quiet read-only update checks. Opening a session never starts a model workflow, dispatches workers, builds memory, Graphify, or workflow state, or reviews code. `OMP_ECC_SAFETY=off` remains the existing catastrophic-guard opt-out; redaction is not a complete secret detector or a filesystem sandbox.
 
 ## Agent-invoked memory
 
@@ -275,13 +284,11 @@ node --check extension.js
 
 Use Node 22 in CI and at least 80% line/function/branch coverage for changed helpers. Keep authored source/test files at or below [500 physical lines](.agents/CODE_QUALITY.md).
 
-Deterministic helper tests are not evidence that a model follows skills. Live evaluation needs a disposable workspace, clean profile, a normally configured model, native transcripts, and this package loaded as a directory:
+Deterministic helper tests are not evidence that a model follows skills. Live evaluation needs a disposable fresh repository, clean profile, a normally configured model, native transcripts, and the normally installed extension. Start OMP normally after installation—without `-e`, a prompt file, or a host-policy override—and record the package, skills, rules, tools, advertised agents, and any actual worker/model metadata before prompting.
 
-```bash
-omp --profile us-skills-smoke --no-extensions -e /absolute/checkout
-```
+Repeat the same normal development prompt three times. Exercise parent research, the bounded planner draft and approval, frontend, backend, and genuinely neither package classification, the corresponding selected worker—including a single package—independent/shared-file work, both reviews, repair/recovery, memory and fallback-note privacy, concise prose, explanations, focused audits, and isolated delivery. Record actual dispatched-worker and model metadata when available; configuration alone is not proof of runtime routing. Then disable the extension in a separate fresh-repository/profile run and repeat the stage prompt to confirm the extension-provided policy is absent. Never copy credential files. Missing model credentials or unavailable worker metadata is a limitation, not a pass. Fake-`gh` checks are contract simulations; live GitHub delivery requires a separately authorized disposable repository.
 
-Record packages, skills, rules, tools, and advertised agents before prompting. `--no-extensions` does not isolate other discovery subsystems: disable unexpected sources only in the disposable profile. Never copy credential files. Repeat normal development three times; exercise approval, independent/shared-file work, both reviews, repair/recovery, memory and fallback-note privacy, concise prose, explanations, focused audits, and isolated delivery. Missing model credentials is a blocker, not a pass. Fake-`gh` checks are contract simulations; live GitHub delivery requires a separately authorized disposable repository.
+These are live-verification instructions, not recorded runtime acceptance. They do not claim that the check passed or that issue #5's frontend or backend was implemented.
 
 ## Attribution
 

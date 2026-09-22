@@ -106,19 +106,32 @@ console.log(JSON.stringify({ marketplace: [] }));
     });
   }
 });
-
-test("startup and prompts only advertise skills, without memory or workflow side effects", async t => {
+test("session prompts receive independent, idempotent workflow guidance without workflow or memory side effects", async t => {
   const f = await fixture(t);
   let nativeCalls = 0;
   f.ctx.memory = { status: async () => { nativeCalls++; return {}; } };
+  const hook = f.events.get("before_agent_start");
+  const basePrompt = Object.freeze(["preserve this instruction"]);
+  const first = hook({ systemPrompt: basePrompt, prompt: "build a simulator" }, f.ctx);
+
+  assert.deepEqual(basePrompt, ["preserve this instruction"], "the incoming prompt must not be mutated");
+  assert.notEqual(first.systemPrompt, basePrompt);
+  assert.deepEqual(first.systemPrompt.slice(0, 1), basePrompt, "existing instructions must be preserved");
+  assert.equal(first.systemPrompt.length, 3);
+  const [discovery, policy] = first.systemPrompt.slice(1);
+
+  const discoveryOnly = hook({ systemPrompt: ["base", discovery] }, f.ctx);
+  assert.deepEqual(discoveryOnly.systemPrompt, ["base", discovery, policy]);
+  const policyOnly = hook({ systemPrompt: ["base", policy] }, f.ctx);
+  assert.deepEqual(policyOnly.systemPrompt, ["base", policy, discovery]);
+  assert.equal(hook({ systemPrompt: first.systemPrompt }, f.ctx), undefined, "repeating a prompt must not add guidance again");
+
+  const otherSession = hook({ systemPrompt: ["other workspace"] }, { ...f.ctx, cwd: path.join(f.root, "other") });
+  assert.deepEqual(otherSession.systemPrompt, ["other workspace", discovery, policy], "guidance must not retain session or workspace state");
   await f.events.get("session_start")({}, f.ctx);
   await f.events.get("session_start")({}, f.ctx);
-  assert.equal(f.timers.length, 1);
-  const hint = await f.events.get("before_agent_start")({ systemPrompt: ["base"], prompt: "build a simulator" }, f.ctx);
-  assert.equal(hint.systemPrompt.length, 2);
-  assert.ok(hint.systemPrompt[1].length < 300);
-  assert.equal(await f.events.get("before_agent_start")({ systemPrompt: hint.systemPrompt }, f.ctx), undefined);
-  await f.events.get("session_stop")?.({}, f.ctx);
+  assert.equal(f.timers.length, 1, "only the existing quiet update check is scheduled");
+  assert.deepEqual([...f.events.keys()], ["before_agent_start", "tool_call", "tool_result", "session_start"]);
   assert.equal(nativeCalls, 0);
   assert.deepEqual(await readdir(f.root), []);
   assert.deepEqual([...f.commands.keys()], ["useful-skills"]);
@@ -204,11 +217,8 @@ test("doctor formats fresh, disabled, and failed memory states for consumers", a
   await handler("doctor", f.ctx);
   assert.match(f.messages.at(-1).message, /Native: Error — Native memory status failed: profile unavailable/);
 });
-
 test("headless help does not start another model turn; menu cancellation is inert", async t => {
   const f = await fixture(t, false);
-  await f.events.get("session_start")({}, f.ctx);
-  assert.equal(f.timers.length, 0);
   await f.commands.get("useful-skills").handler("", f.ctx);
   assert.deepEqual(f.messages.at(-1).options, { triggerTurn: false });
   const count = f.messages.length;

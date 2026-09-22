@@ -1,6 +1,6 @@
 # Native implementation work-package brief
 
-Load `skill://us-concise` before responding. This brief assigns exactly one approved work package to the native `task` worker. Its implementation role is configured separately (normally `@implementation`); that configured route is not proof of the observed running model, and the worker must not select or claim a model. Perform only the assigned task. Do not launch the full workflow, delegate again, publish, commit, push, merge, open a PR, or alter files outside this assignment.
+Load `skill://us-concise` before responding. This brief assigns exactly one approved, classified work package to its selected native worker: frontend uses `us-frontend` (`@frontend`, then `@implementation`), backend uses `us-backend` (`@backend`, then `@implementation`), and genuinely neither uses `task` (normally `@implementation`). `task.agentModelOverrides[agentName]` always wins; agent frontmatter and configured roles do not prove the observed running model. The parent selects the classification and worker; the worker must not select or claim a model. Perform only the assigned task. Do not launch the full workflow, delegate again, publish, commit, push, merge, open a PR, or alter files outside this assignment.
 
 ## Objective
 
@@ -12,7 +12,8 @@ Load `skill://us-concise` before responding. This brief assigns exactly one appr
 
 ## Scope / owned files
 
-Own only: `<Parent fills exact files to create/change and any permitted test files.>` Read dependent files as needed, but do not modify shared manifests, caller files, or another worker's paths.
+Own only: `<Parent fills package classification, selected worker, exact files to create/change, and any permitted test files.>` Read dependent files as needed, but do not modify shared manifests, caller files, or another worker's paths.
+- Work only in the active session workspace; do not select a repository globally.
 
 ## Constraints
 
@@ -21,7 +22,7 @@ Own only: `<Parent fills exact files to create/change and any permitted test fil
 - For a bug or uncertain behavior, establish a behavioral regression before changing implementation when practical.
 - Keep tests consumer-observable; do not add source-text, prompt-wording, forwarding, or mock-echo tests.
 - Run only scoped verification requested by the parent; do not start project-wide checks while parallel edits are active.
-- Return a limitation rather than inventing a role, model, worker, fallback, or additional delegation when stronger host policy prevents the assigned work.
+- Return a limitation rather than inventing a role, model, worker, fallback, reclassification, or additional delegation when stronger host policy prevents the assigned work.
 
 ## Acceptance
 
@@ -29,4 +30,4 @@ Own only: `<Parent fills exact files to create/change and any permitted test fil
 
 ## Output
 
-Return changed paths, a concise account of the observable behavior implemented, scoped verification actually run and its observed result, retained regression tests and their contract, plus exact blockers/limitations. A completion claim is evidence for the parent to inspect, not approval to publish or proof of the routed model.
+Return changed paths, a concise account of the observable behavior implemented, scoped verification actually run and its observed result, retained regression tests and their contract, plus exact blockers/limitations. Include the assigned package classification and any actual worker/model metadata supplied at runtime. A completion claim is evidence for the parent to inspect, not approval to publish or proof of the routed model.

@@ -7,7 +7,7 @@ description: Use automatically after clarification and source research to turn a
 
 Load `skill://us-concise`. Use evidence from `skill://us-research` and settled decisions from `skill://us-grill-me`; inspect additional source only to close a concrete gap. A plan is a human-readable handoff, not a workflow database.
 
-Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `skill://us-workflow`; that guidance does not launch the workflow. The parent owns research, scope, decomposition, and integration. It then dispatches the advertised native `us-planner` worker to draft the bounded implementation plan from that evidence. Its registration declares `model: @plan` and read-only `read`, `grep`, and `glob` tools; `task.agentModelOverrides.us-planner` takes precedence, and OMP uses its native fallback only after frontmatter. Neither configuration nor frontmatter proves the running worker's model. Do not pass a model, switch models, or edit user configuration. Report configured routing separately from observed runtime model metadata when available.
+Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `skill://us-workflow`; that guidance does not launch the workflow. Ordinary installed startup supplies the narrowly scoped session-local policy required for the bounded planner stage, so no host override, prompt file, or extra startup flag is needed. The parent must first complete research and own scope, decomposition, and integration in the active session workspace; it never selects a repository globally. It then dispatches the advertised native `us-planner` worker to draft a bounded implementation plan from that evidence. Existing mappings remain authoritative. The registration declares `model: @plan`; `task.agentModelOverrides.us-planner` takes precedence, and OMP uses its native fallback only after frontmatter. Neither configuration nor frontmatter proves the running worker's model. Do not pass a model, switch models, or edit user configuration. Report configured routing separately from actual worker/model metadata when available. Stronger host policy can still prohibit the stage.
 
 ## Inputs
 
@@ -21,12 +21,12 @@ State:
 
 - acceptance criteria and non-goals observable by a user or consumer;
 - exact files to create or change, relevant symbols, interfaces/contracts, data migration or dependency effects, and callers that must move together;
-- ordered work packages with ownership boundaries, including which ready packages can run in parallel and which must stay serial because they share files, manifests, or interfaces;
+- ordered work packages with ownership boundaries and a frontend, backend, or genuinely neither classification: frontend uses `us-frontend` with `@frontend` then `@implementation`, backend uses `us-backend` with `@backend` then `@implementation`, and only genuinely neither work—such as documentation or tooling—uses `task`/`@implementation`; split mixed packages where coherent, retain dependencies serial, and run only ready disjoint packages in parallel;
 - meaningful behavioral verification for each changed surface, including an empty project; missing existing scripts is not permission to omit verification;
 - test changes only where a plausible behavioral regression needs lasting coverage, plus a throwaway smoke path where that is more appropriate;
 - correctness and security review scope, repair path, documentation/cleanup impact, risks, and explicit unresolved decisions.
 
-Keep every package specific enough for a fresh implementation worker: names, inputs/outputs, acceptance, and evidence are concrete. Prefer existing repository patterns and avoid speculative abstractions. Use native session plan artifacts and `todo`, not an external ledger, command family, scheduler, or workflow engine.
+Keep every package specific enough for its selected implementation worker: classification, names, inputs/outputs, acceptance, and evidence are concrete. Existing `task.agentModelOverrides[agentName]` always wins over agent frontmatter; optional frontend/backend role mappings do not require configuration and must not be reported as observed runtime routing. Prefer existing repository patterns and avoid speculative abstractions. Use native session plan artifacts and `todo`, not an external ledger, command family, scheduler, or workflow engine.
 
 ## Approval boundary
 

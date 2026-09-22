@@ -7,6 +7,7 @@ import {
 } from "./resources.js";
 
 const DISCOVERY_HINT = "Choose relevant `us-*` skills by their descriptions. For software-development requests consult `us-workflow`; for focused audits or delivery consult the matching skill. Load only needed instructions.";
+const WORKFLOW_POLICY = "When a relevant `us-*` workflow requires a native stage, permit that required stage, including one worker, as a narrow exception to general minimum-delegation or parent-only planning guidance: after parent research, a bounded `us-planner` plan draft is permitted; after approval, a required implementation worker (`task`, `us-frontend`, or `us-backend`) is permitted. The parent retains scope, integration, and approval. Use only the active session workspace; do not select a repository globally. Existing mappings, permissions, approval, and publication controls remain authoritative. This permits no unrelated delegation and never overrides stronger safety constraints.";
 const HELP = [
   "Useful Skills for Oh My Pi",
   "/skill:us-<name> — load an owned skill; natural requests also select skills by description.",
@@ -103,8 +104,11 @@ export default function usefulSkills(pi) {
     },
   });
   pi.on("before_agent_start", event => {
-    if (event.systemPrompt.some(prompt => prompt.includes(DISCOVERY_HINT))) return;
-    return { systemPrompt: [...event.systemPrompt, DISCOVERY_HINT] };
+    const additions = [
+      ...(!event.systemPrompt.some(prompt => prompt.includes(DISCOVERY_HINT)) ? [DISCOVERY_HINT] : []),
+      ...(!event.systemPrompt.some(prompt => prompt.includes(WORKFLOW_POLICY)) ? [WORKFLOW_POLICY] : []),
+    ];
+    return additions.length ? { systemPrompt: [...event.systemPrompt, ...additions] } : undefined;
   });
   pi.on("tool_call", event => {
     if (!safetyEnabled() || event.toolName !== "bash") return;
