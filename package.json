@@ -1,6 +1,6 @@
 {
   "name": "oh-my-pi-useful-skills",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "Owned skill-led development workflows and OMP-native memory support",
   "type": "module",
   "private": true,
