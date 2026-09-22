@@ -53,6 +53,16 @@ flowchart TD
     limit -->|No| repair["Repair<br/>approved scope"]
     repair --> verify
     limit -->|Reached| blocked["Keep work<br/>Report blocker"]
+    classDef blue fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:2px;
+    classDef violet fill:#ede9fe,stroke:#7c3aed,color:#2e1065,stroke-width:2px;
+    classDef teal fill:#ccfbf1,stroke:#0d9488,color:#134e4a,stroke-width:2px;
+    classDef amber fill:#fef3c7,stroke:#d97706,color:#451a03,stroke-width:2px;
+    classDef rose fill:#ffe4e6,stroke:#e11d48,color:#4c0519,stroke-width:2px;
+    class request,research blue;
+    class clarify,plan,outcome,limit,repair amber;
+    class implement violet;
+    class verify,correctness,security,summary,memory teal;
+    class blocked rose;
 ```
 
 Verification failures return to implementation. Repairs repeat verification and **both** reviews. Three unsuccessful repair rounds or repeated no progress stop the loop; memory failures prevent claiming the full workflow complete. Publication is a separate, explicitly authorized action—not the next automatic step.
@@ -109,10 +119,14 @@ Open `/model`, then the **Roles** view, to optionally assign and persist role ma
 | `research` | `scout` | `openai-codex/gpt-5.6-luna:xhigh` |
 | `frontend` | `frontend` | `openai-codex/gpt-5.6-terra:high` |
 | `backend` | `backend` | `openai-codex/gpt-5.6-terra:high` |
-| `implementation` | `task` (genuinely neither frontend nor backend) | `openai-codex/gpt-5.6-terra:high` |
+| `implementation` | `task` | `openai-codex/gpt-5.6-terra:high` |
 | `review` | `reviewer` | `openai-codex/gpt-6-astra:medium` |
 | `security` | `security-reviewer` | `openai-codex/gpt-5.6-sol:high` |
-| `plan` | `planner` (bundled, read-only) | `openai-codex/gpt-6-astra:high` |
+| `plan` | `planner` | `openai-codex/gpt-6-astra:high` |
+
+`task` is reserved for work genuinely neither frontend nor backend.
+
+`planner` is bundled and read-only.
 
 ```yaml
 modelRoles:
@@ -170,12 +184,21 @@ The extension adds one short discovery hint and one narrowly scoped, session-loc
 
 ```mermaid
 flowchart TD
+%%{init: {"flowchart":{"useMaxWidth":true,"nodeSpacing":24,"rankSpacing":30,"padding":10,"wrappingWidth":160},"themeVariables":{"fontSize":"14px"}}}%%
     agent["Agent follows us-memory"] --> tool["us_memory"]
-    tool -->|search / save| native["Native OMP memory backend"]
+    tool -->|search / save| native["Native OMP memory<br/>backend"]
     native --> facts["Mnemopi recommended<br/>Facts, decisions, lessons"]
     tool -->|build / query| graphify["Graphify"]
-    graphify --> code["Code relationship graph<br/>Project-scoped storage outside checkout"]
-    tool -->|status| status["Read-only status of both backends"]
+    graphify --> code["Code relationship graph<br/>Project-scoped storage<br/>outside checkout"]
+    tool -->|status| status["Read-only status<br/>of both backends"]
+    classDef blue fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:2px;
+    classDef violet fill:#ede9fe,stroke:#7c3aed,color:#2e1065,stroke-width:2px;
+    classDef teal fill:#ccfbf1,stroke:#0d9488,color:#134e4a,stroke-width:2px;
+    classDef cyan fill:#cffafe,stroke:#0891b2,color:#164e63,stroke-width:2px;
+    class agent blue;
+    class tool violet;
+    class native,facts,status teal;
+    class graphify,code cyan;
 ```
 
 Graphify setup is lazy: only an explicit `build` or `query` prepares its managed dependencies. Opening a session does not install dependencies, build a graph, or start a workflow. With native memory unavailable, the agent can maintain fallback notes using file tools; `us_memory` does not silently save them.
