@@ -20,6 +20,17 @@ async function lockFixture(t) {
   return { lockFile };
 }
 
+function simulateDarwinLockf(file, args, options) {
+  assert.equal(file, "/usr/bin/lockf");
+  assert.deepEqual(args.slice(0, 3), ["-s", "-t", String(Math.ceil((options.timeoutMs - 250) / 1_000))]);
+  assert.equal(args[3], "3");
+  assert.equal(options.inheritedFds.length, 1);
+  return runProcess("/usr/bin/flock", [
+    "--exclusive", "--timeout", String((options.timeoutMs - 250) / 1_000),
+    "--conflict-exit-code", "75", "3",
+  ], options);
+}
+
 async function waitForOutput(child, expected) {
   let output = "";
   for await (const chunk of child.stdout) {
@@ -209,4 +220,106 @@ test("locked execution rejects invalid capabilities and unbounded deadlines befo
   assert.throws(() => createLockedRunner(runProcess, { fd: -1 }), /file descriptor/);
   const run = createLockedRunner(runProcess, { fd: 0 });
   assert.throws(() => run("/not/launched", [], { timeoutMs: 0 }), /positive safe integer/);
+});
+
+test("Darwin lock helper excludes contenders and releases on cancellation (Linux-host simulation)", async (t) => {
+  const { lockFile } = await lockFixture(t);
+  let lockfCalls = 0;
+  const run = (...args) => {
+    lockfCalls += 1;
+    return simulateDarwinLockf(...args);
+  };
+  const owner = await acquireSetupLock(lockFile, { platform: "darwin", run });
+  assert.equal(lockfCalls, 1);
+  t.after(() => owner.release());
+  await assert.rejects(acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf, timeoutMs: 35 }), /timed out after 35ms/i);
+  const controller = new AbortController();
+  const reason = new Error("cancelled while waiting");
+  setTimeout(() => controller.abort(reason), 30);
+  await assert.rejects(acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf, signal: controller.signal }), (error) => error === reason);
+  await owner.release();
+  const next = await acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf, timeoutMs: 1_000 });
+  await next.release();
+});
+
+test("Darwin watchdog bounds an orphan writer and holds its advisory lock (Linux-host simulation)", async (t) => {
+  const { lockFile } = await lockFixture(t);
+  const readyFile = `${lockFile}.darwin-writer`;
+  const lockModule = pathToFileURL(path.resolve(import.meta.dirname, "../setup-lock.js")).href;
+  const runnerModule = pathToFileURL(path.resolve(import.meta.dirname, "../setup-runner.js")).href;
+  const processModule = pathToFileURL(path.resolve(import.meta.dirname, "../process.js")).href;
+  const writer = [
+    'import { writeFile } from "node:fs/promises";',
+    'await writeFile(process.argv.at(-1), String(process.ppid));',
+    'process.on("SIGTERM", () => {});',
+    'setInterval(() => {}, 1_000);',
+  ].join("\n");
+  const source = [
+    `import { acquireSetupLock } from ${JSON.stringify(lockModule)};`,
+    `import { createLockedRunner } from ${JSON.stringify(runnerModule)};`,
+    `import { runProcess } from ${JSON.stringify(processModule)};`,
+    'import assert from "node:assert/strict";',
+    `const simulateDarwinLockf = ${simulateDarwinLockf.toString()};`,
+    "const lease = await acquireSetupLock(process.argv.at(-2), { platform: 'darwin', run: simulateDarwinLockf });",
+    "const run = createLockedRunner(runProcess, lease, { platform: 'darwin' });",
+    `void run(process.execPath, ["--input-type=module", "--eval", ${JSON.stringify(writer)}, process.argv.at(-1)],`,
+    "  { cwd: process.cwd(), env: { PATH: '/usr/bin:/bin' }, timeoutMs: 450, maxBytes: 4096 }).catch(() => {});",
+    'process.stdout.write("watching\\n");',
+    "setInterval(() => {}, 1_000);",
+  ].join("\n");
+  const coordinator = spawn(process.execPath, ["--input-type=module", "--eval", source, lockFile, readyFile], {
+    env: { PATH: "/usr/bin:/bin" }, stdio: ["ignore", "pipe", "pipe"],
+  });
+  let watchdogPid;
+  t.after(() => {
+    coordinator.kill("SIGKILL");
+    if (watchdogPid) {
+      try { process.kill(-watchdogPid, "SIGKILL"); } catch (error) {
+        if (error?.code !== "ESRCH") throw error;
+      }
+    }
+  });
+  await waitForOutput(coordinator, "watching");
+  watchdogPid = Number(await waitForFile(readyFile));
+  assert.ok(Number.isSafeInteger(watchdogPid) && watchdogPid > 0);
+  coordinator.kill("SIGKILL");
+  await once(coordinator, "close");
+  await assert.rejects(acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf, timeoutMs: 80 }), /timed out/i);
+  await waitForProcessGroupExit(watchdogPid);
+  const next = await acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf, timeoutMs: 1_000 });
+  await next.release();
+});
+
+test("Darwin watchdog cancellation stops resistant writers and releases the lease (Linux-host simulation)", async (t) => {
+  const { lockFile } = await lockFixture(t);
+  const readyFile = `${lockFile}.cancel-ready`;
+  const lease = await acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf });
+  t.after(() => lease.release());
+  const controller = new AbortController();
+  const writer = [
+    'import { writeFile } from "node:fs/promises";',
+    'await writeFile(process.argv.at(-1), String(process.ppid));',
+    'process.on("SIGTERM", () => {});',
+    'setInterval(() => {}, 1_000);',
+  ].join("\n");
+  const run = createLockedRunner(runProcess, lease, { platform: "darwin" });
+  const ongoing = run(process.execPath, ["--input-type=module", "--eval", writer, readyFile], {
+    cwd: path.dirname(lockFile),
+    env: { PATH: "/usr/bin:/bin" },
+    signal: controller.signal,
+    timeoutMs: 5_000,
+    maxBytes: 4_096,
+  });
+  const watchdogPid = Number(await waitForFile(readyFile));
+  t.after(() => {
+    try { process.kill(-watchdogPid, "SIGKILL"); } catch (error) {
+      if (error?.code !== "ESRCH") throw error;
+    }
+  });
+  controller.abort(new Error("stop setup"));
+  await assert.rejects(ongoing, /cancelled/i);
+  await waitForProcessGroupExit(watchdogPid);
+  await lease.release();
+  const next = await acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf, timeoutMs: 1_000 });
+  await next.release();
 });

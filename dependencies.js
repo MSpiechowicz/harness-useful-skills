@@ -23,8 +23,10 @@ function requiredAgentDir(agentDir) {
   if (typeof agentDir !== "string" || !agentDir) throw new TypeError("agentDir must be a non-empty path.");
   return path.resolve(agentDir);
 }
-function platformKey() {
-  return process.platform === "linux" && process.arch === "x64" ? "linux-x64" : undefined;
+function platformKey(platform, arch) {
+  if (platform === "linux" && arch === "x64") return "linux-x64";
+  if (platform === "darwin" && arch === "arm64") return "darwin-arm64";
+  return undefined;
 }
 function isApprovedUrl(value) {
   try {
@@ -86,9 +88,9 @@ async function regularFile(file) {
   }
 }
 
-function validateManifest(value) {
-  const key = platformKey();
-  if (!key) throw new Error(`Managed Graphify setup is unsupported on ${process.platform}/${process.arch}.`);
+function validateManifest(value, platform, arch) {
+  const key = platformKey(platform, arch);
+  if (!key) throw new Error(`Managed Graphify setup is unsupported on ${platform}/${arch}.`);
   const uv = value?.uv?.platforms?.[key];
   const python = value?.python?.platforms?.[key];
   const valid = value?.schemaVersion === 1
@@ -171,11 +173,13 @@ async function readMarker(root) {
   }
 }
 
-function archiveEntries(listing) {
+function archiveEntries(listing, platform) {
   const entries = [];
   for (const line of listing.split("\n")) {
     if (!line) continue;
-    const match = line.match(/^([\-dlh])\S*\s+.*?\s+\d+\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+(.+)$/);
+    const match = platform === "darwin"
+      ? line.match(/^([\-dlh])[\-rwxstST]{9}[+@.]?\s+\d+\s+\S+\s+\S+\s+\d+\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+(?:\d{1,2}:\d{2}|\d{4})\s+(.+)$/)
+      : line.match(/^([\-dlh])\S*\s+.*?\s+\d+\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+(.+)$/);
     if (!match) throw new Error("Dependency archive has an unsupported entry format.");
     const [, type, rest] = match;
     const marker = type === "l" ? " -> " : type === "h" ? " link to " : undefined;
@@ -243,17 +247,30 @@ export function createDependencyManager({
   fetch: fetcher = globalThis.fetch,
   run = runProcess,
   setupTimeoutMs = SETUP_TIMEOUT_MS,
+  platform = process.platform,
+  arch = process.arch,
 } = {}) {
   if (typeof fetcher !== "function" || typeof run !== "function") throw new TypeError("Dependency transport and process runner must be functions.");
+  if (typeof platform !== "string" || typeof arch !== "string") throw new TypeError("platform and arch must be strings.");
   if (!Number.isSafeInteger(setupTimeoutMs) || setupTimeoutMs <= 0) throw new TypeError("setupTimeoutMs must be a positive safe integer.");
-
   async function layout(agentDir) {
     const [manifestBytes, lock] = await Promise.all([
       readFile(path.join(dependenciesRoot, "manifest.json")),
       readFile(path.join(dependenciesRoot, "graphify.lock")),
     ]);
-    const metadata = validateManifest(JSON.parse(manifestBytes));
-    const lockHash = hash(Buffer.concat([manifestBytes, Buffer.from([0]), lock]));
+    const metadata = validateManifest(JSON.parse(manifestBytes), platform, arch);
+    // Linux's original manifest bytes are its established cache identity; adding
+    // another platform's metadata must not invalidate healthy Linux installs.
+    const cacheManifest = metadata.key === "linux-x64" && JSON.parse(manifestBytes).uv.platforms["darwin-arm64"]
+      ? (() => {
+        const linuxOnly = JSON.parse(manifestBytes);
+        delete linuxOnly.uv.platforms["darwin-arm64"];
+        delete linuxOnly.python.platforms["darwin-arm64"];
+        const indent = manifestBytes.toString("utf8").match(/\n([ \t]+)"schemaVersion"/)?.[1] ?? "";
+        return Buffer.from(JSON.stringify(linuxOnly, null, indent) + (manifestBytes.at(-1) === 10 ? "\n" : ""));
+      })()
+      : manifestBytes;
+    const lockHash = hash(Buffer.concat([cacheManifest, Buffer.from([0]), lock]));
     const root = dependencyDirectory(agentDir);
     const versionRoot = path.join(root, lockHash);
     return {
@@ -320,11 +337,11 @@ export function createDependencyManager({
       timeoutMs: 30_000,
       maxBytes: COMMAND_MAX_BYTES,
     });
-    return archiveEntries(result.stdout);
+    return archiveEntries(result.stdout, platform);
   }
 
   async function build(state, signal, lease) {
-    const runLocked = createLockedRunner(run, lease);
+    const runLocked = createLockedRunner(run, lease, { platform });
     const stage = await mkdtemp(path.join(state.root, `.setup-${state.lockHash}-`));
     const stageEnvironment = environment(stage);
     let versionCreated = false;
@@ -341,7 +358,9 @@ export function createDependencyManager({
       if (!entries.some((entry) => entry.type === "-" && entry.name === state.metadata.uv.executable)) {
         throw new Error("Dependency archive did not contain the pinned uv executable.");
       }
-      await runLocked("/usr/bin/tar", ["-xzf", uvArchive, "--no-same-owner", "--no-same-permissions"], {
+      await runLocked("/usr/bin/tar", platform === "darwin"
+        ? ["-xozf", uvArchive]
+        : ["-xzf", uvArchive, "--no-same-owner", "--no-same-permissions"], {
         cwd: stage,
         env: stageEnvironment,
         signal,
@@ -361,7 +380,7 @@ export function createDependencyManager({
         maxBytes: 4096,
       });
 
-      if (uvVersion.stdout.trim() !== "uv 0.12.17 (x86_64-unknown-linux-gnu)") throw new Error("Downloaded uv version did not match committed metadata.");
+      if (uvVersion.stdout.trim() !== `uv 0.12.17 (${platform === "darwin" ? "aarch64-apple-darwin" : "x86_64-unknown-linux-gnu"})`) throw new Error("Downloaded uv version did not match committed metadata.");
       const pythonArchive = path.join(stage, "python.tar.gz");
       await download(state.metadata.python.url, state.metadata.python.sha256, pythonArchive, signal, fetcher);
       const mirror = path.join(stage, "python-mirror");
@@ -424,13 +443,13 @@ export function createDependencyManager({
   }
 
   async function status({ agentDir } = {}) {
-    const key = platformKey();
+    const key = platformKey(platform, arch);
     if (!key) {
       return {
         ready: false,
         state: "unsupported",
-        platform: `${process.platform}-${process.arch}`,
-        reason: "Only linux-x64 has validated managed downloads.",
+        platform: `${platform}-${arch}`,
+        reason: "Only linux-x64 and darwin-arm64 have validated managed downloads.",
       };
     }
     const state = await layout(agentDir);
@@ -448,6 +467,7 @@ export function createDependencyManager({
   }
 
   async function ensure({ agentDir, signal } = {}) {
+    if (!platformKey(platform, arch)) throw new Error(`Managed Graphify setup is unsupported on ${platform}/${arch}.`);
     const deadline = createDeadline(signal, setupTimeoutMs);
     let lease;
     try {
@@ -464,6 +484,8 @@ export function createDependencyManager({
       lease = await acquireSetupLock(path.join(root, ".setup.lock"), {
         signal: deadline.signal,
         timeoutMs: setupTimeoutMs,
+        platform,
+        run,
       });
       if (!await ready(state, deadline.signal)) await build(state, deadline.signal, lease);
       if (!await ready(state, deadline.signal)) throw new Error("Managed Graphify installation did not activate.");

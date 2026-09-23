@@ -7,6 +7,7 @@ import test from "node:test";
 
 import { acquireSetupLock } from "../setup-lock.js";
 import { createDependencyManager } from "../dependencies.js";
+import { runProcess } from "../process.js";
 
 const committedDependencies = path.resolve(import.meta.dirname, "../dependencies");
 const digest = (value) => createHash("sha256").update(value).digest("hex");
@@ -31,7 +32,10 @@ async function fixture(t) {
   await mkdir(dependenciesRoot);
   await writeFile(path.join(dependenciesRoot, "manifest.json"), manifest);
   await writeFile(path.join(dependenciesRoot, "graphify.lock"), lock);
-  const lockHash = digest(Buffer.concat([Buffer.from(manifest), Buffer.from([0]), lock]));
+  const linuxOnly = JSON.parse(manifest);
+  delete linuxOnly.uv.platforms["darwin-arm64"];
+  delete linuxOnly.python.platforms["darwin-arm64"];
+  const lockHash = digest(Buffer.concat([Buffer.from(JSON.stringify(linuxOnly)), Buffer.from([0]), lock]));
   const storage = path.join(agentDir, "useful-skills", "dependencies");
   const versionRoot = path.join(storage, lockHash);
   return { root, agentDir, dependenciesRoot, archive, manifest, lockHash, storage, versionRoot,
@@ -51,9 +55,11 @@ async function installedFixture(t) {
 function manager(source, options = {}) {
   return createDependencyManager({
     dependenciesRoot: source.dependenciesRoot,
-    run: unexpectedRun,
     fetch: async () => new Response(source.archive),
     ...options,
+    run: (file, args, processOptions) => file === "/usr/bin/flock"
+      ? runProcess(file, args, processOptions)
+      : (options.run ?? unexpectedRun)(file, args, processOptions),
   });
 }
 

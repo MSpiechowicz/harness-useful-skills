@@ -7,6 +7,7 @@ import test from "node:test";
 
 import { acquireSetupLock } from "../setup-lock.js";
 import { createDependencyManager, dependencyStatus } from "../dependencies.js";
+import { runProcess } from "../process.js";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
 const dependenciesRoot = path.join(repositoryRoot, "dependencies");
@@ -16,6 +17,13 @@ function sha256(value) {
 }
 
 function dependencyLockHash(manifest, lock) {
+  const original = JSON.parse(manifest);
+  if (original.uv.platforms["darwin-arm64"]) {
+    delete original.uv.platforms["darwin-arm64"];
+    delete original.python.platforms["darwin-arm64"];
+    const indent = manifest.toString().match(/\n([ \t]+)"schemaVersion"/)?.[1] ?? "";
+    manifest = Buffer.from(JSON.stringify(original, null, indent) + (manifest.at(-1) === 10 ? "\n" : ""));
+  }
   return sha256(Buffer.concat([Buffer.from(manifest), Buffer.from([0]), Buffer.from(lock)]));
 }
 
@@ -80,6 +88,35 @@ function response(body, { status = 200, location } = {}) {
   };
 }
 
+function simulateDarwinLockf(file, args, options) {
+  assert.equal(file, "/usr/bin/lockf");
+  assert.deepEqual(args, ["-s", "-t", String(Math.ceil((options.timeoutMs - 250) / 1_000)), "3"]);
+  assert.equal(options.inheritedFds.length, 1);
+  return runProcess("/usr/bin/flock", [
+    "--exclusive", "--timeout", String((options.timeoutMs - 250) / 1_000),
+    "--conflict-exit-code", "75", "3",
+  ], options);
+}
+
+
+async function darwinFixture(t) {
+  const source = await fixture(t);
+  const manifest = JSON.parse(source.manifest);
+  manifest.uv.platforms["darwin-arm64"] = {
+    url: "https://github.com/example/darwin-uv.tar.gz",
+    sha256: sha256(source.uvArchive),
+    archive: "tar.gz",
+    executable: "uv-aarch64-apple-darwin/uv",
+  };
+  manifest.python.platforms["darwin-arm64"] = {
+    url: "https://github.com/example/darwin-python.tar.gz",
+    sha256: sha256(source.pythonArchive),
+    mirror: "https://github.com/example",
+    archive: "cpython-3.12.14+20260901-aarch64-apple-darwin-install_only_stripped.tar.gz",
+  };
+  await writeFile(path.join(source.dependencyRoot, "manifest.json"), JSON.stringify(manifest));
+  return source;
+}
 test("dependency status is read-only when no profile state exists", async (t) => {
   const parent = await mkdtemp(path.join(os.tmpdir(), "useful-skills-dependencies-"));
   t.after(() => rm(parent, { recursive: true, force: true }));
@@ -89,6 +126,35 @@ test("dependency status is read-only when no profile state exists", async (t) =>
 
   assert.equal(result.ready, false);
   await assert.rejects(stat(agentDir), { code: "ENOENT" });
+});
+
+test("Darwin ARM64 dependency status is read-only and reports a managed target", async (t) => {
+  const source = await fixture(t);
+  const result = await createDependencyManager({
+    dependenciesRoot,
+    platform: "darwin",
+    arch: "arm64",
+  }).status({ agentDir: source.agentDir });
+  assert.equal(result.platform, "darwin-arm64");
+  assert.equal(result.state, "missing");
+  await assert.rejects(stat(source.agentDir), { code: "ENOENT" });
+});
+
+test("adding Darwin metadata retains the pre-existing Linux installation identity", async (t) => {
+  const agentDir = await mkdtemp(path.join(os.tmpdir(), "useful-skills-cache-key-"));
+  t.after(() => rm(agentDir, { recursive: true, force: true }));
+  const status = await dependencyStatus({ agentDir });
+  assert.equal(status.lockHash, "cef1866e1184ad64821a75807128d758254ff84056ec8b0de43d0c61d6d40500");
+});
+
+test("unsupported targets fail before setup creates profile storage", async (t) => {
+  const source = await fixture(t);
+  for (const [platform, arch] of [["darwin", "x64"], ["linux", "arm64"], ["win32", "x64"]]) {
+    const manager = createDependencyManager({ dependenciesRoot, platform, arch });
+    assert.equal((await manager.status({ agentDir: source.agentDir })).state, "unsupported");
+    await assert.rejects(manager.ensure({ agentDir: source.agentDir }), /unsupported/i);
+  }
+  await assert.rejects(stat(source.agentDir), { code: "ENOENT" });
 });
 
 test("dependency status identifies a partial version directory without repairing it", async (t) => {
@@ -156,7 +222,10 @@ test("setup rejects redirects outside approved HTTPS release hosts", async (t) =
   const manager = createDependencyManager({
     dependenciesRoot: source.dependencyRoot,
     fetch: async url => { fetched.push(url); return response(null, { status: 302, location: "https://evil.example/archive" }); },
-    run: async () => { throw new Error("archive processing must not start"); },
+    run: async (file, args, options) => {
+      if (file === "/usr/bin/flock") return runProcess(file, args, options);
+      throw new Error("archive processing must not start");
+    },
   });
 
   await assert.rejects(manager.ensure({ agentDir: source.agentDir }), /unapproved location/i);
@@ -169,7 +238,8 @@ test("setup rejects unsafe archive links before extraction", async (t) => {
   const manager = createDependencyManager({
     dependenciesRoot: source.dependencyRoot,
     fetch: async (url) => response(url.endsWith("uv.tar.gz") ? source.uvArchive : source.pythonArchive),
-    run: async (_file, args) => {
+    run: async (file, args, options) => {
+      if (file === "/usr/bin/flock") return runProcess(file, args, options);
       if (args.includes("-tvzf")) return { stdout: "lrwxrwxrwx root/root 0 2026-01-01 00:00 uv/uv -> ../../outside\n", stderr: "" };
       throw new Error("unsafe archive must not be extracted");
     },
@@ -183,7 +253,10 @@ test("setup rejects a corrupt download before archive processing", async (t) => 
   const manager = createDependencyManager({
     dependenciesRoot: source.dependencyRoot,
     fetch: async () => response(Buffer.from("corrupt")),
-    run: async () => { throw new Error("corrupt download must not be processed"); },
+    run: async (file, args, options) => {
+      if (file === "/usr/bin/flock") return runProcess(file, args, options);
+      throw new Error("corrupt download must not be processed");
+    },
   });
 
   await assert.rejects(manager.ensure({ agentDir: source.agentDir }), /checksum did not match/i);
@@ -198,7 +271,10 @@ test("the single setup deadline includes lock acquisition", async (t) => {
   const manager = createDependencyManager({
     dependenciesRoot: source.dependencyRoot,
     fetch: async () => { throw new Error("lock must prevent download"); },
-    run: async () => { throw new Error("lock must prevent process execution"); },
+    run: async (file, args, options) => {
+      if (file === "/usr/bin/flock") return runProcess(file, args, options);
+      throw new Error("lock must prevent process execution");
+    },
     setupTimeoutMs: 25,
   });
 
@@ -213,6 +289,7 @@ test("installation creates the interpreter and venv at their final versioned pat
     fetch: async (url) => response(url.endsWith("uv.tar.gz") ? source.uvArchive : source.pythonArchive),
     run: async (file, args, options) => {
       calls.push({ file, args, options });
+      if (file === "/usr/bin/flock") return runProcess(file, args, options);
       if (args.includes("-tvzf")) {
         return { stdout: "-rwxr-xr-x root/root 1 2026-01-01 00:00 uv/uv\n", stderr: "" };
       }
@@ -252,48 +329,105 @@ test("installation creates the interpreter and venv at their final versioned pat
   assert.equal(result.python, path.join(result.versionRoot, "venv", "bin", "python"));
 });
 
-test("setup-mutating subprocesses inherit the lease through a bounded timeout wrapper", async (t) => {
-  const source = await fixture(t);
-  const calls = [];
+test("Darwin manager installs from pinned mirror and reuses healthy setup offline (Linux-host simulation)", async (t) => {
+  const source = await darwinFixture(t);
+  let offline = false;
   const manager = createDependencyManager({
     dependenciesRoot: source.dependencyRoot,
-    fetch: async (url) => response(url.endsWith("uv.tar.gz") ? source.uvArchive : source.pythonArchive),
+    platform: "darwin",
+    arch: "arm64",
+    fetch: async (url) => {
+      if (offline) throw new Error("Healthy Darwin installation must reuse offline.");
+      return response(url.includes("darwin-uv") ? source.uvArchive : source.pythonArchive);
+    },
     run: async (file, args, options) => {
-      calls.push({ file, args, options });
-      if (args.includes("-tvzf")) return { stdout: "-rwxr-xr-x root/root 1 2026-01-01 00:00 uv/uv\n", stderr: "" };
-      if (args.includes("-xzf")) {
-        const executable = path.join(options.cwd, "uv", "uv");
+      if (file === "/usr/bin/lockf") return simulateDarwinLockf(file, args, options);
+      if (args.includes("-tvzf")) return { stdout: "-rwxr-xr-x  0 user staff 123 Sep  1 12:34 uv-aarch64-apple-darwin/uv\n" };
+      if (args.includes("-xozf")) {
+        const executable = path.join(options.cwd, "uv-aarch64-apple-darwin", "uv");
         await mkdir(path.dirname(executable), { recursive: true });
         await writeFile(executable, "");
-        await chmod(executable, 0o700);
-        return { stdout: "", stderr: "" };
+        return { stdout: "" };
       }
-      if (args.join(" ") === "--version") {
-        return { stdout: file.endsWith(path.join("uv", "uv")) ? "uv 0.12.17 (x86_64-unknown-linux-gnu)\n" : "Python 3.12.14\n", stderr: "" };
-      }
+      if (args.join(" ") === "--version") return { stdout: file.endsWith("darwin/uv") ? "uv 0.12.17 (aarch64-apple-darwin)\n" : "Python 3.12.14\n" };
       if (args.includes("python") && args.includes("install")) {
+        const mirror = new URL(options.env.UV_PYTHON_INSTALL_MIRROR);
+        const mirroredArchive = path.join(mirror.pathname, "20260901",
+          "cpython-3.12.14+20260901-aarch64-apple-darwin-install_only_stripped.tar.gz");
+        assert.deepEqual(await readFile(mirroredArchive), source.pythonArchive);
         const python = path.join(args.at(-1), "cpython-3.12.14-test", "bin", "python3.12");
         await mkdir(path.dirname(python), { recursive: true });
         await writeFile(python, "");
-        return { stdout: "", stderr: "" };
       }
       if (args.includes("venv")) {
         const python = path.join(args.at(-1), "bin", "python");
         await mkdir(path.dirname(python), { recursive: true });
         await writeFile(python, "");
-        return { stdout: "", stderr: "" };
       }
-      return { stdout: args.includes("-I") ? "0.9.65\n" : "", stderr: "" };
+      return { stdout: args.includes("-I") ? "0.9.65\n" : "" };
     },
   });
-
+  const result = await manager.ensure({ agentDir: source.agentDir });
+  assert.equal((await manager.status({ agentDir: source.agentDir })).ready, true);
+  assert.equal(result.python, path.join(result.versionRoot, "venv", "bin", "python"));
+  offline = true;
   await manager.ensure({ agentDir: source.agentDir });
-  const writers = calls.filter(({ file }) => file === "/usr/bin/timeout");
-  assert.equal(writers.length, 4);
-  assert.equal(writers.every(({ args }) => args[0] === "--kill-after=1s" && args[2].startsWith("/")), true);
-  assert.equal(writers.every(({ options }) => options.inheritedFds?.length === 1), true);
-  assert.deepEqual(writers.map(({ args }) => args[1]), ["30s", "600s", "60s", "600s"]);
-  assert.equal(new Set(writers.map(({ options }) => options.inheritedFds[0])).size, 1);
-  assert.equal(writers[0].args[2], "/usr/bin/tar");
-  assert.equal(writers.slice(1).every(({ args }) => args[2].endsWith(path.join("uv", "uv"))), true);
+  assert.equal((await manager.status({ agentDir: source.agentDir })).ready, true);
+});
+
+test("Darwin archive listings reject traversal, escaping links and unknown formats before extraction", async (t) => {
+  const source = await darwinFixture(t);
+  const listings = [
+    ["-rw-r--r--  0 user staff 123 Sep  1 12:34 ../outside\n", /unsafe path/i],
+    ["lrwxr-xr-x  0 user staff 0 Sep  1 12:34 uv-aarch64-apple-darwin/uv -> ../../outside\n", /unsafe link target/i],
+    ["unexpected listing\n", /unsupported entry format/i],
+  ];
+  for (const [listing, error] of listings) {
+    const manager = createDependencyManager({
+      dependenciesRoot: source.dependencyRoot,
+      platform: "darwin",
+      arch: "arm64",
+      fetch: async () => response(source.uvArchive),
+      run: async (file, args, options) => {
+        if (file === "/usr/bin/lockf") return simulateDarwinLockf(file, args, options);
+        if (args.includes("-tvzf")) return { stdout: listing };
+        throw new Error("unsafe archive must not be extracted");
+      },
+    });
+    await assert.rejects(manager.ensure({ agentDir: source.agentDir }), error);
+  }
+  assert.equal((await createDependencyManager({
+    dependenciesRoot: source.dependencyRoot, platform: "darwin", arch: "arm64",
+  }).status({ agentDir: source.agentDir })).ready, false);
+});
+
+test("Darwin metadata and uv target mismatches fail closed", async (t) => {
+  const source = await darwinFixture(t);
+  const metadata = JSON.parse(await readFile(path.join(source.dependencyRoot, "manifest.json")));
+  metadata.python.platforms["darwin-arm64"].sha256 = "invalid";
+  await writeFile(path.join(source.dependencyRoot, "manifest.json"), JSON.stringify(metadata));
+  const manager = createDependencyManager({ dependenciesRoot: source.dependencyRoot, platform: "darwin", arch: "arm64" });
+  await assert.rejects(manager.status({ agentDir: source.agentDir }), /metadata is invalid/i);
+  await assert.rejects(stat(source.agentDir), { code: "ENOENT" });
+  metadata.python.platforms["darwin-arm64"].sha256 = sha256(source.pythonArchive);
+  await writeFile(path.join(source.dependencyRoot, "manifest.json"), JSON.stringify(metadata));
+  const mismatched = createDependencyManager({
+    dependenciesRoot: source.dependencyRoot,
+    platform: "darwin",
+    arch: "arm64",
+    fetch: async () => response(source.uvArchive),
+    run: async (_file, args, options) => {
+      if (_file === "/usr/bin/lockf") return simulateDarwinLockf(_file, args, options);
+      if (args.includes("-tvzf")) return { stdout: "-rwxr-xr-x  0 user staff 123 Sep  1 12:34 uv-aarch64-apple-darwin/uv\n" };
+      if (args.includes("-xozf")) {
+        const target = path.join(options.cwd, "uv-aarch64-apple-darwin", "uv");
+        await mkdir(path.dirname(target), { recursive: true });
+        await writeFile(target, "");
+        return { stdout: "" };
+      }
+      if (args.join(" ") === "--version") return { stdout: "uv 0.12.17 (x86_64-unknown-linux-gnu)\n" };
+      throw new Error("wrong uv target must not prepare Python");
+    },
+  });
+  await assert.rejects(mismatched.ensure({ agentDir: source.agentDir }), /uv version did not match/i);
 });

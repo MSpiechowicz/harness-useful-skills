@@ -5,6 +5,7 @@ import path from "node:path";
 import { runProcess } from "./process.js";
 
 const FLOCK = "/usr/bin/flock";
+const LOCKF = "/usr/bin/lockf";
 const LOCK_WAIT_TIMEOUT_MS = 10 * 60 * 1_000;
 const LOCK_TIMEOUT_EXIT_CODE = 75;
 const RUNNER_GRACE_MS = 250;
@@ -63,8 +64,9 @@ async function secureLockHandle(lockFile) {
 }
 
 /** Acquire an OS-owned exclusive setup lock that child writers may inherit as fd 3. */
-export async function acquireSetupLock(lockFile, { signal, timeoutMs = LOCK_WAIT_TIMEOUT_MS } = {}) {
+export async function acquireSetupLock(lockFile, { signal, timeoutMs = LOCK_WAIT_TIMEOUT_MS, platform = process.platform, run = runProcess } = {}) {
   if (signal !== undefined && !(signal instanceof AbortSignal)) throw new TypeError("signal must be an AbortSignal.");
+  if (typeof run !== "function") throw new TypeError("run must be a function.");
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
     throw new TypeError("timeoutMs must be a positive safe integer.");
   }
@@ -73,12 +75,14 @@ export async function acquireSetupLock(lockFile, { signal, timeoutMs = LOCK_WAIT
   const handle = await secureLockHandle(lockFile);
   try {
     throwIfAborted(signal);
-    await runProcess(FLOCK, [
-      "--exclusive",
-      "--timeout", String(lockTimeoutMs / 1_000),
-      "--conflict-exit-code", String(LOCK_TIMEOUT_EXIT_CODE),
-      "3",
-    ], {
+    await run(platform === "darwin" ? LOCKF : FLOCK, platform === "darwin"
+      ? ["-s", "-t", String(Math.ceil(lockTimeoutMs / 1_000)), "3"]
+      : [
+        "--exclusive",
+        "--timeout", String(lockTimeoutMs / 1_000),
+        "--conflict-exit-code", String(LOCK_TIMEOUT_EXIT_CODE),
+        "3",
+      ], {
       cwd: path.dirname(lockFile),
       env: { PATH: "/usr/bin:/bin", LC_ALL: "C" },
       signal,
@@ -89,7 +93,9 @@ export async function acquireSetupLock(lockFile, { signal, timeoutMs = LOCK_WAIT
   } catch (error) {
     await handle.close();
     throwIfAborted(signal);
-    if (error?.exitCode === LOCK_TIMEOUT_EXIT_CODE) {
+    if (error?.exitCode === LOCK_TIMEOUT_EXIT_CODE || (
+      platform === "darwin" && error?.message === `Process timed out after ${lockTimeoutMs + RUNNER_GRACE_MS}ms.`
+    )) {
       throw new Error(`Dependency setup lock acquisition timed out after ${lockTimeoutMs}ms.`);
     }
     throw error;
