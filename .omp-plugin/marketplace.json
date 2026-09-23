@@ -10,11 +10,11 @@
     {
       "name": "oh-my-pi-useful-skills",
       "description": "OMP-native ECC engineering workflows, safety, memory, and practical development skills",
-      "version": "0.2.13",
+      "version": "0.2.14",
       "source": {
         "source": "github",
         "repo": "MSpiechowicz/oh-my-pi-useful-skills",
-        "ref": "v0.2.13"
+        "ref": "v0.2.14"
       },
       "homepage": "https://github.com/MSpiechowicz/oh-my-pi-useful-skills",
       "license": "GPL-3.0-only"
