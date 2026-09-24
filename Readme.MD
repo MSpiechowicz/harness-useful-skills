@@ -173,14 +173,15 @@ Some hosts require parent-only planning or prohibit delegating a single work pac
 ```text
 /useful-skills list [query]
 /useful-skills doctor
+/useful-skills graph test
 /useful-skills library list [skills|commands|agents|rules] [query]
 /useful-skills update check
 /useful-skills update install
 ```
 
-The terminal launcher supports the same catalog/update operations, plus `install` and `help`. `/ecc`, `/ecc-doctor`, and `/ecc-memory` aliases are removed. OMP's native `/memory` remains unchanged.
+The terminal launcher supports the existing catalog/update operations, plus `install` and `help`; `graph test` is an **in-session OMP command only**, not a terminal subcommand. `/ecc`, `/ecc-doctor`, and `/ecc-memory` aliases are removed. OMP's native `/memory` remains unchanged.
 
-Run `/useful-skills` without arguments for **List**, **Libraries**, **Doctor**, **Update**, and **Help**. **Update** opens a second menu with **Check** and **Install**; cancelling either menu performs no operation. Typed commands remain unchanged.
+Run `/useful-skills` without arguments for **List**, **Libraries**, **Doctor**, **Update**, and **Help**. **Update** opens a second menu with **Check** and **Install**; cancelling either menu performs no operation. The graph diagnostic is available only by typing the exact `/useful-skills graph test` command, not from the menu, help, doctor, or startup.
 
 Doctor shows a compact report of resources, safety, native memory, and Graphify readiness instead of raw JSON. Disabled native memory and a graph that is not built are availability states, not proof of a failed installation. Genuine status failures remain visible. The terminal doctor cannot inspect OMP's current memory integration and directs you to the in-session command. Neither doctor installs dependencies, enables memory, builds graphs, or writes workspace files.
 
@@ -211,7 +212,7 @@ flowchart TD
     class graphify,code cyan;
 ```
 
-Graphify setup is lazy: only an explicit `build` or `query` prepares its managed dependencies. Opening a session does not install dependencies, build a graph, or start a workflow. With native memory unavailable, the agent can maintain fallback notes using file tools; `us_memory` does not silently save them.
+Graphify setup is lazy: an explicit `us_memory` build/query action or `/useful-skills graph test` prepares its managed dependencies. Opening a session does not install dependencies, build a graph, or start a workflow. With native memory unavailable, the agent can maintain fallback notes using file tools; `us_memory` does not silently save them.
 
 ### Recommended setup: local memory alongside Graphify
 
@@ -247,7 +248,9 @@ Enabling Mnemopi does not replace or rebuild Graphify. Searching saved facts doe
 
 ### Tool contract and managed graph storage
 
-The model follows `us-memory` automatically; the user need not run Graphify or a memory command. The essential `us_memory` tool exposes only:
+The model follows `us-memory` automatically; the user need not run Graphify or a memory command during an ordinary task. For a deliberate graph diagnostic without starting an agent task, type `/useful-skills graph test` inside OMP. It first announces possible lazy managed setup and profile-local graph writes, builds the current session workspace, then queries the fixed symbol `main` only after a successful build. For example, a repository with `app.py` defining `main` and `helper` can return those nodes and their relationships; other repositories may have no matching `main` symbol. The command reports the actual generation, node/edge/source counts, graph storage path, query text, and returned output. Graphify's `No matching nodes found.` response is explicitly reported as no matches; an empty response does not claim retrieved relationships. Build/query errors and a changed active generation are reported by stage. Notifications redact common secret patterns and limit display size, but redaction is not complete secret detection. This command does not invoke native memory save/search, start a workflow, or prompt for `us_memory` tool exec approval: typing it is the explicit request for setup and graph writes. Doctor and other passive commands remain read-only.
+
+The essential `us_memory` tool exposes only:
 
 ```text
 { action: "status" }
@@ -261,7 +264,7 @@ Unused `query` and `content` fields may be omitted or set to `null` when a provi
 
 `status` is read-only. `search/save` adapt the current native OMP backend, reporting unavailable/failed/queued outcomes honestly. Secret-shaped facts are rejected **before** native storage, not merely redacted afterward. Only actual storage is reported as saved. This detector is a backstop, not a guarantee.
 
-Graphify `build/query` lazily prepare pinned managed dependencies on their first explicit agent call. There are no startup installs, persistent watcher, MCP server, semantic LLM extraction, embeddings, paid service, or remote memory backend added by this package. Strict plan/read-only mode defers setup/build/cache writes and continues source research.
+Graphify `build/query` lazily prepare pinned managed dependencies on their first explicit agent call; the typed graph diagnostic uses the same build/query implementation. There are no startup installs, persistent watcher, MCP server, semantic LLM extraction, embeddings, paid service, or remote memory backend added by this package. Strict plan/read-only mode defers setup/build/cache writes during agent tasks and continues source research; the direct diagnostic is a separately typed, explicit command, not an agent mode detector.
 
 Managed Graphify targets **Linux x64 (glibc)** and **macOS Darwin ARM64**. Other OS/architecture pairs return an explicit setup limitation; there is no global-install fallback. Pins: uv **0.12.17**, CPython **3.12.14 / 20260901**, Graphify **0.9.65**. `dependencies/manifest.json`, `graphify.in`, and the resolved wheel/hash lock define installation; no floating resolution runs on the user's machine. Downloads are verified; setup has a ten-minute deadline and uses only profile-owned locations. Healthy installations are reused offline. Adding Darwin metadata does not invalidate existing healthy Linux installations. Updated pins apply on the next Graphify action. Darwin behavior has Linux-host simulated coverage, but no native macOS ARM64 execution was available for verification.
 
