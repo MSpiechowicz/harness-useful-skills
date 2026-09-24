@@ -284,6 +284,7 @@ test("the single setup deadline includes lock acquisition", async (t) => {
 test("installation creates the interpreter and venv at their final versioned paths", async (t) => {
   const source = await fixture(t);
   const calls = [];
+  let uvOutput = "uv 0.12.17 (x86_64-unknown-linux-gnu)\n";
   const manager = createDependencyManager({
     dependenciesRoot: source.dependencyRoot,
     fetch: async (url) => response(url.endsWith("uv.tar.gz") ? source.uvArchive : source.pythonArchive),
@@ -301,7 +302,7 @@ test("installation creates the interpreter and venv at their final versioned pat
         return { stdout: "", stderr: "" };
       }
       if (args.join(" ") === "--version") {
-        return { stdout: file.endsWith(path.join("uv", "uv")) ? "uv 0.12.17 (x86_64-unknown-linux-gnu)\n" : "Python 3.12.14\n", stderr: "" };
+        return { stdout: file.endsWith(path.join("uv", "uv")) ? uvOutput : "Python 3.12.14\n", stderr: "" };
       }
       if (args.includes("python") && args.includes("install")) {
         const python = path.join(args.at(-1), "cpython-3.12.14-test", "bin", "python3.12");
@@ -327,10 +328,16 @@ test("installation creates the interpreter and venv at their final versioned pat
   assert.match(pythonInstall.options.env.UV_PYTHON_INSTALL_MIRROR, /^file:/);
   assert.equal(venv.args.at(-1), path.join(result.versionRoot, "venv"));
   assert.equal(result.python, path.join(result.versionRoot, "venv", "bin", "python"));
+  uvOutput = "uv 0.12.17 (8f3a12bc 2026-09-01 x86_64-unknown-linux-gnu)\n";
+  const releaseProfile = path.join(source.agentDir, "release-style");
+  const releaseResult = await manager.ensure({ agentDir: releaseProfile });
+  assert.equal(releaseResult.python, path.join(releaseResult.versionRoot, "venv", "bin", "python"));
+  assert.equal((await manager.status({ agentDir: releaseProfile })).ready, true);
 });
 
 test("Darwin manager installs from pinned mirror and reuses healthy setup offline (Linux-host simulation)", async (t) => {
   const source = await darwinFixture(t);
+  let uvOutput = "uv 0.12.17 (8f3a12bc 2026-09-01 aarch64-apple-darwin)\n";
   let offline = false;
   const manager = createDependencyManager({
     dependenciesRoot: source.dependencyRoot,
@@ -349,7 +356,7 @@ test("Darwin manager installs from pinned mirror and reuses healthy setup offlin
         await writeFile(executable, "");
         return { stdout: "" };
       }
-      if (args.join(" ") === "--version") return { stdout: file.endsWith("darwin/uv") ? "uv 0.12.17 (aarch64-apple-darwin)\n" : "Python 3.12.14\n" };
+      if (args.join(" ") === "--version") return { stdout: file.endsWith("darwin/uv") ? uvOutput : "Python 3.12.14\n" };
       if (args.includes("python") && args.includes("install")) {
         const mirror = new URL(options.env.UV_PYTHON_INSTALL_MIRROR);
         const mirroredArchive = path.join(mirror.pathname, "20260901",
@@ -373,6 +380,14 @@ test("Darwin manager installs from pinned mirror and reuses healthy setup offlin
   offline = true;
   await manager.ensure({ agentDir: source.agentDir });
   assert.equal((await manager.status({ agentDir: source.agentDir })).ready, true);
+  offline = false;
+  uvOutput = "uv 0.12.17 (aarch64-apple-darwin)\n";
+  const metadataFreeProfile = path.join(source.agentDir, "metadata-free");
+  const plainResult = await manager.ensure({ agentDir: metadataFreeProfile });
+  assert.equal(plainResult.python, path.join(plainResult.versionRoot, "venv", "bin", "python"));
+  assert.equal((await manager.status({ agentDir: metadataFreeProfile })).ready, true);
+  offline = true;
+  await manager.ensure({ agentDir: metadataFreeProfile });
 });
 
 test("Darwin archive listings reject traversal, escaping links and unknown formats before extraction", async (t) => {
@@ -401,7 +416,7 @@ test("Darwin archive listings reject traversal, escaping links and unknown forma
   }).status({ agentDir: source.agentDir })).ready, false);
 });
 
-test("Darwin metadata and uv target mismatches fail closed", async (t) => {
+test("Darwin manifest and invalid uv version output fail before Python preparation", async (t) => {
   const source = await darwinFixture(t);
   const metadata = JSON.parse(await readFile(path.join(source.dependencyRoot, "manifest.json")));
   metadata.python.platforms["darwin-arm64"].sha256 = "invalid";
@@ -411,13 +426,19 @@ test("Darwin metadata and uv target mismatches fail closed", async (t) => {
   await assert.rejects(stat(source.agentDir), { code: "ENOENT" });
   metadata.python.platforms["darwin-arm64"].sha256 = sha256(source.pythonArchive);
   await writeFile(path.join(source.dependencyRoot, "manifest.json"), JSON.stringify(metadata));
+  let uvOutput;
+  const fetched = [];
   const mismatched = createDependencyManager({
     dependenciesRoot: source.dependencyRoot,
     platform: "darwin",
     arch: "arm64",
-    fetch: async () => response(source.uvArchive),
-    run: async (_file, args, options) => {
-      if (_file === "/usr/bin/lockf") return simulateDarwinLockf(_file, args, options);
+    fetch: async (url) => {
+      fetched.push(url);
+      if (url !== metadata.uv.platforms["darwin-arm64"].url) throw new Error("Invalid uv output must not prepare Python");
+      return response(source.uvArchive);
+    },
+    run: async (file, args, options) => {
+      if (file === "/usr/bin/lockf") return simulateDarwinLockf(file, args, options);
       if (args.includes("-tvzf")) return { stdout: "-rwxr-xr-x  0 user staff 123 Sep  1 12:34 uv-aarch64-apple-darwin/uv\n" };
       if (args.includes("-xozf")) {
         const target = path.join(options.cwd, "uv-aarch64-apple-darwin", "uv");
@@ -425,9 +446,22 @@ test("Darwin metadata and uv target mismatches fail closed", async (t) => {
         await writeFile(target, "");
         return { stdout: "" };
       }
-      if (args.join(" ") === "--version") return { stdout: "uv 0.12.17 (x86_64-unknown-linux-gnu)\n" };
-      throw new Error("wrong uv target must not prepare Python");
+      if (args.join(" ") === "--version") return { stdout: uvOutput };
+      throw new Error("Invalid uv output must not prepare Python");
     },
   });
-  await assert.rejects(mismatched.ensure({ agentDir: source.agentDir }), /uv version did not match/i);
+  for (const [reason, output] of [
+    ["wrong target", "uv 0.12.17 (8f3a12bc 2026-09-01 x86_64-unknown-linux-gnu)\n"],
+    ["wrong version", "uv 0.12.18 (8f3a12bc 2026-09-01 aarch64-apple-darwin)\n"],
+    ["development suffix", "uv 0.12.17+1 (8f3a12bc 2026-09-01 aarch64-apple-darwin)\n"],
+    ["non-hex commit", "uv 0.12.17 (nothex 2026-09-01 aarch64-apple-darwin)\n"],
+    ["missing date", "uv 0.12.17 (8f3a12bc aarch64-apple-darwin)\n"],
+    ["malformed date", "uv 0.12.17 (8f3a12bc 2026/09/01 aarch64-apple-darwin)\n"],
+    ["trailing output", "uv 0.12.17 (8f3a12bc 2026-09-01 aarch64-apple-darwin)\nextra\n"],
+  ]) {
+    uvOutput = output;
+    fetched.length = 0;
+    await assert.rejects(mismatched.ensure({ agentDir: source.agentDir }), /uv version did not match/i, reason);
+    assert.deepEqual(fetched, [metadata.uv.platforms["darwin-arm64"].url], reason);
+  }
 });

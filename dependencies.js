@@ -380,7 +380,10 @@ export function createDependencyManager({
         maxBytes: 4096,
       });
 
-      if (uvVersion.stdout.trim() !== `uv 0.12.17 (${platform === "darwin" ? "aarch64-apple-darwin" : "x86_64-unknown-linux-gnu"})`) throw new Error("Downloaded uv version did not match committed metadata.");
+      const uvVersionMatch = /^uv 0\.12\.17 \((?:[0-9a-fA-F]+ [0-9]{4}-[0-9]{2}-[0-9]{2} )?(aarch64-apple-darwin|x86_64-unknown-linux-gnu)\)(?:\r?\n)?(?![\s\S])/.exec(uvVersion.stdout);
+      if (uvVersionMatch?.[1] !== (platform === "darwin" ? "aarch64-apple-darwin" : "x86_64-unknown-linux-gnu")) {
+        throw new Error("Downloaded uv version did not match committed metadata.");
+      }
       const pythonArchive = path.join(stage, "python.tar.gz");
       await download(state.metadata.python.url, state.metadata.python.sha256, pythonArchive, signal, fetcher);
       const mirror = path.join(stage, "python-mirror");
