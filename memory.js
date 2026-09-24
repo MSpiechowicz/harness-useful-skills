@@ -30,26 +30,44 @@ function invalidArguments(paths, error) {
 }
 
 function validateText(value, field, maximum) {
-  if (typeof value !== "string" || !value.trim()) return `${field} must be a non-empty string.`;
-  if (value.length > maximum) return `${field} exceeds ${maximum} characters.`;
+  if (typeof value !== "string" || !value.trim()) {
+    return `${field} must be a non-empty string.`;
+  }
+
+  if (value.length > maximum) {
+    return `${field} exceeds ${maximum} characters.`;
+  }
+
   return undefined;
+}
+
+function unavailableMemory(paths) {
+  return {
+    ok: false,
+    backend: "native-memory",
+    paths,
+    error: "Native memory backend is unavailable; local notes are at the reported notes path.",
+  };
+}
+
+function nativeBackend(observation) {
+  return validObject(observation) && typeof observation.backend === "string"
+    ? observation.backend
+    : "native-memory";
 }
 
 async function nativeStatus(memory, paths) {
   if (!memory?.status) {
-    return {
-      ok: false,
-      backend: "native-memory",
-      paths,
-      error: "Native memory backend is unavailable; local notes are at the reported notes path.",
-    };
+    return unavailableMemory(paths);
   }
+
   try {
     const observation = await memory.status();
     const ok = validObject(observation) && observation.active === true && !observation.error;
+
     return {
       ok,
-      backend: validObject(observation) && typeof observation.backend === "string" ? observation.backend : "native-memory",
+      backend: nativeBackend(observation),
       paths,
       observation,
       ...(!ok ? { error: observation?.error || observation?.message || "Native memory backend is inactive or unavailable." } : {}),
@@ -58,11 +76,13 @@ async function nativeStatus(memory, paths) {
     return { ok: false, backend: "native-memory", paths, error: `Native memory status failed: ${errorMessage(error)}` };
   }
 }
+
 async function memoryStatus({ cwd, agentDir, memory, paths }) {
   const [native, graph] = await Promise.all([
     nativeStatus(memory, paths),
     graphStatus({ cwd, agentDir }),
   ]);
+
   return {
     ok: native.ok && graph.ok,
     backend: "us_memory",
@@ -75,22 +95,18 @@ async function memoryStatus({ cwd, agentDir, memory, paths }) {
   };
 }
 
-
 async function nativeSearch(memory, query, paths) {
   if (!memory?.search) {
-    return {
-      ok: false,
-      backend: "native-memory",
-      paths,
-      error: "Native memory backend is unavailable; local notes are at the reported notes path.",
-    };
+    return unavailableMemory(paths);
   }
+
   try {
     const observation = await memory.search(query, { limit: 8 });
     const ok = validObject(observation) && observation.backend !== "off" && Array.isArray(observation.items) && Number.isSafeInteger(observation.count) && observation.count >= 0;
+
     return {
       ok,
-      backend: validObject(observation) && typeof observation.backend === "string" ? observation.backend : "native-memory",
+      backend: nativeBackend(observation),
       paths,
       query,
       observation,
@@ -110,20 +126,18 @@ async function nativeSave(memory, content, paths) {
       error: "Refusing to save secret-shaped content. Resubmit a secret-free durable fact.",
     };
   }
+
   if (!memory?.save) {
-    return {
-      ok: false,
-      backend: "native-memory",
-      paths,
-      error: "Native memory backend is unavailable; local notes are at the reported notes path.",
-    };
+    return unavailableMemory(paths);
   }
+
   try {
     const observation = await memory.save({ content });
     const ok = validObject(observation) && observation.backend !== "off" && Number.isSafeInteger(observation.stored) && observation.stored > 0;
+
     return {
       ok,
-      backend: validObject(observation) && typeof observation.backend === "string" ? observation.backend : "native-memory",
+      backend: nativeBackend(observation),
       paths,
       observation,
       ...(!ok ? { error: observation?.queued ? "Native memory save is queued, not confirmed persisted." : observation?.message || "Native memory did not confirm storage." } : {}),
@@ -140,23 +154,42 @@ export async function executeMemory(args, { cwd, agentDir, memory, signal } = {}
   } catch (error) {
     return { ok: false, backend: "us_memory", paths: undefined, error: errorMessage(error) };
   }
+
   if (!validObject(args) || !Object.hasOwn(args, "action") || typeof args.action !== "string") {
     return invalidArguments(paths, "Memory arguments require one supported action.");
   }
-  const payload = args.action === "query" || args.action === "search" ? "query" : args.action === "save" ? "content" : undefined;
+
+  let payload;
+  if (args.action === "query" || args.action === "search") {
+    payload = "query";
+  } else if (args.action === "save") {
+    payload = "content";
+  }
+
   for (const key of Object.keys(args)) {
-    if (key === "action") continue;
+    if (key === "action") {
+      continue;
+    }
+
     if (key !== "query" && key !== "content") {
       return invalidArguments(paths, "Memory arguments contain an unknown field.");
     }
+
     if (key !== payload && args[key] != null) {
       return invalidArguments(paths, "Unused memory payload fields must be omitted or null.");
     }
   }
+
   if (payload) {
-    const error = validateText(Object.hasOwn(args, payload) ? args[payload] : undefined, payload, payload === "query" ? MAX_QUERY_CHARS : MAX_SAVE_CHARS);
-    if (error) return invalidArguments(paths, error);
+    const value = Object.hasOwn(args, payload) ? args[payload] : undefined;
+    const maximum = payload === "query" ? MAX_QUERY_CHARS : MAX_SAVE_CHARS;
+    const error = validateText(value, payload, maximum);
+
+    if (error) {
+      return invalidArguments(paths, error);
+    }
   }
+
   switch (args.action) {
     case "status":
       return memoryStatus({ cwd, agentDir, memory, paths });

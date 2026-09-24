@@ -9,7 +9,10 @@ function record(value) {
 }
 
 function diagnostic(value) {
-  if (typeof value !== "string" || !value.trim()) return undefined;
+  if (typeof value !== "string" || !value.trim()) {
+    return undefined;
+  }
+
   const cleaned = redactText(stripVTControlCharacters(value).replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim());
   return cleaned.length <= MAX_DIAGNOSTIC_CHARS ? cleaned : `${cleaned.slice(0, MAX_DIAGNOSTIC_CHARS - 1)}…`;
 }
@@ -20,44 +23,101 @@ function inventory(label, value) {
 }
 
 function nativeStatus(memory) {
-  if (!record(memory)) return "Unavailable — terminal cannot inspect the OMP profile.";
+  if (!record(memory)) {
+    return "Unavailable — terminal cannot inspect the OMP profile.";
+  }
+
   const native = memory.native;
-  if (!record(native)) return "Unavailable — no native-memory status was returned.";
+  if (!record(native)) {
+    return "Unavailable — no native-memory status was returned.";
+  }
+
   const observation = record(native.observation) ? native.observation : undefined;
   const observedError = diagnostic(observation?.error);
-  if (observedError) return `Error — ${observedError}`;
-  if (observation?.backend === "off" || observation?.active === false) return "Disabled";
-  if (native.ok === true || observation?.active === true) return "Ready";
+  if (observedError) {
+    return `Error — ${observedError}`;
+  }
+
+  if (observation?.backend === "off" || observation?.active === false) {
+    return "Disabled";
+  }
+
+  if (native.ok === true || observation?.active === true) {
+    return "Ready";
+  }
+
   const error = diagnostic(native.error);
-  if (error && !/backend is unavailable/i.test(error)) return `Error — ${error}`;
+  if (error && !/backend is unavailable/i.test(error)) {
+    return `Error — ${error}`;
+  }
+
   const message = diagnostic(observation?.message);
-  if (message) return `Error — ${message}`;
+  if (message) {
+    return `Error — ${message}`;
+  }
+
   return "Unavailable";
 }
 
 function graphStatus(memory) {
-  if (!record(memory)) return "Unavailable";
+  if (!record(memory)) {
+    return "Unavailable";
+  }
+
   const graph = memory.graph;
-  if (!record(graph)) return "Unavailable — no graph status was returned.";
+  if (!record(graph)) {
+    return "Unavailable — no graph status was returned.";
+  }
+
   const error = diagnostic(graph.error);
-  if (error) return `Error — ${error}`;
-  if (!graph.available) return "Not built";
+  if (error) {
+    return `Error — ${error}`;
+  }
+
+  if (!graph.available) {
+    return "Not built";
+  }
+
   const nodes = graph.snapshot?.nodes;
   const edges = graph.snapshot?.edges;
-  if (Number.isSafeInteger(nodes) && nodes >= 0 && Number.isSafeInteger(edges) && edges >= 0) return `Ready — ${nodes} nodes, ${edges} edges`;
+  if (Number.isSafeInteger(nodes) && nodes >= 0 && Number.isSafeInteger(edges) && edges >= 0) {
+    return `Ready — ${nodes} nodes, ${edges} edges`;
+  }
+
   return "Ready";
 }
 
 function dependencyStatus(memory) {
-  if (!record(memory)) return "Unavailable";
+  if (!record(memory)) {
+    return "Unavailable";
+  }
+
   const dependency = memory.graph?.dependency;
-  if (!record(dependency)) return "Unavailable — no dependency status was returned.";
+  if (!record(dependency)) {
+    return "Unavailable — no dependency status was returned.";
+  }
+
   const reason = diagnostic(dependency.reason);
-  if (dependency.ready === true || dependency.state === "ready") return "Ready";
-  if (dependency.state === "missing") return "Not installed";
-  if (dependency.state === "partial") return "Incomplete";
-  if (dependency.state === "unsupported") return reason ? `Unsupported — ${reason}` : "Unsupported";
-  if (dependency.state === "unknown") return reason ? `Error — ${reason}` : "Unavailable";
+  if (dependency.ready === true || dependency.state === "ready") {
+    return "Ready";
+  }
+
+  if (dependency.state === "missing") {
+    return "Not installed";
+  }
+
+  if (dependency.state === "partial") {
+    return "Incomplete";
+  }
+
+  if (dependency.state === "unsupported") {
+    return reason ? `Unsupported — ${reason}` : "Unsupported";
+  }
+
+  if (dependency.state === "unknown") {
+    return reason ? `Error — ${reason}` : "Unavailable";
+  }
+
   return reason ? `Error — ${reason}` : "Unavailable";
 }
 

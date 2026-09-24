@@ -99,8 +99,12 @@ test("confirms a newer installation after the scoped native upgrade", async (t) 
     fetcher: stableRelease(),
     runner: async (_file, args) => {
       calls.push(args);
-      if (args.join(" ") === "plugin list --json") return JSON.stringify(registry);
-      if (args.join(" ") === `plugin marketplace update ${MARKETPLACE}`) return "";
+      if (args.join(" ") === "plugin list --json") {
+        return JSON.stringify(registry);
+      }
+      if (args.join(" ") === `plugin marketplace update ${MARKETPLACE}`) {
+        return "";
+      }
       if (args.join(" ") === `plugin upgrade ${PLUGIN_ID} --scope user`) {
         registry = listing(upgraded, "1.0.1");
         return "";
@@ -123,9 +127,15 @@ test("does not report successful upgrade when native OMP leaves the old version 
       fetcher: stableRelease(),
       runner: async (_file, args) => {
         calls.push(args);
-        if (args.join(" ") === "plugin list --json") return JSON.stringify(listing(installed));
-        if (args.join(" ") === `plugin marketplace update ${MARKETPLACE}`) return "";
-        if (args.join(" ") === `plugin upgrade ${PLUGIN_ID} --scope user`) return "";
+        if (args.join(" ") === "plugin list --json") {
+          return JSON.stringify(listing(installed));
+        }
+        if (args.join(" ") === `plugin marketplace update ${MARKETPLACE}`) {
+          return "";
+        }
+        if (args.join(" ") === `plugin upgrade ${PLUGIN_ID} --scope user`) {
+          return "";
+        }
         throw new Error("unexpected command");
       },
     }),
@@ -161,8 +171,12 @@ test("does not accept an upgrade still behind the advertised release", async (t)
     root: installed,
     fetcher: stableRelease("1.0.2"),
     runner: async (_file, args) => {
-      if (args.join(" ") === "plugin list --json") return JSON.stringify(registry);
-      if (args[1] === "upgrade") registry = listing(stale, "1.0.1");
+      if (args.join(" ") === "plugin list --json") {
+        return JSON.stringify(registry);
+      }
+      if (args[1] === "upgrade") {
+        registry = listing(stale, "1.0.1");
+      }
       return "";
     },
   }), UpdateError);

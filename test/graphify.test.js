@@ -10,6 +10,7 @@ import { createGraphify, graphStatus, workspaceMemoryPaths } from "../graphify.j
 async function fixturePaths(t) {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "us-workspace-"));
   t.after(() => rm(workspace, { recursive: true, force: true }));
+
   const agentDir = await mkdtemp(path.join(os.tmpdir(), "us-agent-"));
   t.after(() => rm(agentDir, { recursive: true, force: true }));
   return { workspace, agentDir };
@@ -52,6 +53,7 @@ test("graph status derives an uncreated external path", async (t) => {
 test("workspace memory rejects a profile inside the checkout", async (t) => {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "us-workspace-"));
   t.after(() => rm(workspace, { recursive: true, force: true }));
+
   const agentDir = path.join(workspace, "profile");
   await mkdir(agentDir);
 
@@ -65,6 +67,7 @@ test("workspace memory rejects a symlinked profile", async (t) => {
   const { workspace, agentDir } = await fixturePaths(t);
   const linkRoot = await mkdtemp(path.join(os.tmpdir(), "us-link-"));
   t.after(() => rm(linkRoot, { recursive: true, force: true }));
+
   const link = path.join(linkRoot, "profile");
   await symlink(agentDir, link);
 
@@ -101,12 +104,15 @@ test("build activates graph and metadata together in an isolated environment", a
   const calls = [];
   const service = graphService(async (file, args, options) => {
     calls.push({ file, args, options });
+
     if (args[3] === "extract") {
       const output = args.at(-1);
       await mkdir(path.join(output, "graphify-out"), { recursive: true });
       await writeFile(path.join(output, "graphify-out", "graph.json"), graph());
+
       return { stdout: "extracted", stderr: "" };
     }
+
     throw new Error("unexpected command");
   });
 
@@ -123,6 +129,7 @@ test("build activates graph and metadata together in an isolated environment", a
   assert.equal(calls[0].options.env.HOME.startsWith(result.paths.runtime), true);
   assert.equal(activeGraph.nodes[0].id, "main");
   assert.equal(activeMetadata.generation, active.generation);
+
   assert.equal(activeMetadata.sources, 1);
 });
 
@@ -134,10 +141,12 @@ test("failed builds preserve the prior generation and metadata", async (t) => {
     const output = args.at(-1);
     await mkdir(path.join(output, "graphify-out"), { recursive: true });
     build += 1;
+
     await writeFile(
       path.join(output, "graphify-out", "graph.json"),
       build === 1 ? graph() : graph([{ id: "main", source_file: "../escape.py" }]),
     );
+
     return { stdout: "", stderr: "" };
   });
 
@@ -145,6 +154,7 @@ test("failed builds preserve the prior generation and metadata", async (t) => {
   const before = await readFile(first.active.pointer, "utf8");
   const second = await service.buildGraph({ cwd: workspace, agentDir });
   const after = await readFile(first.active.pointer, "utf8");
+
   assert.equal(second.ok, false);
   assert.equal(after, before);
   assert.match(second.error, /source file/i);
@@ -157,10 +167,12 @@ test("build rejects an outside-root source symlink before activation", async (t)
   const external = path.join(externalRoot, "external.py");
   await writeFile(external, "def external(): pass\n");
   await symlink(external, path.join(workspace, "linked.py"));
+
   const service = graphService(async (_file, args) => {
     const output = args.at(-1);
     await mkdir(path.join(output, "graphify-out"), { recursive: true });
     await writeFile(path.join(output, "graphify-out", "graph.json"), graph([{ id: "linked", source_file: "linked.py" }]));
+
     return { stdout: "", stderr: "" };
   });
 
@@ -174,10 +186,12 @@ test("build rejects generated output sources", async (t) => {
   const { workspace, agentDir } = await fixturePaths(t);
   await mkdir(path.join(workspace, "generated"));
   await writeFile(path.join(workspace, "generated", "schema.generated.py"), "def generated(): pass\n");
+
   const service = graphService(async (_file, args) => {
     const output = args.at(-1);
     await mkdir(path.join(output, "graphify-out"), { recursive: true });
     await writeFile(path.join(output, "graphify-out", "graph.json"), graph([{ id: "generated", source_file: "generated/schema.generated.py" }]));
+
     return { stdout: "", stderr: "" };
   });
 
@@ -197,6 +211,7 @@ test("query uses one immutable generation and truncates UTF-8 output by bytes", 
     assert.equal(args[5], "--graph");
     assert.equal(args[6], path.join(active.directory, "graph.json"));
     assert.equal(options.cwd, paths.directory);
+
     return { stdout: long, stderr: "diagnostic ".repeat(2_000) };
   });
 
@@ -215,6 +230,7 @@ test("query rejects invalid input and reports runner cancellation without changi
   await writeFile(path.join(workspace, "main.py"), "def main(): pass\n");
   const paths = await workspaceMemoryPaths({ cwd: workspace, agentDir });
   const active = await installActive(paths, graph());
+
   let calls = 0;
   const service = graphService(async () => {
     calls += 1;

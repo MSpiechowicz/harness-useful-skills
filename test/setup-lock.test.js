@@ -17,6 +17,7 @@ async function lockFixture(t) {
   const lockFile = path.join(directory, ".setup.lock");
   await mkdir(directory, { recursive: true, mode: 0o700 });
   t.after(() => rm(root, { recursive: true, force: true }));
+
   return { lockFile };
 }
 
@@ -25,6 +26,7 @@ function simulateDarwinLockf(file, args, options) {
   assert.deepEqual(args.slice(0, 3), ["-s", "-t", String(Math.ceil((options.timeoutMs - 250) / 1_000))]);
   assert.equal(args[3], "3");
   assert.equal(options.inheritedFds.length, 1);
+
   return runProcess("/usr/bin/flock", [
     "--exclusive", "--timeout", String((options.timeoutMs - 250) / 1_000),
     "--conflict-exit-code", "75", "3",
@@ -35,8 +37,11 @@ async function waitForOutput(child, expected) {
   let output = "";
   for await (const chunk of child.stdout) {
     output += chunk;
-    if (output.includes(expected)) return output;
+    if (output.includes(expected)) {
+      return output;
+    }
   }
+
   throw new Error(`Lock holder exited before writing ${expected}.`);
 }
 
@@ -45,7 +50,9 @@ async function waitForFile(file) {
     try {
       return await readFile(file, "utf8");
     } catch (error) {
-      if (error?.code !== "ENOENT") throw error;
+      if (error?.code !== "ENOENT") {
+        throw error;
+      }
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
   }
@@ -58,10 +65,14 @@ async function waitForProcessGroupExit(pid) {
       process.kill(-pid, 0);
       await new Promise((resolve) => setTimeout(resolve, 10));
     } catch (error) {
-      if (error?.code === "ESRCH") return;
+      if (error?.code === "ESRCH") {
+        return;
+      }
+
       throw error;
     }
   }
+
   throw new Error(`Orphan writer process group did not terminate: ${pid}`);
 }
 
@@ -73,6 +84,7 @@ function abruptHolder(lockFile) {
     'process.stdout.write(`locked:${lease.fd}\\n`);',
     "setInterval(() => {}, 1_000);",
   ].join("\n");
+
   return spawn(process.execPath, ["--input-type=module", "--eval", source, lockFile], {
     env: { PATH: "/usr/bin:/bin" },
     stdio: ["ignore", "pipe", "pipe"],
@@ -92,6 +104,7 @@ function crashingCoordinator(lockFile, writerReadyFile) {
     'process.stdout.write(`writer:${writer.pid}\\n`);',
     "setInterval(() => {}, 1_000);",
   ].join("\n");
+
   return spawn(process.execPath, ["--input-type=module", "--eval", source, lockFile, writerReadyFile], {
     env: { PATH: "/usr/bin:/bin" },
     stdio: ["ignore", "pipe", "pipe"],
@@ -102,6 +115,7 @@ test("a lock becomes acquirable after an abrupt holder exit", async (t) => {
   const { lockFile } = await lockFixture(t);
   const holder = abruptHolder(lockFile);
   t.after(() => holder.kill("SIGKILL"));
+
   await waitForOutput(holder, "locked:");
   holder.kill("SIGKILL");
   await once(holder, "close");
@@ -115,13 +129,16 @@ test("an orphaned writer retains the coordinator lock until its bounded work exi
   const writerReadyFile = `${lockFile}.writer-ready`;
   const coordinator = crashingCoordinator(lockFile, writerReadyFile);
   let writerPid;
+
   t.after(() => {
     coordinator.kill("SIGKILL");
     if (writerPid) {
       try {
         process.kill(-writerPid, "SIGKILL");
       } catch (error) {
-        if (error?.code !== "ESRCH") throw error;
+        if (error?.code !== "ESRCH") {
+          throw error;
+        }
       }
     }
   });
@@ -136,6 +153,7 @@ test("an orphaned writer retains the coordinator lock until its bounded work exi
   assert.equal(await waitForFile(writerReadyFile), "started");
   await assert.rejects(acquireSetupLock(lockFile, { timeoutMs: 100 }), /timed out/i);
   await waitForProcessGroupExit(writerPid);
+
   const lease = await acquireSetupLock(lockFile, { signal: AbortSignal.timeout(1_000) });
   await lease.release();
 });
@@ -144,10 +162,12 @@ test("cancelling a waiter leaves a live owner in control of the lock", async (t)
   const { lockFile } = await lockFixture(t);
   const owner = await acquireSetupLock(lockFile, {});
   t.after(() => owner.release());
+
   const controller = new AbortController();
   const cancellation = new Error("cancel setup waiting for lock");
   const timer = setTimeout(() => controller.abort(cancellation), 30);
   t.after(() => clearTimeout(timer));
+
   await assert.rejects(acquireSetupLock(lockFile, { signal: controller.signal }), (error) => error === cancellation);
   await assert.rejects(acquireSetupLock(lockFile, { timeoutMs: 25 }), /timed out/i);
 
@@ -219,6 +239,7 @@ test("locked execution rejects invalid capabilities and unbounded deadlines befo
   assert.throws(() => createLockedRunner(runProcess, {}), /file descriptor/);
   assert.throws(() => createLockedRunner(runProcess, { fd: -1 }), /file descriptor/);
   const run = createLockedRunner(runProcess, { fd: 0 });
+
   assert.throws(() => run("/not/launched", [], { timeoutMs: 0 }), /positive safe integer/);
 });
 
@@ -229,14 +250,17 @@ test("Darwin lock helper excludes contenders and releases on cancellation (Linux
     lockfCalls += 1;
     return simulateDarwinLockf(...args);
   };
+
   const owner = await acquireSetupLock(lockFile, { platform: "darwin", run });
   assert.equal(lockfCalls, 1);
   t.after(() => owner.release());
   await assert.rejects(acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf, timeoutMs: 35 }), /timed out after 35ms/i);
+
   const controller = new AbortController();
   const reason = new Error("cancelled while waiting");
   setTimeout(() => controller.abort(reason), 30);
   await assert.rejects(acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf, signal: controller.signal }), (error) => error === reason);
+
   await owner.release();
   const next = await acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf, timeoutMs: 1_000 });
   await next.release();
@@ -254,6 +278,7 @@ test("Darwin watchdog bounds an orphan writer and holds its advisory lock (Linux
     'process.on("SIGTERM", () => {});',
     'setInterval(() => {}, 1_000);',
   ].join("\n");
+
   const source = [
     `import { acquireSetupLock } from ${JSON.stringify(lockModule)};`,
     `import { createLockedRunner } from ${JSON.stringify(runnerModule)};`,
@@ -267,25 +292,34 @@ test("Darwin watchdog bounds an orphan writer and holds its advisory lock (Linux
     'process.stdout.write("watching\\n");',
     "setInterval(() => {}, 1_000);",
   ].join("\n");
+
   const coordinator = spawn(process.execPath, ["--input-type=module", "--eval", source, lockFile, readyFile], {
     env: { PATH: "/usr/bin:/bin" }, stdio: ["ignore", "pipe", "pipe"],
   });
+
   let watchdogPid;
   t.after(() => {
     coordinator.kill("SIGKILL");
     if (watchdogPid) {
-      try { process.kill(-watchdogPid, "SIGKILL"); } catch (error) {
-        if (error?.code !== "ESRCH") throw error;
+      try {
+        process.kill(-watchdogPid, "SIGKILL");
+      } catch (error) {
+        if (error?.code !== "ESRCH") {
+          throw error;
+        }
       }
     }
   });
+
   await waitForOutput(coordinator, "watching");
   watchdogPid = Number(await waitForFile(readyFile));
   assert.ok(Number.isSafeInteger(watchdogPid) && watchdogPid > 0);
   coordinator.kill("SIGKILL");
   await once(coordinator, "close");
+
   await assert.rejects(acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf, timeoutMs: 80 }), /timed out/i);
   await waitForProcessGroupExit(watchdogPid);
+
   const next = await acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf, timeoutMs: 1_000 });
   await next.release();
 });
@@ -295,6 +329,7 @@ test("Darwin watchdog cancellation stops resistant writers and releases the leas
   const readyFile = `${lockFile}.cancel-ready`;
   const lease = await acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf });
   t.after(() => lease.release());
+
   const controller = new AbortController();
   const writer = [
     'import { writeFile } from "node:fs/promises";',
@@ -302,6 +337,7 @@ test("Darwin watchdog cancellation stops resistant writers and releases the leas
     'process.on("SIGTERM", () => {});',
     'setInterval(() => {}, 1_000);',
   ].join("\n");
+
   const run = createLockedRunner(runProcess, lease, { platform: "darwin" });
   const ongoing = run(process.execPath, ["--input-type=module", "--eval", writer, readyFile], {
     cwd: path.dirname(lockFile),
@@ -310,16 +346,23 @@ test("Darwin watchdog cancellation stops resistant writers and releases the leas
     timeoutMs: 5_000,
     maxBytes: 4_096,
   });
+
   const watchdogPid = Number(await waitForFile(readyFile));
   t.after(() => {
-    try { process.kill(-watchdogPid, "SIGKILL"); } catch (error) {
-      if (error?.code !== "ESRCH") throw error;
+    try {
+      process.kill(-watchdogPid, "SIGKILL");
+    } catch (error) {
+      if (error?.code !== "ESRCH") {
+        throw error;
+      }
     }
   });
+
   controller.abort(new Error("stop setup"));
   await assert.rejects(ongoing, /cancelled/i);
   await waitForProcessGroupExit(watchdogPid);
   await lease.release();
+
   const next = await acquireSetupLock(lockFile, { platform: "darwin", run: simulateDarwinLockf, timeoutMs: 1_000 });
   await next.release();
 });

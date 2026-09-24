@@ -52,6 +52,7 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
   pi.setLabel("Useful Skills");
   let busy = false;
   let startupScheduled = false;
+
   async function settings(ctx) {
     try {
       return await readWorkflowSettings({ agentDir: pi.pi.getAgentDir() });
@@ -71,6 +72,7 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
 
   function status(snapshot) {
     const workflow = settingState(snapshot, "workflow");
+
     return [
       "Useful Skills profile settings:",
       ...(snapshot.directory ? [`Settings directory: ${snapshot.directory}`] : []),
@@ -83,17 +85,21 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
         const reason = snapshot.errors[stage] || (
           workflow === "disabled" ? "workflow disabled" : workflow === "unknown" ? "workflow setting unreadable" : ""
         );
+
         return `${STAGE_LABELS[stage]}: saved ${saved}, effective ${effective}${reason ? ` (${reason})` : ""}`;
       }),
     ].join("\n");
   }
 
   function notify(ctx, message, level = "info") {
-    if (ctx.hasUI) ctx.ui.notify(message, level);
-    else pi.sendMessage(
-      { customType: "useful-skills", content: message, display: true, attribution: "agent" },
-      { triggerTurn: false },
-    );
+    if (ctx.hasUI) {
+      ctx.ui.notify(message, level);
+    } else {
+      pi.sendMessage(
+        { customType: "useful-skills", content: message, display: true, attribution: "agent" },
+        { triggerTurn: false },
+      );
+    }
   }
 
   function graphNotice(ctx, message, level = "info") {
@@ -110,7 +116,9 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
     let build;
     try {
       build = await memoryAction({ action: "build" }, options);
-      if (!build.ok) return graphNotice(ctx, `Graphify build failed: ${build.error || "No build result was returned."}`, "error");
+      if (!build.ok) {
+        return graphNotice(ctx, `Graphify build failed: ${build.error || "No build result was returned."}`, "error");
+      }
       const { generation, graph } = build.active;
       const { nodes, edges, sources } = build.snapshot;
       graphNotice(ctx, `Graphify built generation ${generation}: ${nodes} nodes, ${edges} edges, ${sources} source files.\nGraph storage: ${graph}`);
@@ -120,11 +128,15 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
 
     try {
       const result = await memoryAction({ action: "query", query: GRAPH_TEST_QUERY }, options);
-      if (!result.ok) return graphNotice(ctx, `Graphify query failed: ${result.error || "No query result was returned."}`, "error");
+      if (!result.ok) {
+        return graphNotice(ctx, `Graphify query failed: ${result.error || "No query result was returned."}`, "error");
+      }
       if (result.active?.generation !== build.active.generation) {
         return graphNotice(ctx, `Graphify query failed: active generation changed from ${build.active.generation} to ${result.active?.generation ?? "unknown"}; results cannot be attributed to this build.`, "error");
       }
-      if (typeof result.output !== "string") return graphNotice(ctx, "Graphify query failed: no text output was returned.", "error");
+      if (typeof result.output !== "string") {
+        return graphNotice(ctx, "Graphify query failed: no text output was returned.", "error");
+      }
       const output = result.output.trim();
       graphNotice(ctx, output
         ? /^No matching nodes found\.?$/i.test(output)
@@ -138,18 +150,31 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
 
   async function update(action, ctx, quiet = false) {
     if (busy) {
-      if (!quiet) notify(ctx, "A Useful Skills update operation is already running.", "warning");
+      if (!quiet) {
+        notify(ctx, "A Useful Skills update operation is already running.", "warning");
+      }
+
       return;
     }
+
     busy = true;
     try {
-      if (action === "install") notify(ctx, "Updating Useful Skills through OMP's native plugin manager…");
+      if (action === "install") {
+        notify(ctx, "Updating Useful Skills through OMP's native plugin manager…");
+      }
+
       const report = await runUpdate(action, { cwd: ctx.cwd, profile: process.env.OMP_PROFILE });
-      if (report.updated) notify(ctx, `Useful Skills updated to ${report.currentVersion}. Restart OMP to load the update.`);
-      else if (report.updateAvailable) notify(ctx, `Useful Skills update available: ${report.currentVersion} → ${report.latestVersion}. Run /useful-skills update install.`, "warning");
-      else if (!quiet) notify(ctx, `Useful Skills ${report.currentVersion}: ${report.message || "No newer stable release available."}`);
+      if (report.updated) {
+        notify(ctx, `Useful Skills updated to ${report.currentVersion}. Restart OMP to load the update.`);
+      } else if (report.updateAvailable) {
+        notify(ctx, `Useful Skills update available: ${report.currentVersion} → ${report.latestVersion}. Run /useful-skills update install.`, "warning");
+      } else if (!quiet) {
+        notify(ctx, `Useful Skills ${report.currentVersion}: ${report.message || "No newer stable release available."}`);
+      }
     } catch (error) {
-      if (!quiet) notify(ctx, `Useful Skills update failed: ${error.message}`, "error");
+      if (!quiet) {
+        notify(ctx, `Useful Skills update failed: ${error.message}`, "error");
+      }
     } finally {
       busy = false;
     }
@@ -169,42 +194,76 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
       let command = args.trim();
       // Commands unrelated to workflow settings retain their synchronous progress notices.
       const directTokens = command.split(/\s+/);
-      if (command === "doctor") return await doctor(ctx);
-      if (directTokens[0] === "graph" && directTokens.length === 2 && directTokens[1] === "test") return await graphTest(ctx);
+
+      if (command === "doctor") {
+        return await doctor(ctx);
+      }
+
+      if (directTokens[0] === "graph" && directTokens.length === 2 && directTokens[1] === "test") {
+        return await graphTest(ctx);
+      }
+
       if (directTokens[0] === "update" && directTokens.length === 2 && ["check", "install"].includes(directTokens[1])) {
         return await update(directTokens[1], ctx);
       }
+
       const snapshot = await refresh;
       if (!command && ctx.hasUI) {
         const workflowChoice = `Workflow (${settingState(snapshot, "workflow")})`;
         const choice = await ctx.ui.select("Useful Skills", ["List", "Libraries", "Doctor", "Status", workflowChoice, "Stages", "Update", "Help"]);
-        if (!choice) return;
+        if (!choice) {
+          return;
+        }
+
         if (choice === workflowChoice) {
           const mode = await ctx.ui.select(`Workflow: ${settingState(snapshot, "workflow")}`, ["Enabled", "Disabled"]);
-          if (!mode) return;
+          if (!mode) {
+            return;
+          }
+
           command = `workflow ${mode.toLowerCase()}`;
         } else if (choice === "Stages") {
           const choices = STAGES.map(stage => `${STAGE_LABELS[stage]} (${settingState(snapshot, stage)})`);
           const selected = await ctx.ui.select("Automatic stages", choices);
-          if (!selected) return;
+          if (!selected) {
+            return;
+          }
+
           const stage = STAGES[choices.indexOf(selected)];
-          if (!stage) return;
+          if (!stage) {
+            return;
+          }
+
           const mode = await ctx.ui.select(`${STAGE_LABELS[stage]}: ${settingState(snapshot, stage)}`, ["Enabled", "Disabled"]);
-          if (!mode) return;
+          if (!mode) {
+            return;
+          }
+
           command = `stage ${stage} ${mode.toLowerCase()}`;
         } else if (choice === "Update") {
           const action = await ctx.ui.select("Update", ["Check", "Install"]);
-          if (!action) return;
+          if (!action) {
+            return;
+          }
+
           command = `update ${action.toLowerCase()}`;
         } else {
           command = { List: "list", Libraries: "library list", Doctor: "doctor", Status: "status", Help: "help" }[choice];
         }
       }
-      if (!command || command === "help") return notify(ctx, HELP);
+
+      if (!command || command === "help") {
+        return notify(ctx, HELP);
+      }
+
       if (command === "status") {
         return notify(ctx, status(snapshot), Object.keys(snapshot.errors).length ? "warning" : "info");
       }
-      if (command === "doctor") return await doctor(ctx);
+
+      if (command === "doctor") {
+        return await doctor(ctx);
+      }
+
       const tokens = command.split(/\s+/);
       if (tokens[0] === "workflow" || tokens[0] === "stage") {
         const stageCommand = tokens[0] === "stage";
@@ -216,19 +275,23 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
             : "workflow enabled|disabled";
           return notify(ctx, `Expected /useful-skills ${usage}.\n${status(snapshot)}`, "warning");
         }
+
         // The store accepts replacement of a corrupt regular JSON value, but rejects unsafe paths.
         try {
           await writeWorkflowSetting({ agentDir: pi.pi.getAgentDir(), key, enabled: mode === "enabled" });
         } catch (error) {
           return notify(ctx, `Cannot change ${key}: ${error instanceof Error ? error.message : String(error)}`, "error");
         }
+
         const confirmed = await settings(ctx);
         if (confirmed.errors[key] || settingState(confirmed, key) !== mode) {
           return notify(ctx, `Cannot confirm ${key} setting: ${confirmed.errors[key] || "profile readback differs from the requested mode"}.\n${status(confirmed)}`, "error");
         }
         return notify(ctx, `Useful Skills ${key} ${mode} for this OMP profile.`);
       }
-      if (tokens[0] === "graph" && tokens.length === 2 && tokens[1] === "test") return await graphTest(ctx);
+      if (tokens[0] === "graph" && tokens.length === 2 && tokens[1] === "test") {
+        return await graphTest(ctx);
+      }
       if (tokens[0] === "update" && tokens.length === 2 && ["check", "install"].includes(tokens[1])) {
         return await update(tokens[1], ctx);
       }
@@ -243,6 +306,7 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
     description: "Browse skills, references, health, graph diagnostics, and updates",
     handler: workbench,
   });
+
   pi.registerTool({
     name: "us_memory",
     label: "Useful Skills Memory",
@@ -255,6 +319,7 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
       return { content: [{ type: "text", text: JSON.stringify(result) }], details: result, ...(result.ok === false ? { isError: true } : {}) };
     },
   });
+
   pi.on("before_agent_start", async (event, ctx) => {
     const snapshot = await settings(ctx);
     const mode = settingState(snapshot, "workflow");
@@ -263,23 +328,35 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
       : mode === "disabled"
         ? [FAST_LANE_HINT]
         : [DISCOVERY_HINT, WORKFLOW_POLICY, ...STAGES.map(stage => STAGE_GUIDANCE[stage][settingState(snapshot, stage)])];
+
     const retained = event.systemPrompt.filter(prompt => !OWNED_GUIDANCE.has(prompt));
     const next = [...retained, ...desired];
     return next.length === event.systemPrompt.length && next.every((prompt, index) => prompt === event.systemPrompt[index])
       ? undefined
       : { systemPrompt: next };
   });
+
   pi.on("tool_call", event => {
-    if (!safetyEnabled() || event.toolName !== "bash") return;
+    if (!safetyEnabled() || event.toolName !== "bash") {
+      return;
+    }
+
     const reason = dangerousCommandReason(event.input?.command);
-    if (reason) return { block: true, reason: `Useful Skills safety guard: ${reason}. Use a reversible, explicitly approved operation instead.` };
+    if (reason) {
+      return { block: true, reason: `Useful Skills safety guard: ${reason}. Use a reversible, explicitly approved operation instead.` };
+    }
   });
+
   pi.on("tool_result", event => {
     const content = redactToolResultContent(event.content);
     return content ? { content } : undefined;
   });
+
   pi.on("session_start", (_event, ctx) => {
-    if (!ctx.hasUI || startupScheduled) return;
+    if (!ctx.hasUI || startupScheduled) {
+      return;
+    }
+
     startupScheduled = true;
     ctx.setTimeout(() => update("check", ctx, true), 0);
   });

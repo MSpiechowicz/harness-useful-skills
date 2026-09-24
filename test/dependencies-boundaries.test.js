@@ -11,12 +11,15 @@ import { runProcess } from "../process.js";
 
 const committedDependencies = path.resolve(import.meta.dirname, "../dependencies");
 const digest = (value) => createHash("sha256").update(value).digest("hex");
-const unexpectedRun = async () => { throw new Error("Unexpected executable invocation"); };
+const unexpectedRun = async () => {
+  throw new Error("Unexpected executable invocation");
+};
 const healthyRun = async (_file, args) => ({ stdout: args.includes("--version") ? "Python 3.12.14\n" : "0.9.65\n" });
 
 async function fixture(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "us-dependency-boundary-"));
   t.after(() => rm(root, { recursive: true, force: true }));
+
   const agentDir = path.join(root, "profile");
   const dependenciesRoot = path.join(root, "dependencies");
   const archive = Buffer.from("local archive fixture");
@@ -28,18 +31,29 @@ async function fixture(t) {
       "linux-x64": { ...original.uv.platforms["linux-x64"], sha256: digest(archive) },
     } },
   });
+
   const lock = await readFile(path.join(committedDependencies, "graphify.lock"));
   await mkdir(dependenciesRoot);
   await writeFile(path.join(dependenciesRoot, "manifest.json"), manifest);
   await writeFile(path.join(dependenciesRoot, "graphify.lock"), lock);
+
   const linuxOnly = JSON.parse(manifest);
   delete linuxOnly.uv.platforms["darwin-arm64"];
   delete linuxOnly.python.platforms["darwin-arm64"];
   const lockHash = digest(Buffer.concat([Buffer.from(JSON.stringify(linuxOnly)), Buffer.from([0]), lock]));
   const storage = path.join(agentDir, "useful-skills", "dependencies");
   const versionRoot = path.join(storage, lockHash);
-  return { root, agentDir, dependenciesRoot, archive, manifest, lockHash, storage, versionRoot,
-    python: path.join(versionRoot, "venv", "bin", "python") };
+  return {
+    root,
+    agentDir,
+    dependenciesRoot,
+    archive,
+    manifest,
+    lockHash,
+    storage,
+    versionRoot,
+    python: path.join(versionRoot, "venv", "bin", "python"),
+  };
 }
 
 async function installedFixture(t) {
@@ -49,6 +63,7 @@ async function installedFixture(t) {
   await writeFile(path.join(source.versionRoot, "installation.json"), JSON.stringify({
     lockHash: source.lockHash, version: "0.9.65",
   }));
+
   return source;
 }
 
@@ -71,6 +86,7 @@ test("dependency manager rejects invalid adapters, deadlines, and profile argume
   assert.throws(() => createDependencyManager({ fetch: null }), TypeError);
   assert.throws(() => createDependencyManager({ run: false }), TypeError);
   assert.throws(() => createDependencyManager({ setupTimeoutMs: 0 }), TypeError);
+
   const source = await fixture(t);
   const dependency = manager(source);
   await assert.rejects(dependency.status(), /agentDir/i);
@@ -88,7 +104,18 @@ test("a malformed archive digest is rejected independently of archive path valid
       "linux-x64": { ...manifest.python.platforms["linux-x64"], sha256: "not-a-digest" },
     } },
   };
+
   await writeFile(path.join(source.dependenciesRoot, "manifest.json"), JSON.stringify(invalid));
+  await assert.rejects(manager(source).status({ agentDir: source.agentDir }), /metadata is invalid/i);
+  await assert.rejects(stat(source.agentDir), { code: "ENOENT" });
+});
+
+test("metadata rejects an escaping executable path", async (t) => {
+  const source = await fixture(t);
+  const manifest = JSON.parse(source.manifest);
+  manifest.uv.platforms["linux-x64"].executable = "../uv";
+  await writeFile(path.join(source.dependenciesRoot, "manifest.json"), JSON.stringify(manifest));
+
   await assert.rejects(manager(source).status({ agentDir: source.agentDir }), /metadata is invalid/i);
   await assert.rejects(stat(source.agentDir), { code: "ENOENT" });
 });
@@ -97,14 +124,17 @@ test("cancellation while waiting for another setup preserves that setup's lock",
   const source = await fixture(t);
   await mkdir(source.storage, { recursive: true });
   const lock = path.join(source.storage, ".setup.lock");
+
   const lease = await acquireSetupLock(lock, {});
   t.after(() => lease.release());
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort("cancel setup waiting for lock"), 30);
   t.after(() => clearTimeout(timer));
+
   await assert.rejects(manager(source).ensure({ agentDir: source.agentDir, signal: controller.signal }), /cancelled/i);
   assert.deepEqual(await readdir(source.storage), [".setup.lock"]);
 });
+
 test("simultaneous fresh-profile setups converge before dependency setup", async (t) => {
   const source = await fixture(t);
   const setups = Array.from({ length: 12 }, () => manager(source, {
@@ -186,7 +216,9 @@ test("a valid marker cannot hide a missing interpreter or a failed package impor
   await rm(source.python);
   const dependency = manager(source, {
     run: async (_file, args) => {
-      if (args.includes("--version")) return { stdout: "Python 3.12.14\n" };
+      if (args.includes("--version")) {
+        return { stdout: "Python 3.12.14\n" };
+      }
       throw new Error("ModuleNotFoundError: graphify");
     },
   });
@@ -214,6 +246,30 @@ test("an otherwise successful HTTP response must contain a download body", async
   const source = await fixture(t);
   const dependency = manager(source, { fetch: async () => new Response(null, { status: 204 }) });
   await assert.rejects(dependency.ensure({ agentDir: source.agentDir }), /HTTP 204/);
+  await assertFailedSetupRetainsLock(source);
+});
+
+test("a corrupt download cannot reach archive processing", async (t) => {
+  const source = await fixture(t);
+  const dependency = manager(source, { fetch: async () => new Response("corrupt") });
+
+  await assert.rejects(dependency.ensure({ agentDir: source.agentDir }), /checksum did not match/i);
+  await assertFailedSetupRetainsLock(source);
+});
+
+test("an unsafe archive link is rejected before extraction", async (t) => {
+  const source = await fixture(t);
+  const dependency = manager(source, {
+    run: async (_file, args) => {
+      if (args.includes("-tvzf")) {
+        return { stdout: "lrwxrwxrwx root/root 0 2026-01-01 00:00 uv/uv -> ../../outside\n" };
+      }
+
+      throw new Error("unsafe archive must not be extracted");
+    },
+  });
+
+  await assert.rejects(dependency.ensure({ agentDir: source.agentDir }), /unsafe link target/i);
   await assertFailedSetupRetainsLock(source);
 });
 
@@ -288,7 +344,9 @@ test("extraction output is rechecked rather than trusting the archive listing", 
   await writeFile(outside, "not a managed executable");
   const dependency = manager(source, {
     run: async (_file, args, options) => {
-      if (args.includes("-tvzf")) return { stdout: `-rwxr-xr-x root/root 1 2026-01-01 00:00 ${executable}\n` };
+      if (args.includes("-tvzf")) {
+        return { stdout: `-rwxr-xr-x root/root 1 2026-01-01 00:00 ${executable}\n` };
+      }
       if (args.includes("-xzf")) {
         const target = path.join(options.cwd, executable);
         await mkdir(path.dirname(target), { recursive: true });

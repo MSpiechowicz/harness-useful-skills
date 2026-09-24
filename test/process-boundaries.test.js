@@ -18,6 +18,7 @@ function options(extra = {}) {
 
 async function temporaryDirectory(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "us-process-boundary-"));
+
   t.after(() => rm(root, { recursive: true, force: true }));
   return root;
 }
@@ -120,8 +121,20 @@ test("children receive only explicitly inherited descriptors", async (t) => {
   const privateHandle = await open(descriptorFile, "r");
   t.after(() => privateHandle.close());
   const identity = await privateHandle.stat();
+  const leakCheckSource = [
+    "const fs = require('node:fs');",
+    "const leaked = [3, Number(process.argv[1])].some((fd) => {",
+    "  try {",
+    "    const stat = fs.fstatSync(fd);",
+    "    return `${stat.dev}:${stat.ino}` === process.argv[2];",
+    "  } catch {",
+    "    return false;",
+    "  }",
+    "});",
+    "process.stdout.write(String(leaked));",
+  ].join("\n");
   const withoutInheritance = await runProcess(process.execPath, ["-e",
-    "const fs=require('node:fs');const leaked=[3,Number(process.argv[1])].some(fd=>{try{const s=fs.fstatSync(fd);return `${s.dev}:${s.ino}`===process.argv[2];}catch{return false;}});process.stdout.write(String(leaked));",
+    leakCheckSource,
     String(privateHandle.fd), `${identity.dev}:${identity.ino}`,
   ], options());
   assert.equal(withoutInheritance.stdout, "false");
@@ -148,14 +161,19 @@ test("embedded NUL environment values fail safely as startup errors", async () =
 
 async function waitForReady(file) {
   const deadline = Date.now() + 4_000;
+
   while (Date.now() < deadline) {
     try {
       return JSON.parse(await readFile(file, "utf8"));
     } catch (error) {
-      if (error.code !== "ENOENT" && !(error instanceof SyntaxError)) throw error;
+      if (error.code !== "ENOENT" && !(error instanceof SyntaxError)) {
+        throw error;
+      }
+
       await delay(10);
     }
   }
+
   throw new Error("Child process did not announce readiness");
 }
 
@@ -165,7 +183,10 @@ async function processRunning(pid) {
     // A killed orphan may remain a zombie until the host reaps it.
     return !/\) [ZX] /.test(state);
   } catch (error) {
-    if (error.code === "ENOENT") return false;
+    if (error.code === "ENOENT") {
+      return false;
+    }
+
     throw error;
   }
 }
@@ -176,12 +197,12 @@ async function descendantScenario(t, cancel) {
   const controller = new AbortController();
   const childSource = [
     "process.on('SIGTERM', () => {});",
-    "require('node:fs').writeFileSync(process.argv[1], JSON.stringify({pid:process.pid, parent:process.ppid}));",
+    "require('node:fs').writeFileSync(process.argv[1], JSON.stringify({ pid: process.pid, parent: process.ppid }));",
     "setInterval(() => {}, 1000);",
   ].join("\n");
   const parentSource = [
     "process.on('SIGTERM', () => {});",
-    `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(childSource)}, process.argv[1]], {stdio:'ignore'});`,
+    `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(childSource)}, process.argv[1]], { stdio: 'ignore' });`,
     "setInterval(() => {}, 1000);",
   ].join("\n");
   const running = runProcess(process.execPath, ["-e", parentSource, readyFile], options({
@@ -194,13 +215,25 @@ async function descendantScenario(t, cancel) {
   t.after(async () => {
     controller.abort();
     await outcome;
+
     if (descendant && await processRunning(descendant.pid)) {
-      try { process.kill(descendant.pid, "SIGKILL"); } catch (error) { if (error.code !== "ESRCH") throw error; }
+      try {
+        process.kill(descendant.pid, "SIGKILL");
+      } catch (error) {
+        if (error.code !== "ESRCH") {
+          throw error;
+        }
+      }
     }
   });
+
   descendant = await waitForReady(readyFile);
   assert.equal(await processRunning(descendant.pid), true);
-  if (cancel) controller.abort(new Error("cancel running process tree"));
+
+  if (cancel) {
+    controller.abort(new Error("cancel running process tree"));
+  }
+
   const { error } = await outcome;
   assert.ok(error instanceof Error, "a stopped process must reject");
   assert.match(error.message, cancel ? /cancelled/i : /timed out/i);

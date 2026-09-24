@@ -45,7 +45,10 @@ function isDisabled(value) {
 function frontmatterField(contents, field) {
   const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(contents)?.[1];
   const value = frontmatter && new RegExp(`^${field}:\\s*(.+?)\\s*$`, "m").exec(frontmatter)?.[1];
-  if (!value) return undefined;
+  if (!value) {
+    return undefined;
+  }
+
   const quoted = /^("|')(.*)\1$/.exec(value);
   return quoted ? quoted[2] : value;
 }
@@ -54,7 +57,9 @@ async function readOptional(file) {
   try {
     return await readFile(file, "utf8");
   } catch (error) {
-    if (error.code === "ENOENT") return undefined;
+    if (error.code === "ENOENT") {
+      return undefined;
+    }
     throw error;
   }
 }
@@ -63,7 +68,9 @@ async function entriesOptional(directory) {
   try {
     return await readdir(directory, { withFileTypes: true });
   } catch (error) {
-    if (error.code === "ENOENT") return [];
+    if (error.code === "ENOENT") {
+      return [];
+    }
     throw error;
   }
 }
@@ -74,8 +81,11 @@ async function walkMarkdown(root) {
     const entries = await entriesOptional(directory);
     for (const entry of entries) {
       const file = path.join(directory, entry.name);
-      if (entry.isDirectory()) await visit(file);
-      else if (entry.isFile() && entry.name.endsWith(".md")) output.push(file);
+      if (entry.isDirectory()) {
+        await visit(file);
+      } else if (entry.isFile() && entry.name.endsWith(".md")) {
+        output.push(file);
+      }
     }
   }
   await visit(root);
@@ -87,12 +97,18 @@ export function safetyEnabled(environment = process.env) {
 }
 
 export function dangerousCommandReason(command) {
-  if (typeof command !== "string" || !command.trim()) return undefined;
+  if (typeof command !== "string" || !command.trim()) {
+    return undefined;
+  }
+
   return DANGEROUS_COMMANDS.find(({ pattern }) => pattern.test(command))?.reason;
 }
 
 export function redactText(value) {
-  if (typeof value !== "string" || !value) return value;
+  if (typeof value !== "string" || !value) {
+    return value;
+  }
+
   let redacted = value;
   for (const pattern of SECRET_PATTERNS) {
     redacted = redacted.replace(pattern, (...matches) => {
@@ -112,12 +128,21 @@ export function containsSecret(value) {
 }
 
 export function redactToolResultContent(content) {
-  if (!Array.isArray(content)) return undefined;
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+
   let changed = false;
   const redacted = content.map((block) => {
-    if (!block || block.type !== "text" || typeof block.text !== "string") return block;
+    if (!block || block.type !== "text" || typeof block.text !== "string") {
+      return block;
+    }
+
     const text = redactText(block.text);
-    if (text === block.text) return block;
+    if (text === block.text) {
+      return block;
+    }
+
     changed = true;
     return { ...block, text };
   });
@@ -133,9 +158,18 @@ export async function resourceInventory(options = {}) {
 
 /** One shallow skill catalog; archived references never become active skills. */
 export async function listResources(kind, { root = PACKAGE_ROOT, query = "", source = "core" } = {}) {
-  if (!RESOURCE_KINDS.includes(kind)) throw new TypeError("Resource kind must be skills, commands, agents, or rules.");
-  if (!["core", "library"].includes(source)) throw new TypeError("Resource source must be core or library.");
-  if (typeof query !== "string") throw new TypeError("Resource query must be a string.");
+  if (!RESOURCE_KINDS.includes(kind)) {
+    throw new TypeError("Resource kind must be skills, commands, agents, or rules.");
+  }
+
+  if (!["core", "library"].includes(source)) {
+    throw new TypeError("Resource source must be core or library.");
+  }
+
+  if (typeof query !== "string") {
+    throw new TypeError("Resource query must be a string.");
+  }
+
   const base = source === "core" ? root : path.join(root, "skills/us-library/references/ecc");
   const directory = path.join(base, kind);
   const entries = await entriesOptional(directory);
@@ -145,16 +179,23 @@ export async function listResources(kind, { root = PACKAGE_ROOT, query = "", sou
       .map(entry => path.join(directory, entry.name, ...(kind === "skills" ? ["SKILL.md"] : [])));
   const items = await Promise.all(files.map(async file => {
     const contents = await readOptional(file);
-    if (!contents) return undefined;
+    if (!contents) {
+      return undefined;
+    }
+
     const baseName = kind === "skills" ? path.basename(path.dirname(file)) : path.basename(file, ".md");
     const name = frontmatterField(contents, "name") ?? baseName;
     const description = frontmatterField(contents, "description") ?? "";
-    if (kind === "skills" && source === "core" && (name !== baseName || !frontmatterField(contents, "name") || !description)) return undefined;
+    if (kind === "skills" && source === "core" && (name !== baseName || !frontmatterField(contents, "name") || !description)) {
+      return undefined;
+    }
+
     const relative = path.relative(root, file).split(path.sep).join("/");
     const uri = source === "library" ? `skill://us-library/references/ecc/${path.relative(base, file).split(path.sep).join("/")}` : undefined;
     const usage = uri ?? (kind === "skills" ? `/skill:${name}` : relative);
     return { name, description, path: relative, usage, ...(uri ? { uri } : {}) };
   }));
+
   const normalizedQuery = query.trim().toLowerCase();
   return items.filter(item => item && `${item.name} ${item.description} ${item.path}`.toLowerCase().includes(normalizedQuery))
     .sort((left, right) => left.name.localeCompare(right.name));
@@ -163,16 +204,24 @@ export async function listResources(kind, { root = PACKAGE_ROOT, query = "", sou
 /** Both the extension's text input and the launcher's argv use this parser. */
 export function parseCatalogArguments(input) {
   const tokens = typeof input === "string" ? input.trim().split(/\s+/).filter(Boolean) : input;
-  if (!Array.isArray(tokens) || tokens.some(token => typeof token !== "string")) throw new TypeError("Expected catalog arguments.");
+  if (!Array.isArray(tokens) || tokens.some(token => typeof token !== "string")) {
+    throw new TypeError("Expected catalog arguments.");
+  }
+
   const library = tokens[0] === "library";
   const rest = library ? tokens.slice(1) : tokens;
-  if (rest[0] !== "list") throw new TypeError("Expected list [query] or library list [kind] [query].");
+  if (rest[0] !== "list") {
+    throw new TypeError("Expected list [query] or library list [kind] [query].");
+  }
+
   const hasKind = library && RESOURCE_KINDS.includes(rest[1]);
   return { source: library ? "library" : "core", kind: hasKind ? rest[1] : "skills", query: rest.slice(hasKind ? 2 : 1).join(" ").trim() };
 }
 
 export function formatResources(kind, resources, query = "", source = "core") {
-  if (resources.length === 0) return `No ${kind} match${query ? `ing ${JSON.stringify(query)}` : ""}.`;
+  if (resources.length === 0) {
+    return `No ${kind} match${query ? `ing ${JSON.stringify(query)}` : ""}.`;
+  }
   return [
     `Useful Skills ${source === "library" ? "reference library" : "core"} ${kind} (${resources.length}):`,
     ...resources.map(resource => `  ${resource.name}${resource.description ? ` — ${resource.description}` : ""}\n    ${resource.usage}`),

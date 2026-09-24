@@ -32,10 +32,17 @@ export function versionTuple(value) {
   if (typeof value !== "string" || value.length > 80) {
     throw new UpdateError("Expected a stable MAJOR.MINOR.PATCH version.");
   }
+
   const match = STABLE_VERSION.exec(value);
-  if (!match) throw new UpdateError("Expected a stable MAJOR.MINOR.PATCH version.");
+  if (!match) {
+    throw new UpdateError("Expected a stable MAJOR.MINOR.PATCH version.");
+  }
+
   const parts = [Number(match[1]), Number(match[2]), Number(match[3])];
-  if (!parts.every(Number.isSafeInteger)) throw new UpdateError("Version components exceed the safe integer range.");
+  if (!parts.every(Number.isSafeInteger)) {
+    throw new UpdateError("Version components exceed the safe integer range.");
+  }
+
   return parts;
 }
 
@@ -43,11 +50,13 @@ export function versionTuple(value) {
 export function isNewerVersion(candidate, current) {
   const left = versionTuple(candidate);
   const right = versionTuple(current);
-  return left[0] !== right[0]
-    ? left[0] > right[0]
-    : left[1] !== right[1]
-      ? left[1] > right[1]
-      : left[2] > right[2];
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) {
+      return left[index] > right[index];
+    }
+  }
+
+  return false;
 }
 
 async function packageVersion(root) {
@@ -60,7 +69,6 @@ async function packageVersion(root) {
     throw new UpdateError(`Cannot read a valid useful-skills package version: ${detail}`);
   }
 }
-
 
 /** Read the latest published stable GitHub release without following redirects. */
 export async function latestRelease(fetcher = fetch) {
@@ -80,8 +88,13 @@ export async function latestRelease(fetcher = fetch) {
     throw new UpdateError(`Cannot retrieve the public GitHub release: ${detail}`);
   }
 
-  if (response.status === 404) return null;
-  if (!response.ok) throw new UpdateError(`GitHub release request failed (HTTP ${response.status}).`);
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new UpdateError(`GitHub release request failed (HTTP ${response.status}).`);
+  }
 
   let body;
   try {
@@ -129,28 +142,38 @@ function normalizedOptions(options = {}) {
   if (!options || typeof options !== "object") {
     throw new UpdateError("Update options must be an object.");
   }
+
   const profile = options.profile ?? process.env.OMP_PROFILE;
   if (profile !== undefined && (typeof profile !== "string" || profile.length === 0)) {
     throw new UpdateError("OMP profile must be a non-empty string.");
   }
+
   const root = path.resolve(options.root ?? PACKAGE_ROOT);
   const cwd = path.resolve(options.cwd ?? process.cwd());
   if (options.runner !== undefined && typeof options.runner !== "function") {
     throw new UpdateError("Update runner must be a function.");
   }
+
   if (options.fetcher !== undefined && typeof options.fetcher !== "function") {
     throw new UpdateError("Update fetcher must be a function.");
   }
+
   return { root, cwd, profile, runner: options.runner ?? execRunner, fetcher: options.fetcher ?? fetch };
 }
 
 async function native(state, args, timeoutMs) {
   const command = [];
-  if (state.profile) command.push("--profile", state.profile);
+  if (state.profile) {
+    command.push("--profile", state.profile);
+  }
+
   command.push("plugin", ...args);
   try {
     const output = await state.runner("omp", command, { cwd: state.cwd, timeoutMs });
-    if (typeof output !== "string") throw new TypeError("runner did not return stdout");
+    if (typeof output !== "string") {
+      throw new TypeError("runner did not return stdout");
+    }
+
     return output;
   } catch {
     throw new UpdateError(`OMP plugin ${args[0] ?? "operation"} failed; inspect the native OMP command output and retry.`);
@@ -169,7 +192,10 @@ async function installedPlugins(state) {
   try {
     data = JSON.parse(await native(state, ["list", "--json"], LIST_TIMEOUT_MS));
   } catch (error) {
-    if (error instanceof UpdateError) throw error;
+    if (error instanceof UpdateError) {
+      throw error;
+    }
+
     throw new UpdateError("Cannot read native OMP marketplace installations.");
   }
   return marketplaceEntries(data);
@@ -179,25 +205,40 @@ async function installedPlugins(state) {
 async function managedInstallation(state, expectedRoot) {
   const matches = [];
   for (const summary of await installedPlugins(state)) {
-    if (!summary || typeof summary !== "object" || summary.id !== PLUGIN_ID) continue;
-    if ((summary.scope !== "user" && summary.scope !== "project") || summary.shadowedBy) continue;
-    if (!Array.isArray(summary.entries) || summary.entries.length !== 1) continue;
+    if (!summary || typeof summary !== "object" || summary.id !== PLUGIN_ID) {
+      continue;
+    }
+
+    if ((summary.scope !== "user" && summary.scope !== "project") || summary.shadowedBy) {
+      continue;
+    }
+
+    if (!Array.isArray(summary.entries) || summary.entries.length !== 1) {
+      continue;
+    }
 
     const entry = summary.entries[0];
-    if (!entry || typeof entry !== "object" || entry.enabled === false || entry.scope !== summary.scope) continue;
-    if (typeof entry.installPath !== "string" || !path.isAbsolute(entry.installPath)) continue;
+    if (!entry || typeof entry !== "object" || entry.enabled === false || entry.scope !== summary.scope) {
+      continue;
+    }
+
+    if (typeof entry.installPath !== "string" || !path.isAbsolute(entry.installPath)) {
+      continue;
+    }
 
     const installPath = path.resolve(entry.installPath);
     const version = await packageVersion(installPath);
     if (entry.version !== version) {
       throw new UpdateError("OMP registry and installed useful-skills versions disagree; inspect `omp plugin list` before updating.");
     }
+
     matches.push({ scope: summary.scope, installPath, version });
   }
 
   if (matches.length > 1) {
     throw new UpdateError("useful-skills has multiple active marketplace installations; remove the ambiguity before updating.");
   }
+
   const installed = matches[0];
   return expectedRoot === undefined || installed?.installPath === path.resolve(expectedRoot) ? installed : undefined;
 }
@@ -224,6 +265,7 @@ export async function checkUpdate(options = {}) {
   } else if (!release) {
     report.message = "No published stable GitHub release is available.";
   }
+
   return report;
 }
 
@@ -265,8 +307,13 @@ export async function installUpdate(options = {}) {
 
 /** Contract used by the extension and launcher. */
 export async function runUpdate(action, options = {}) {
-  if (action === "check") return checkUpdate(options);
-  if (action === "install") return installUpdate(options);
+  if (action === "check") {
+    return checkUpdate(options);
+  }
+  if (action === "install") {
+    return installUpdate(options);
+  }
+
   throw new UpdateError("Update action must be check or install.");
 }
 

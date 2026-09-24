@@ -15,7 +15,9 @@ function abortReason(signal) {
 }
 
 function throwIfAborted(signal) {
-  if (signal?.aborted) throw abortReason(signal);
+  if (signal?.aborted) {
+    throw abortReason(signal);
+  }
 }
 
 function sameFile(left, right) {
@@ -26,6 +28,7 @@ async function secureLockHandle(lockFile) {
   if (typeof lockFile !== "string" || !path.isAbsolute(lockFile)) {
     throw new TypeError("lockFile must be an absolute path.");
   }
+
   const parent = path.dirname(lockFile);
   const parentEntry = await lstat(parent);
   if (!parentEntry.isDirectory() || parentEntry.isSymbolicLink() || await realpath(parent) !== parent) {
@@ -39,8 +42,10 @@ async function secureLockHandle(lockFile) {
     if (error?.code === "ELOOP" || error?.code === "EISDIR") {
       throw new Error("Dependency setup lock must be a regular file, not a symlink.");
     }
+
     throw error;
   }
+
   try {
     const [descriptorEntry, pathnameEntry, resolved] = await Promise.all([
       handle.stat(),
@@ -56,6 +61,7 @@ async function secureLockHandle(lockFile) {
     ) {
       throw new Error("Dependency setup lock must be a regular file, not a symlink.");
     }
+
     return handle;
   } catch (error) {
     await handle.close();
@@ -65,24 +71,37 @@ async function secureLockHandle(lockFile) {
 
 /** Acquire an OS-owned exclusive setup lock that child writers may inherit as fd 3. */
 export async function acquireSetupLock(lockFile, { signal, timeoutMs = LOCK_WAIT_TIMEOUT_MS, platform = process.platform, run = runProcess } = {}) {
-  if (signal !== undefined && !(signal instanceof AbortSignal)) throw new TypeError("signal must be an AbortSignal.");
-  if (typeof run !== "function") throw new TypeError("run must be a function.");
+  if (signal !== undefined && !(signal instanceof AbortSignal)) {
+    throw new TypeError("signal must be an AbortSignal.");
+  }
+
+  if (typeof run !== "function") {
+    throw new TypeError("run must be a function.");
+  }
+
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
     throw new TypeError("timeoutMs must be a positive safe integer.");
   }
+
   const lockTimeoutMs = Math.min(timeoutMs, LOCK_WAIT_TIMEOUT_MS);
   throwIfAborted(signal);
   const handle = await secureLockHandle(lockFile);
+
   try {
     throwIfAborted(signal);
-    await run(platform === "darwin" ? LOCKF : FLOCK, platform === "darwin"
+
+    const darwin = platform === "darwin";
+    const lockCommand = darwin ? LOCKF : FLOCK;
+    const lockArgs = darwin
       ? ["-s", "-t", String(Math.ceil(lockTimeoutMs / 1_000)), "3"]
       : [
         "--exclusive",
         "--timeout", String(lockTimeoutMs / 1_000),
         "--conflict-exit-code", String(LOCK_TIMEOUT_EXIT_CODE),
         "3",
-      ], {
+      ];
+
+    await run(lockCommand, lockArgs, {
       cwd: path.dirname(lockFile),
       env: { PATH: "/usr/bin:/bin", LC_ALL: "C" },
       signal,
@@ -93,19 +112,25 @@ export async function acquireSetupLock(lockFile, { signal, timeoutMs = LOCK_WAIT
   } catch (error) {
     await handle.close();
     throwIfAborted(signal);
+
     if (error?.exitCode === LOCK_TIMEOUT_EXIT_CODE || (
       platform === "darwin" && error?.message === `Process timed out after ${lockTimeoutMs + RUNNER_GRACE_MS}ms.`
     )) {
       throw new Error(`Dependency setup lock acquisition timed out after ${lockTimeoutMs}ms.`);
     }
+
     throw error;
   }
 
   const fd = handle.fd;
   let closed;
   const release = () => {
-    if (!closed) closed = handle.close();
+    if (!closed) {
+      closed = handle.close();
+    }
+
     return closed;
   };
+
   return Object.freeze({ fd, release });
 }

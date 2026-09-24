@@ -45,7 +45,10 @@ test("process runner fails when an output stream exceeds its bound", async () =>
 test("process runner terminates on an aborted signal", async () => {
   const controller = new AbortController();
   const started = new Promise((resolve) => {
-    setTimeout(() => { controller.abort(new Error("cancelled by test")); resolve(); }, 20);
+    setTimeout(() => {
+      controller.abort(new Error("cancelled by test"));
+      resolve();
+    }, 20);
   });
 
   const result = runProcess(process.execPath, ["-e", "setInterval(() => {}, 1_000)"], {
@@ -55,6 +58,7 @@ test("process runner terminates on an aborted signal", async () => {
     signal: controller.signal,
     maxBytes: 32,
   });
+
   await started;
   await assert.rejects(result, /cancelled/i);
 });
@@ -90,5 +94,6 @@ test("process runner escalates termination after a timeout", async () => {
     }),
     /timed out/i,
   );
+
   assert.ok(Date.now() - startedAt < 2_000);
 });

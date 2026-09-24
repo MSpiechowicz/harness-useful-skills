@@ -34,13 +34,17 @@ def bump_version(version, bump):
     match = VERSION.fullmatch(version)
     if match is None:
         raise ValueError("package.json version must be stable MAJOR.MINOR.PATCH")
+
     major, minor, patch = map(int, match.groups())
     if bump == "major":
         return f"{major + 1}.0.0"
+
     if bump == "minor":
         return f"{major}.{minor + 1}.0"
+
     if bump == "patch":
         return f"{major}.{minor}.{patch + 1}"
+
     raise ValueError("Unknown version bump")
 
 
@@ -50,9 +54,11 @@ def catalog_for(repo, source, current_version, version):
     plugins = [plugin for plugin in catalog["plugins"] if plugin["name"] == PLUGIN]
     if len(plugins) != 1:
         raise ValueError("Marketplace must contain exactly one useful-skills plugin")
+
     plugin = plugins[0]
     if plugin["version"] != current_version or plugin["source"]["ref"] != f"v{current_version}":
         raise ValueError("Marketplace version and source ref must match package.json")
+
     plugin["version"] = version
     plugin["source"]["ref"] = f"v{version}"
     return catalog
@@ -66,6 +72,7 @@ def is_matching_release(repo, source, metadata, catalog, version, message, commi
         released_catalog = json.loads(git(repo, "show", f"{commit}:{CATALOG}"))
     except (KeyError, json.JSONDecodeError, subprocess.SubprocessError):
         return False
+
     changed = git(repo, "diff-tree", "--no-commit-id", "--name-only", "-r", commit).splitlines()
     return (
         parents == source
@@ -86,8 +93,10 @@ def plan_release(repo, source, bump="patch", push=False):
     repo = Path(repo).resolve()
     if not re.fullmatch(r"[0-9a-f]{40}", source):
         raise ValueError("Source must be a full commit SHA")
+
     if git(repo, "status", "--porcelain", "--untracked-files=all"):
         raise ValueError("Release checkout must be clean")
+
     if git(repo, "rev-parse", "HEAD") != source:
         raise ValueError("Release checkout must be at the workflow source SHA")
 
@@ -110,6 +119,7 @@ def plan_release(repo, source, bump="patch", push=False):
         commit = git(repo, "rev-parse", f"refs/tags/{tag}^{{commit}}")
         if not is_matching_release(repo, source, metadata, catalog, version, message, commit):
             raise ValueError(f"Tag {tag} already exists and is not this release")
+
         # GitHub Release creation is independent from a later main commit.  The
         # immutable tag proves this source was already atomically published.
         return {
@@ -144,8 +154,10 @@ def plan_release(repo, source, bump="patch", push=False):
     if count != 1:
         raise ValueError("package.json must contain exactly one version field")
     package.write_text(updated, encoding="utf-8")
+
     (repo / CATALOG).write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
     git(repo, "add", "--", "package.json", CATALOG)
+
     git(
         repo,
         "-c",
@@ -158,10 +170,13 @@ def plan_release(repo, source, bump="patch", push=False):
         "-m",
         message,
     )
+
     commit = git(repo, "rev-parse", "HEAD")
     git(repo, "-c", "tag.gpgsign=false", "tag", tag, commit)
+
     # No force-push: Git rejects both refs if either main or the tag changed.
     git(repo, "push", "--atomic", "origin", f"{commit}:refs/heads/main", f"refs/tags/{tag}:refs/tags/{tag}")
+
     result["commit"] = commit
     return result
 
@@ -182,8 +197,10 @@ def publish_release(repository, tag):
     """Create generated GitHub release notes, preserving an existing stable release."""
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
         raise ValueError("Repository must be owner/name")
+
     if not re.fullmatch(r"v" + VERSION.pattern, tag):
         raise ValueError("Tag must be vMAJOR.MINOR.PATCH")
+
     if not (os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")):
         raise ValueError("GITHUB_TOKEN or GH_TOKEN is required to publish a GitHub Release")
 
@@ -193,15 +210,18 @@ def publish_release(repository, tag):
         if release.get("draft") or release.get("prerelease"):
             raise ValueError(f"{tag} already has a draft or prerelease; resolve it manually")
         return release["html_url"]
+
     if not re.search(r"(?:HTTP )?404(?:\D|$)", existing.stderr):
         raise ValueError("GitHub release lookup failed; check gh authentication and repository access")
 
     created = gh(repository, "release", "create", tag, "--title", tag, "--generate-notes")
     if created.returncode:
         raise ValueError("GitHub release creation failed; rerun the workflow to resume")
+
     released = gh(repository, "api", f"repos/{repository}/releases/tags/{tag}")
     if released.returncode:
         raise ValueError("GitHub release was created but could not be read; rerun the workflow to resume")
+
     return json.loads(released.stdout)["html_url"]
 
 
@@ -216,10 +236,12 @@ def main():
     args = parser.parse_args()
     if args.github_release and (not args.push or not args.repository):
         parser.error("--github-release requires --push and --repository (or GITHUB_REPOSITORY)")
+
     try:
         result = plan_release(args.repo, args.source, args.bump, args.push)
         if args.github_release and not result["skipped"]:
             result["releaseUrl"] = publish_release(args.repository, result["tag"])
+
         print(json.dumps(result))
         return 0
     except (ValueError, KeyError, OSError, json.JSONDecodeError, subprocess.SubprocessError) as error:
@@ -229,6 +251,7 @@ def main():
             text = "GitHub or Git command timed out; rerun in a fresh checkout"
         else:
             text = str(error)
+
         print(f"Release failed: {text}", file=sys.stderr)
         return 1
 

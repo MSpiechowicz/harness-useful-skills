@@ -20,13 +20,25 @@ const child = spawn(file, args, {
 });
 
 function terminate() {
-  if (stopping) return;
+  if (stopping) {
+    return;
+  }
+
   stopping = true;
   // Child and watchdog share the group. The coordinator's cancellation also
   // signals this group, including any grandchildren that retained fd 3.
-  try { process.kill(-process.pid, "SIGTERM"); } catch { child.kill("SIGTERM"); }
+  try {
+    process.kill(-process.pid, "SIGTERM");
+  } catch {
+    child.kill("SIGTERM");
+  }
+
   escalation = setTimeout(() => {
-    try { process.kill(-process.pid, "SIGKILL"); } catch { child.kill("SIGKILL"); }
+    try {
+      process.kill(-process.pid, "SIGKILL");
+    } catch {
+      child.kill("SIGKILL");
+    }
   }, 1_000);
 }
 
@@ -41,6 +53,9 @@ child.once("error", (error) => {
 child.once("close", (code, signal) => {
   clearTimeout(deadline);
   clearTimeout(escalation);
-  if (signal) process.exitCode = 128 + (signal === "SIGTERM" ? 15 : 9);
-  else process.exitCode = code ?? 1;
+  if (signal) {
+    process.exitCode = 128 + (signal === "SIGTERM" ? 15 : 9);
+  } else {
+    process.exitCode = code ?? 1;
+  }
 });

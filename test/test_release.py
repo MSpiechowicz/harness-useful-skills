@@ -171,7 +171,5 @@ class ReleaseTransactionTests(unittest.TestCase):
             bump_version("03.9.8", "patch")
 
 
-
-
 if __name__ == "__main__":
     unittest.main()

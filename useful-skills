@@ -38,7 +38,9 @@ async function doctor() {
  */
 function optionValue(argv, index, name) {
   const value = argv[index + 1];
-  if (!value || value.startsWith("--")) throw new UpdateError(`${name} requires a value.`);
+  if (!value || value.startsWith("--")) {
+    throw new UpdateError(`${name} requires a value.`);
+  }
   return value;
 }
 
@@ -47,7 +49,9 @@ function parseOptions(argv, allowed) {
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--profile" || argument === "--scope") {
-      if (!allowed.has(argument)) throw new UpdateError(`${argument} is not valid for this command.`);
+      if (!allowed.has(argument)) {
+        throw new UpdateError(`${argument} is not valid for this command.`);
+      }
       options[argument.slice(2)] = optionValue(argv, index, argument);
       index += 1;
       continue;
@@ -83,10 +87,13 @@ export async function main(argv = process.argv.slice(2)) {
     if (argv[0] === "update" && (argv[1] === "check" || argv[1] === "install")) {
       const options = parseOptions(argv.slice(2), new Set(["--profile"]));
       const report = await runUpdate(argv[1], options);
-      if (report.updated) console.log(report.message);
-      else if (report.updateAvailable) {
+      if (report.updated) {
+        console.log(report.message);
+      } else if (report.updateAvailable) {
         console.log(`Update available: ${report.currentVersion} → ${report.latestVersion}.\nRun ./useful-skills update install.`);
-      } else console.log(`Useful Skills ${report.currentVersion}: ${report.message || "No newer stable release available."}`);
+      } else {
+        console.log(`Useful Skills ${report.currentVersion}: ${report.message || "No newer stable release available."}`);
+      }
       return 0;
     }
 
