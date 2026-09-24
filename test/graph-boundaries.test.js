@@ -143,6 +143,21 @@ const malformedGraphs = [
   ["external node missing source field", { nodes: [{ ...externalNode, source_file: undefined }], edges: [] }, /source_file.*non-empty/i],
   ["external node escaping workspace", { nodes: [{ ...externalNode, source_file: "../outside.py" }], edges: [] }, /escapes the workspace/i],
   ["external node with credential source", { nodes: [{ ...externalNode, source_file: ".env" }], edges: [] }, /credential-shaped/i],
+  ["AST package reference without an import edge", {
+    nodes: [...validGraph.nodes, { id: "package_component_d_ts", label: "component.d.ts", file_type: "code", source_file: "@scope/package/component.d.ts", _origin: "ast" }],
+    edges: [],
+  }, /external.*import/i],
+  ["AST package reference with a non-import edge", {
+    nodes: [...validGraph.nodes, { id: "package_component_d_ts", label: "component.d.ts", file_type: "code", source_file: "@scope/package/component.d.ts", _origin: "ast" }],
+    edges: [{ source: "main", target: "package_component_d_ts", relation: "references" }],
+  }, /external.*import/i],
+  ["AST package reference with a mismatched importer path", {
+    nodes: [
+      { id: "main", label: "main", file_type: "code", source_file: "main.py", source_location: "main.py", _origin: "ast" },
+      { id: "package_component_d_ts", label: "component.d.ts", file_type: "code", source_file: "@scope/package/component.d.ts", _origin: "ast" },
+    ],
+    edges: [{ source: "main", target: "package_component_d_ts", relation: "dynamic_import", _origin: "ast", source_file: "other.py" }],
+  }, /external.*import/i],
   ["null edge", { ...validGraph, edges: [null] }, /edges.*reference/i],
   ["missing relation", { ...validGraph, edges: [{ source: "main", target: "main" }] }, /edges.*relation/i],
 ];
@@ -195,6 +210,200 @@ test("external imports survive publication without being counted as local source
   assert.equal(status.available, true);
   assert.deepEqual([status.snapshot.nodes, status.snapshot.edges, status.snapshot.sources], [2, 1, 1]);
   assert.deepEqual(JSON.parse(await readFile(status.active.graph, "utf8")), contents);
+});
+
+test("external AST import references publish with only local sources counted", async (t) => {
+  const f = await fixture(t);
+  const importer = { id: "main", label: "main", file_type: "code", source_file: "main.py", source_location: "main.py", _origin: "ast" };
+  const externalReferences = [
+    {
+      id: "scoped_package_component_d_ts",
+      label: "component.d.ts",
+      _origin: "ast",
+      file_type: "code",
+      source_file: "@scope/package/src/component.d.ts",
+    },
+    {
+      id: "scoped_package_module_js",
+      label: "module.js",
+      _origin: "ast",
+      file_type: "code",
+      source_file: "@scope/package/lib/module.js",
+    },
+    {
+      id: "utility_package",
+      label: "utility-package",
+      _origin: "ast",
+      file_type: "code",
+      source_file: "utility-package",
+    },
+    {
+      id: "remote_module_js",
+      label: "https://example.invalid/remote-module.js",
+      _origin: "ast",
+      file_type: "code",
+      source_file: "https://example.invalid/remote-module.js",
+    },
+  ];
+  const contents = {
+    nodes: [importer, ...externalReferences],
+    links: externalReferences.map((reference) => ({
+      source: importer.id,
+      target: reference.id,
+      relation: "dynamic_import",
+      _origin: "ast",
+      source_file: importer.source_file,
+    })),
+  };
+  const graphify = service({ runProcess: async (_file, args) => extract(args, contents) });
+
+  const result = await graphify.buildGraph(f.options);
+  assert.equal(result.ok, true, result.error);
+  assert.deepEqual([result.snapshot.nodes, result.snapshot.edges, result.snapshot.sources], [5, 4, 1]);
+
+  const status = await graphify.graphStatus(f.options);
+  assert.equal(status.available, true);
+  assert.equal(status.active.generation, result.snapshot.generation);
+  const publishedGraph = JSON.parse(await readFile(status.active.graph, "utf8"));
+  assert.ok(publishedGraph.nodes.some((node) => node.id === importer.id && node.source_file === importer.source_file));
+  for (const reference of externalReferences) {
+    assert.ok(publishedGraph.nodes.some((node) => node.id === reference.id && node.source_file === reference.source_file));
+    assert.ok(publishedGraph.links.some((link) => link.source === importer.id && link.target === reference.id && link.relation === "dynamic_import"));
+  }
+});
+
+for (const label of ["../App.d.ts", "./App.d.ts"]) {
+  test(`missing local AST import labeled ${label} preserves the active snapshot`, async (t) => {
+    const f = await fixture(t);
+    const active = await seed(f);
+    const before = await readFile(f.paths.current, "utf8");
+    const localDirectory = path.join(f.workspace, "src", "shared", "react");
+    await mkdir(localDirectory, { recursive: true });
+    const importerSource = "src/shared/react/index.ts";
+    await writeFile(path.join(localDirectory, "index.ts"), "import App from '../App.d.ts';\n");
+    const importer = {
+      id: "index_ts",
+      label: "index.ts",
+      _origin: "ast",
+      file_type: "code",
+      source_file: importerSource,
+      source_location: importerSource,
+    };
+    const reference = {
+      id: "app_d_ts",
+      label,
+      _origin: "ast",
+      file_type: "code",
+      source_file: "src/shared/react/App.d.ts",
+    };
+    const contents = {
+      nodes: [importer, reference],
+      edges: [{ source: importer.id, target: reference.id, relation: "dynamic_import", _origin: "ast", source_file: importerSource }],
+    };
+    const graphify = service({ runProcess: async (_file, args) => extract(args, contents) });
+
+    const result = await graphify.buildGraph(f.options);
+
+    assert.equal(result.ok, false);
+    assert.match(result.error, /cannot verify.*source file/i);
+    assert.equal(await readFile(f.paths.current, "utf8"), before);
+    assert.deepEqual(await readdir(f.paths.generations), [active.generation]);
+    assert.equal((await graphify.graphStatus(f.options)).active.generation, active.generation);
+  });
+}
+
+test("a missing workspace-rooted AST source cannot be skipped as a package import", async (t) => {
+  const f = await fixture(t);
+  const active = await seed(f);
+  const before = await readFile(f.paths.current, "utf8");
+  const localDirectory = path.join(f.workspace, "src", "shared", "react");
+  await mkdir(localDirectory, { recursive: true });
+  const importerSource = "src/shared/react/index.ts";
+  await writeFile(path.join(localDirectory, "index.ts"), "import App from '../App.d.ts';\n");
+  const importer = {
+    id: "index_ts",
+    label: "index.ts",
+    _origin: "ast",
+    file_type: "code",
+    source_file: importerSource,
+    source_location: importerSource,
+  };
+  const reference = {
+    id: "app_d_ts",
+    label: "App.d.ts",
+    _origin: "ast",
+    file_type: "code",
+    source_file: "src/shared/react/App.d.ts",
+  };
+  const contents = {
+    nodes: [importer, reference],
+    edges: [{ source: importer.id, target: reference.id, relation: "dynamic_import", _origin: "ast", source_file: importerSource }],
+  };
+  const graphify = service({ runProcess: async (_file, args) => extract(args, contents) });
+
+  const result = await graphify.buildGraph(f.options);
+
+  assert.equal(result.ok, false);
+  assert.match(result.error, /cannot verify.*source file/i);
+  assert.equal(await readFile(f.paths.current, "utf8"), before);
+  assert.deepEqual(await readdir(f.paths.generations), [active.generation]);
+  assert.equal((await graphify.graphStatus(f.options)).active.generation, active.generation);
+});
+
+for (const [name, sourceFile] of [
+  ["missing local relative import", "./missing-local.js"],
+  ["missing absolute source", (f) => path.join(f.workspace, "missing-absolute.js")],
+]) {
+  test(`external AST classification does not skip a ${name}`, async (t) => {
+    const f = await fixture(t);
+    const active = await seed(f);
+    const before = await readFile(f.paths.current, "utf8");
+    const importer = { id: "main", label: "main", file_type: "code", source_file: "main.py", source_location: "main.py", _origin: "ast" };
+    const reference = {
+      id: "missing-reference",
+      label: "missing-reference",
+      _origin: "ast",
+      file_type: "code",
+      source_file: typeof sourceFile === "function" ? sourceFile(f) : sourceFile,
+    };
+    const contents = {
+      nodes: [importer, reference],
+      links: [{ source: importer.id, target: reference.id, relation: "dynamic_import", _origin: "ast", source_file: importer.source_file }],
+    };
+    const graphify = service({ runProcess: async (_file, args) => extract(args, contents) });
+    const result = await graphify.buildGraph(f.options);
+    assert.equal(result.ok, false);
+    assert.match(result.error, /cannot verify.*source file/i);
+    assert.equal(await readFile(f.paths.current, "utf8"), before);
+    assert.deepEqual(await readdir(f.paths.generations), [active.generation]);
+  });
+}
+
+test("external AST import cannot hide a missing source behind an outside symlink", async (t) => {
+  const f = await fixture(t);
+  const active = await seed(f);
+  const before = await readFile(f.paths.current, "utf8");
+  const outside = path.join(f.root, "outside");
+  await mkdir(outside);
+  await symlink(outside, path.join(f.workspace, "@scope"));
+  const importer = { id: "main", label: "main", file_type: "code", source_file: "main.py", source_location: "main.py", _origin: "ast" };
+  const reference = {
+    id: "package_component_d_ts",
+    label: "@scope/package/component.d.ts",
+    _origin: "ast",
+    file_type: "code",
+    source_file: "@scope/package/component.d.ts",
+  };
+  const contents = {
+    nodes: [importer, reference],
+    links: [{ source: importer.id, target: reference.id, relation: "dynamic_import", _origin: "ast", source_file: importer.source_file }],
+  };
+  const graphify = service({ runProcess: async (_file, args) => extract(args, contents) });
+  const result = await graphify.buildGraph(f.options);
+  assert.equal(result.ok, false);
+  assert.match(result.error, /outside the workspace/i);
+  assert.equal(await readFile(f.paths.current, "utf8"), before);
+  assert.deepEqual(await readdir(f.paths.generations), [active.generation]);
 });
 
 test("unresolved AST references remain in the graph without a local source", async (t) => {

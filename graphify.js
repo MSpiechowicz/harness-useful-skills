@@ -73,6 +73,89 @@ function isSourceLessReference(node) {
     || (node._origin === "ast" && node.file_type === "code" && node.source_location === "");
 }
 
+function isExternalImportCandidate(node) {
+  return node._origin === "ast"
+    && node.file_type === "code"
+    && node.source_location === undefined
+    && typeof node.label === "string"
+    && Boolean(node.label)
+    && typeof node.source_file === "string"
+    && Boolean(node.source_file);
+}
+
+function isRelativeImportSpecifier(specifier) {
+  return typeof specifier === "string"
+    && (specifier.startsWith("./") || specifier.startsWith("../"));
+}
+
+function isExternalImportSpecifier(sourceFile) {
+  if (typeof sourceFile !== "string" || !sourceFile || /[\s\\\u0000-\u001f]/.test(sourceFile)) return false;
+  if (path.isAbsolute(sourceFile) || path.win32.isAbsolute(sourceFile) || /^[A-Za-z]:/.test(sourceFile)) return false;
+
+  if (/^https:\/\//i.test(sourceFile)) {
+    try {
+      const url = new URL(sourceFile);
+      return url.protocol === "https:" && Boolean(url.hostname) && !url.username && !url.password;
+    } catch {
+      return false;
+    }
+  }
+
+  if (isRelativeImportSpecifier(sourceFile) || sourceFile.startsWith("~") || sourceFile.startsWith("#")) return false;
+  if (sourceFile.startsWith("node:")) {
+    const builtinParts = sourceFile.slice("node:".length).split("/");
+    return builtinParts.every((part) => part && part !== "." && part !== ".." && /^[A-Za-z0-9._~-]+$/.test(part));
+  }
+  if (sourceFile.includes(":") || sourceFile.includes("?") || sourceFile.includes("#")) return false;
+
+  const parts = sourceFile.split("/");
+  const isPackagePart = (part) => part !== "." && part !== ".." && /^[A-Za-z0-9._~-]+$/.test(part);
+  if (parts[0].startsWith("@")) {
+    return parts.length > 1
+      && /^@[A-Za-z0-9._~-]+$/.test(parts[0])
+      && parts.slice(1).every(isPackagePart);
+  }
+  return parts.every(isPackagePart);
+}
+
+function importRelations(edges) {
+  const incoming = new Map();
+  const outgoing = new Set();
+  for (const edge of edges) {
+    outgoing.add(edge.source);
+    let links = incoming.get(edge.target);
+    if (!links) {
+      links = [];
+      incoming.set(edge.target, links);
+    }
+    links.push(edge);
+  }
+  return { incoming, outgoing };
+}
+
+function isExternalImportReference(node, nodesById, relations) {
+  if (!isExternalImportCandidate(node)
+    || isRelativeImportSpecifier(node.label)
+    || !isExternalImportSpecifier(node.source_file)) return false;
+  if (relations.outgoing.has(node.id)) return false;
+  const edges = relations.incoming.get(node.id);
+  if (!edges?.length) return false;
+
+  for (const edge of edges) {
+    if (edge.relation !== "dynamic_import" || edge._origin !== "ast") return false;
+
+    const importer = nodesById.get(edge.source);
+    if (!importer
+      || importer.id === node.id
+      || importer._origin !== "ast"
+      || importer.file_type !== "code"
+      || typeof importer.source_file !== "string"
+      || !importer.source_file
+      || edge.source_file !== importer.source_file) return false;
+  }
+  return true;
+}
+
 function sourcePolicyError(sourceFile, workspace) {
   if (typeof sourceFile !== "string" || !sourceFile) return "Graph node source_file must be a non-empty string.";
   const sourcePath = path.resolve(workspace, sourceFile);
@@ -100,21 +183,81 @@ async function validateSource(sourceFile, workspace) {
   return undefined;
 }
 
+async function validateExternalImportSource(sourceFile, workspace) {
+  const policyError = sourcePolicyError(sourceFile, workspace);
+  if (policyError) return policyError;
+  const sourcePath = path.resolve(workspace, sourceFile);
+
+  let existingWorkspaceDirectory = false;
+  const segments = path.relative(workspace, sourcePath).split(path.sep);
+  let current = workspace;
+  for (const [index, segment] of segments.entries()) {
+    const candidate = path.join(current, segment);
+    try {
+      await lstat(candidate);
+    } catch (error) {
+      if (error?.code === "ENOENT") {
+        if (index > 0 && existingWorkspaceDirectory) {
+          return `Cannot verify graph node source file ${sourceFile}: ${errorMessage(error)}`;
+        }
+        return undefined;
+      }
+      return `Cannot verify graph node source file ${sourceFile}: ${errorMessage(error)}`;
+    }
+
+    let resolved;
+    try {
+      resolved = await realpath(candidate);
+    } catch (error) {
+      return `Cannot verify graph node source file ${sourceFile}: ${errorMessage(error)}`;
+    }
+    if (!containedIn(resolved, workspace)) return `Graph node source file resolves outside the workspace: ${sourceFile}`;
+
+    const hasRemainingSegments = index < segments.length - 1;
+    let isDirectory;
+    if (index === 0 || hasRemainingSegments) {
+      isDirectory = (await stat(resolved)).isDirectory();
+    }
+    if (index === 0) existingWorkspaceDirectory = isDirectory;
+    if (hasRemainingSegments && !isDirectory) {
+      return `Graph node source path is not a directory: ${sourceFile}`;
+    }
+    current = resolved;
+  }
+
+  return validateSource(sourceFile, workspace);
+}
+
 function graphValidationError(contents, workspace) {
   if (!isObject(contents) || !Array.isArray(contents.nodes)) return "Graphify graph must be an object with a nodes array.";
   const edges = contents.edges ?? contents.links;
   if (!Array.isArray(edges)) return "Graphify graph must contain an edges or links array.";
+
   const ids = new Set();
+  const nodesById = new Map();
   for (const node of contents.nodes) {
     if (!isObject(node) || typeof node.id !== "string" || !node.id || ids.has(node.id)) return "Graphify graph nodes must have unique non-empty string ids.";
     ids.add(node.id);
-    if (isSourceLessReference(node)) continue;
-    const sourceError = sourcePolicyError(node.source_file, workspace);
-    if (sourceError) return sourceError;
+    nodesById.set(node.id, node);
   }
+
   for (const edge of edges) {
     if (!isObject(edge) || typeof edge.source !== "string" || typeof edge.target !== "string" || !edge.source || !edge.target || !ids.has(edge.source) || !ids.has(edge.target) || typeof edge.relation !== "string" || !edge.relation) {
       return "Graphify graph edges must reference graph node ids and have a relation.";
+    }
+  }
+
+  const relations = importRelations(edges);
+
+  for (const node of contents.nodes) {
+    if (isSourceLessReference(node)) continue;
+    const sourceError = sourcePolicyError(node.source_file, workspace);
+    if (sourceError) return sourceError;
+    if (isExternalImportCandidate(node)
+      && !isRelativeImportSpecifier(node.label)
+      && isExternalImportSpecifier(node.source_file)
+      && !isExternalImportReference(node, nodesById, relations)) {
+      return "Graphify external AST import references must be leaf nodes linked only by dynamic_import edges from local source files.";
     }
   }
   return undefined;
@@ -354,12 +497,24 @@ export function createGraphify(overrides = {}) {
       if (!stagedGraph.available) throw new Error(stagedGraph.error ?? "Graphify did not produce a graph.");
       const graphHash = createHash("sha256").update(stagedGraph.text).digest("hex");
       const sourceFiles = new Set();
+      const externalSources = new Set();
+      const edges = stagedGraph.contents.edges ?? stagedGraph.contents.links;
+      const relations = importRelations(edges);
+      const nodesById = new Map(stagedGraph.contents.nodes.map((node) => [node.id, node]));
       for (const node of stagedGraph.contents.nodes) {
-        if (!isSourceLessReference(node)) sourceFiles.add(node.source_file);
+        if (isSourceLessReference(node)) continue;
+        if (isExternalImportReference(node, nodesById, relations)) externalSources.add(node.source_file);
+        else sourceFiles.add(node.source_file);
       }
       for (const sourceFile of sourceFiles) {
         assertBuildActive(deadline);
         const sourceError = await validateSource(sourceFile, paths.workspace);
+        assertBuildActive(deadline);
+        if (sourceError) throw new Error(sourceError);
+      }
+      for (const sourceFile of externalSources) {
+        assertBuildActive(deadline);
+        const sourceError = await validateExternalImportSource(sourceFile, paths.workspace);
         assertBuildActive(deadline);
         if (sourceError) throw new Error(sourceError);
       }
