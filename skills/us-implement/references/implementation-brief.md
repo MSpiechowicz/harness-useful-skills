@@ -19,6 +19,7 @@ Own only: `<Parent fills package classification, selected worker, exact files to
 
 - The approved plan is the boundary; report material scope or interface drift instead of expanding work.
 - Reuse local patterns and preserve unrelated edits.
+- Keep code easy to read: group related declarations with the logic that uses them, separate distinct logical stages and conditional branches with whitespace rather than packing declarations or `if`/`return` statements together, and favor straightforward control flow. Expand complex inline conditionals into clear branches; simple inline cases are fine when clear.
 - For a bug or uncertain behavior, establish a behavioral regression before changing implementation when practical.
 - Keep tests consumer-observable; do not add source-text, prompt-wording, forwarding, or mock-echo tests.
 - Run only scoped verification requested by the parent; do not start project-wide checks while parallel edits are active.
