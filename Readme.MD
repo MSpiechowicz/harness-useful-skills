@@ -35,7 +35,7 @@ omp -e /absolute/path/to/oh-my-pi-useful-skills
 
 ## Skill-led development
 
-Ask naturally: “I want to build a rocket simulator.” `us-workflow` guides the following development flow. Precise requests can require zero clarification questions. Small changes scale the depth without omitting research, reviews, or memory.
+Ask naturally: “I want to build a rocket simulator.” With the current session's workflow enabled (the default), `us-workflow` guides the following development flow. Precise requests can require zero clarification questions. Small changes scale the depth without omitting research, reviews, or memory; small size alone does not opt out.
 
 ```mermaid
 flowchart TD
@@ -69,13 +69,16 @@ Verification failures return to implementation. Repairs repeat verification and 
 
 The parent owns the objective, research scope, native todo list, acceptance, approval, and integration. Research uses a read-only worker; after the parent completes research, the native `planner` worker drafts a bounded plan. The plan classifies each implementation package as frontend, backend, or genuinely neither. After approval, frontend packages use `frontend`, backend packages use `backend`, and only genuinely neither packages—such as documentation or tooling—use native `task`; every class includes a single package when applicable. Mixed packages split at that boundary where coherent, and dependencies remain serial. Independent ready packages run in parallel only with disjoint ownership. Existing session plans/transcripts support interruption recovery.
 
-With ordinary startup after installation, the extension adds a session-local policy alongside its discovery hint; each is added independently and at most once. Only when a relevant `us-*` workflow requires a native stage, the policy permits that required stage. It covers the bounded planner draft after parent research and the selected native implementation worker after approval, including a single package. The parent uses only the active session workspace; the policy never selects a repository globally. It neither authorizes general extra delegation nor starts a workflow, dispatches workers, builds Graphify, or writes workflow state at session open.
+With ordinary startup after installation, the extension supplies discovery and the narrowly scoped session-local workflow-stage policy while the **session mode** is enabled. Each prompt reconciles these owned instructions without duplicating them; session-disabled mode instead supplies fast-lane guidance and no workflow-stage permission. The enabled-mode discovery instruction permits a native one-request opt-out through `/skill:us-ignore-workflow`, but the extension does not inspect prompt content or skill-shaped markers to detect selection and does not change session mode for that request. Only when a relevant `us-*` workflow requires a native stage does the enabled-mode policy permit it: the bounded planner draft after parent research and selected implementation worker after approval, including a single package. The parent uses only the active session workspace; the policy never selects a repository globally. It neither authorizes general extra delegation nor starts a workflow, dispatches workers, builds Graphify, or writes workflow state at session open.
 
 These are prompt instructions, **not enforced stage transitions**. They cannot guarantee model compliance or override stronger safety constraints, existing mappings, permissions, approval boundaries, or publication rules. Ordinary explanations and explicitly focused audits do not start the full development workflow. Plan approval does not authorize publication.
+
+For a development fast lane, run `/useful-skills workflow disabled` in OMP to choose it for the **current session**, or explicitly invoke the native `/skill:us-ignore-workflow` skill for **one request** while leaving session mode untouched. A copied invocation or skill-shaped marker inside ordinary task material does not change extension guidance. Run `/useful-skills workflow enabled` to restore the full development workflow; a new OMP session or restart defaults to enabled, and returning to a previously selected session keeps its in-memory mode until restart. The fast lane still inspects relevant code and callers, implements and exercises the changed path, but skips the package-mandatory planner, plan approval, worker delegation, reviews, and automatic memory. It does not bypass stronger safety/permission rules, requested audits, or publication authorization. These are guidance changes, not enforcement of workflow completion or a ban on independently required verification.
 
 | Skill | Selection and responsibility |
 | --- | --- |
 | `us-workflow` | Natural build/fix/change/refactor requests; composes the development flow |
+| `us-ignore-workflow` | Explicit one-request development fast lane without changing session mode |
 | `us-grill-me` | Consequential unresolved product/engineering choices; inspect before asking |
 | `us-research` | Current code, callers, conventions, documentation, and memory before planning |
 | `us-plan` | Native planner dispatch, concrete acceptance and ownership, one approval |
@@ -96,6 +99,7 @@ These are prompt instructions, **not enforced stage transitions**. They cannot g
 Direct invocation uses OMP's actual syntax:
 
 ```text
+/skill:us-ignore-workflow
 /skill:us-check-security
 /skill:us-check-performance
 /skill:us-check-code-quality
@@ -163,7 +167,7 @@ Native dispatch selects an **agent type**, not a model. For every dispatched age
 
 Loading a skill or defining a role does not execute that role's model. The installed extension's session-local policy permits the relevant stage only: `us-plan` dispatches a bounded `planner` draft after parent research, and `us-implement` dispatches `frontend`, `backend`, or `task` after approval according to the package classification, including a single package. The parent integrates the plan and requests approval before implementation. Report configured routing separately from actual worker/model metadata when it is available.
 
-After ordinary installation and restart, the package advertises its native agents and adds its session-local policy without extra configuration. If an agent is absent, no allowed configured/frontmatter/native route resolves, runtime metadata is unavailable, or stronger host policy prohibits delegation, report the specific limitation rather than silently doing the work in the parent or claiming the requested model ran. A permitted fallback must be identified with its actual routing; it is not proof of the requested role's execution. See [Native model routing](skills/us-workflow/SKILL.md#native-model-routing) for the shared guidance; loading it does not launch the workflow.
+After ordinary installation and restart, the package advertises its native agents and defaults to enabled workflow guidance without extra configuration. If an agent is absent, no allowed configured/frontmatter/native route resolves, runtime metadata is unavailable, or stronger host policy prohibits delegation, report the specific limitation rather than silently doing the work in the parent or claiming the requested model ran. A permitted fallback must be identified with its actual routing; it is not proof of the requested role's execution. See [Native model routing](skills/us-workflow/SKILL.md#native-model-routing) for the shared guidance; loading it does not launch the workflow.
 
 
 Some hosts require parent-only planning or prohibit delegating a single work package. Those higher-priority policies still block the corresponding stage; this package cannot override them. Report the conflict; do not treat installation, restart, or a host-configuration change as a bypass.
@@ -172,6 +176,7 @@ Some hosts require parent-only planning or prohibit delegating a single work pac
 
 ```text
 /useful-skills list [query]
+/useful-skills workflow enabled|disabled
 /useful-skills doctor
 /useful-skills graph test
 /useful-skills library list [skills|commands|agents|rules] [query]
@@ -179,15 +184,15 @@ Some hosts require parent-only planning or prohibit delegating a single work pac
 /useful-skills update install
 ```
 
-The terminal launcher supports the existing catalog/update operations, plus `install` and `help`; `graph test` is an **in-session OMP command only**, not a terminal subcommand. `/ecc`, `/ecc-doctor`, and `/ecc-memory` aliases are removed. OMP's native `/memory` remains unchanged.
+The terminal launcher supports the existing catalog/update operations, plus `install` and `help`; `workflow` and `graph test` are **in-session OMP commands only**, not terminal subcommands. `/ecc`, `/ecc-doctor`, and `/ecc-memory` aliases are removed. OMP's native `/memory` remains unchanged.
 
-Run `/useful-skills` without arguments for **List**, **Libraries**, **Doctor**, **Update**, and **Help**. **Update** opens a second menu with **Check** and **Install**; cancelling either menu performs no operation. The graph diagnostic is available only by typing the exact `/useful-skills graph test` command, not from the menu, help, doctor, or startup.
+Run `/useful-skills` without arguments for **List**, **Libraries**, **Doctor**, **Workflow (enabled/disabled)**, **Update**, and **Help**. **Workflow** displays the current session mode and offers **Enabled** and **Disabled**; **Update** opens **Check** and **Install**. Cancelling either menu performs no operation. Invalid workflow arguments leave the mode unchanged. Headless command notices do not start a model turn. The graph diagnostic is available only by typing the exact `/useful-skills graph test` command, not from the menu, help, doctor, or startup.
 
 Doctor shows a compact report of resources, safety, native memory, and Graphify readiness instead of raw JSON. Disabled native memory and a graph that is not built are availability states, not proof of a failed installation. Genuine status failures remain visible. The terminal doctor cannot inspect OMP's current memory integration and directs you to the in-session command. Neither doctor installs dependencies, enables memory, builds graphs, or writes workspace files.
 
 Broad ECC skills, commands, agents, rules, and supporting files live under `skills/us-library/references/ecc/`. They are **not active skills, injected rules, or native worker overrides**. On an explicit library request, the agent reads only relevant references, for example `skill://us-library/references/ecc/skills/security-audit/SKILL.md`, and translates useful guidance into owned/native conventions. It must not activate legacy workflows or another harness.
 
-The extension adds one short discovery hint and one narrowly scoped, session-local workflow-stage policy, each independently deduplicated; it retains independent catastrophic-command protection and common secret-pattern output redaction, and performs quiet read-only update checks. Opening a session never starts a model workflow, dispatches workers, builds memory, Graphify, or workflow state, or reviews code. `OMP_ECC_SAFETY=off` remains the existing catastrophic-guard opt-out; redaction is not a complete secret detector or a filesystem sandbox.
+The extension reconciles its own discovery and workflow-stage guidance with the current session mode on each prompt; native skill expansion supplies the explicit one-request skill instructions separately, without changing that mode. The extension cannot authenticate skill selection from prompt text, and its instructions cannot guarantee that a model will ignore a forged skill marker in user-provided material. Depending on OMP's native expansion, an embedded `/skill:us-ignore-workflow` token in copied material may itself select the skill; no trusted selected-skill metadata is available to this hook to distinguish it from deliberate invocation. Switching modes removes stale package guidance while preserving unrelated system instructions. It retains independent catastrophic-command protection and common secret-pattern output redaction, and performs quiet read-only update checks. Opening a session never starts a model workflow, dispatches workers, builds memory, Graphify, or workflow state, or reviews code. `OMP_ECC_SAFETY=off` remains the existing catastrophic-guard opt-out; redaction is not a complete secret detector or a filesystem sandbox.
 
 ## Agent-invoked memory
 

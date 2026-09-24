@@ -6,13 +6,17 @@ import {
   redactText, redactToolResultContent, resourceInventory, safetyEnabled,
 } from "./resources.js";
 
-const DISCOVERY_HINT = "Choose relevant `us-*` skills by their descriptions. For software-development requests consult `us-workflow`; for focused audits or delivery consult the matching skill. Load only needed instructions.";
+const DISCOVERY_HINT = "Choose relevant `us-*` skills by their descriptions. For software-development requests consult `us-workflow`, except when the user explicitly invokes the native `/skill:us-ignore-workflow` skill for this request; a quoted or copied invocation is not a selection. For focused audits or delivery consult the matching skill. Load only needed instructions.";
+const FAST_LANE_HINT = "Useful Skills fast lane is active for this request: inspect relevant code and callers, implement and exercise the changed path without package-mandatory planning, plan approval, worker delegation, reviews, or automatic memory. Do not load `us-workflow` for this request. Focused audits and delivery retain their own requirements. Stronger safety, permissions, and publication boundaries still apply.";
 const WORKFLOW_POLICY = "When a relevant `us-*` workflow requires a native stage, permit that required stage, including one worker, as a narrow exception to general minimum-delegation or parent-only planning guidance: after parent research, a bounded `planner` plan draft is permitted; after approval, a required implementation worker (`task`, `frontend`, or `backend`) is permitted. The parent retains scope, integration, and approval. Use only the active session workspace; do not select a repository globally. Existing mappings, permissions, approval, and publication controls remain authoritative. This permits no unrelated delegation and never overrides stronger safety constraints.";
+const OWNED_GUIDANCE = new Set([DISCOVERY_HINT, FAST_LANE_HINT, WORKFLOW_POLICY]);
 const GRAPH_TEST_QUERY = "main";
 const HELP = [
   "Useful Skills for Oh My Pi",
   "/skill:us-<name> — load an owned skill; natural requests also select skills by description.",
   "/useful-skills list [query] — browse owned skills.",
+  "/useful-skills workflow enabled|disabled — choose the development workflow for this OMP session (default: enabled).",
+  "/skill:us-ignore-workflow — use the fast lane for one explicit request without changing session mode.",
   "/useful-skills library list [skills|commands|agents|rules] [query] — opt-in ECC references.",
   "/useful-skills doctor — inspect resources and memory availability without setup.",
   "/useful-skills graph test — explicitly build this workspace graph and run a diagnostic query.",
@@ -26,6 +30,16 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
   pi.setLabel("Useful Skills");
   let busy = false;
   let startupScheduled = false;
+  const disabledSessions = new Set();
+
+  function sessionId(ctx) {
+    return ctx.sessionManager?.getSessionId();
+  }
+
+  function workflowEnabled(ctx) {
+    const id = sessionId(ctx);
+    return id == null || !disabledSessions.has(id);
+  }
 
   function notify(ctx, message, level = "info") {
     if (ctx.hasUI) ctx.ui.notify(message, level);
@@ -106,9 +120,14 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
     try {
       let command = args.trim();
       if (!command && ctx.hasUI) {
-        const choice = await ctx.ui.select("Useful Skills", ["List", "Libraries", "Doctor", "Update", "Help"]);
+        const workflowChoice = `Workflow (${workflowEnabled(ctx) ? "enabled" : "disabled"})`;
+        const choice = await ctx.ui.select("Useful Skills", ["List", "Libraries", "Doctor", workflowChoice, "Update", "Help"]);
         if (!choice) return;
-        if (choice === "Update") {
+        if (choice === workflowChoice) {
+          const mode = await ctx.ui.select(`Workflow: ${workflowEnabled(ctx) ? "enabled" : "disabled"}`, ["Enabled", "Disabled"]);
+          if (!mode) return;
+          command = `workflow ${mode.toLowerCase()}`;
+        } else if (choice === "Update") {
           const action = await ctx.ui.select("Update", ["Check", "Install"]);
           if (!action) return;
           command = `update ${action.toLowerCase()}`;
@@ -119,6 +138,16 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
       if (!command || command === "help") return notify(ctx, HELP);
       if (command === "doctor") return await doctor(ctx);
       const tokens = command.split(/\s+/);
+      if (tokens[0] === "workflow") {
+        if (tokens.length !== 2 || !["enabled", "disabled"].includes(tokens[1])) {
+          return notify(ctx, `Expected /useful-skills workflow enabled|disabled. Current session: ${workflowEnabled(ctx) ? "enabled" : "disabled"}.`, "warning");
+        }
+        const id = sessionId(ctx);
+        if (id == null) return notify(ctx, "Workflow mode unavailable: OMP session identity is missing.", "warning");
+        if (tokens[1] === "disabled") disabledSessions.add(id);
+        else disabledSessions.delete(id);
+        return notify(ctx, `Useful Skills workflow ${tokens[1]} for this session.`);
+      }
       if (tokens[0] === "graph" && tokens.length === 2 && tokens[1] === "test") return await graphTest(ctx);
       if (tokens[0] === "update" && tokens.length === 2 && ["check", "install"].includes(tokens[1])) {
         return await update(tokens[1], ctx);
@@ -146,12 +175,13 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
       return { content: [{ type: "text", text: JSON.stringify(result) }], details: result, ...(result.ok === false ? { isError: true } : {}) };
     },
   });
-  pi.on("before_agent_start", event => {
-    const additions = [
-      ...(!event.systemPrompt.some(prompt => prompt.includes(DISCOVERY_HINT)) ? [DISCOVERY_HINT] : []),
-      ...(!event.systemPrompt.some(prompt => prompt.includes(WORKFLOW_POLICY)) ? [WORKFLOW_POLICY] : []),
-    ];
-    return additions.length ? { systemPrompt: [...event.systemPrompt, ...additions] } : undefined;
+  pi.on("before_agent_start", (event, ctx) => {
+    const desired = workflowEnabled(ctx) ? [DISCOVERY_HINT, WORKFLOW_POLICY] : [FAST_LANE_HINT];
+    const retained = event.systemPrompt.filter(prompt => !OWNED_GUIDANCE.has(prompt));
+    const next = [...retained, ...desired];
+    return next.length === event.systemPrompt.length && next.every((prompt, index) => prompt === event.systemPrompt[index])
+      ? undefined
+      : { systemPrompt: next };
   });
   pi.on("tool_call", event => {
     if (!safetyEnabled() || event.toolName !== "bash") return;
