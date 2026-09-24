@@ -1,10 +1,10 @@
 # Native implementation work-package brief
 
-Load `skill://us-concise` before responding. This brief assigns exactly one approved, classified work package to its selected native worker: frontend uses `frontend` (`@frontend`, then `@implementation`), backend uses `backend` (`@backend`, then `@implementation`), and genuinely neither uses `task` (normally `@implementation`). `task.agentModelOverrides[agentName]` always wins; agent frontmatter and configured roles do not prove the observed running model. The parent selects the classification and worker; the worker must not select or claim a model. Perform only the assigned task. Do not launch the full workflow, delegate again, publish, commit, push, merge, open a PR, or alter files outside this assignment.
+Load `skill://us-concise` before responding. This brief assigns one authorized, classified work package to its selected native worker: frontend uses `frontend` (`@frontend`, then `@implementation`), backend uses `backend` (`@backend`, then `@implementation`), and genuinely neither uses `task` (normally `@implementation`). Authorization is the approved plan when `plan` is enabled, or the bounded user request when automatic `plan` is disabled; independent approval requirements remain in force. `task.agentModelOverrides[agentName]` always wins; agent frontmatter and configured roles do not prove the observed running model. The parent selects the classification and worker; the worker must not select or claim a model. Perform only the assigned task. Do not launch the full workflow, delegate again, publish, commit, push, merge, open a PR, or alter files outside this assignment.
 
 ## Objective
 
-`<Parent fills: approved task, requested observable behavior, and plan path or excerpt.>`
+`<Parent fills: authorized task, requested observable behavior, and approved plan path/excerpt when applicable or bounded user-request scope when plan is disabled.>`
 
 ## Evidence
 
@@ -17,7 +17,7 @@ Own only: `<Parent fills package classification, selected worker, exact files to
 
 ## Constraints
 
-- The approved plan is the boundary; report material scope or interface drift instead of expanding work.
+- The authorized scope is the boundary; report material scope or interface drift instead of expanding work.
 - Reuse local patterns and preserve unrelated edits.
 - Keep code easy to read: group related declarations with the logic that uses them, separate distinct logical stages and conditional branches with whitespace rather than packing declarations or `if`/`return` statements together, and favor straightforward control flow. Expand complex inline conditionals into clear branches; simple inline cases are fine when clear.
 - For a bug or uncertain behavior, establish a behavioral regression before changing implementation when practical.

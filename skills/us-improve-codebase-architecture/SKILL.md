@@ -44,15 +44,15 @@ End with one top recommendation and why it has the best evidence-to-risk ratio. 
 
 ## Authorization and selected change
 
-A report, a top recommendation, and a user's interest in a candidate are not approval to edit. Ask the user which candidate, if any, they want to explore. For a selected candidate, use the existing owned stages directly rather than recursively starting `skill://us-workflow`:
+A report, a top recommendation, and a user's interest in a candidate are not by themselves authorization to edit. Ask which candidate, if any, the user wants to explore and whether they authorize a bounded change. For a selected, authorized candidate, use enabled owned stages directly rather than recursively starting `skill://us-workflow`:
 
-1. Load `skill://us-research` for fresh, read-only evidence on the selected change. It uses `skill://us-memory` during research as its own procedure.
+1. Inspect current source, callers, tests, and conventions. When automatic `research` is enabled, load `skill://us-research`; enabled backend/graph memory actions during inspection follow `skill://us-memory` independently.
 2. Load `skill://us-grill-me` only for consequential unresolved decisions; a precise, evidence-backed selection needs no invented questions.
-3. Load `skill://us-plan` to produce one actionable plan and obtain explicit user approval before edits.
-4. After approval, load `skill://us-implement`. Preserve established contracts and consumer behavior; migrate affected callers together, maintain meaningful tests, and avoid unrelated cleanup.
-5. Obtain fresh correctness review through `skill://us-review`, then security review through `skill://us-check-security`. After verified work and both reviews, use `skill://us-memory` to refresh only durable, verified facts.
+3. When automatic `plan` is enabled, load `skill://us-plan` to produce one actionable plan and obtain explicit approval before edits. Otherwise a bounded user request can authorize implementation without a mandatory planner or separate plan approval; preserve any independent approval requirement.
+4. Once authorized, load `skill://us-implement`. Preserve established contracts and consumer behavior; migrate affected callers together, maintain meaningful tests, and avoid unrelated cleanup.
+5. Obtain fresh correctness review through `skill://us-review` only if `review` is enabled and security review through `skill://us-check-security` only if `security-review` is enabled. After verified work and enabled reviews, use `skill://us-memory` only for enabled backend/graph actions.
 
-The selected change remains bounded by the approved plan. A material interface, behavior, dependency, or scope change returns to planning and the user; it never becomes an architectural workaround. Do not automatically edit domain documents, `CONTEXT.md`, ADRs, or any architecture record. Propose such an edit separately only when the user authorizes it.
+The selected change remains bounded by its authorization. A material interface, behavior, dependency, or scope change returns to the user (and to planning when enabled); it never becomes an architectural workaround. Do not automatically edit domain documents, `CONTEXT.md`, ADRs, or any architecture record. Propose such an edit separately only when the user authorizes it.
 
 ## Completion and failure behavior
 
