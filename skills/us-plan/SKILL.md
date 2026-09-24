@@ -1,17 +1,17 @@
 ---
 name: us-plan
-description: Use automatically after clarification and source research to turn a software request into an actionable, reviewable implementation plan with one explicit approval request before edits.
+description: Use after clarification and source inspection when the profile's plan stage is enabled, or when explicitly requested, to draft an actionable implementation plan and obtain the required approval before edits.
 ---
 
 # Plan a proposed change
 
-Load `skill://us-concise`. Use evidence from `skill://us-research` and settled decisions from `skill://us-grill-me`; inspect additional source only to close a concrete gap. A plan is a human-readable handoff, not a workflow database.
+Load `skill://us-concise`. Use available evidence from `skill://us-research` when enabled and settled decisions from `skill://us-grill-me`; inspect additional source to close concrete gaps. A plan is a human-readable handoff, not a workflow database. When automatic `plan` is disabled, this skill imposes no planner dispatch or separate plan approval on ordinary implementation; a bounded user request can authorize it, subject to independent authorization requirements. An explicitly requested plan is separate from that automatic stage.
 
-Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `skill://us-workflow`; that guidance does not launch the workflow. Ordinary installed startup supplies the narrowly scoped session-local policy required for the bounded planner stage, so no host override, prompt file, or extra startup flag is needed. The parent must first complete research and own scope, decomposition, and integration in the active session workspace; it never selects a repository globally. It then dispatches the advertised native `planner` worker to draft a bounded implementation plan from that evidence. Existing mappings remain authoritative. The registration declares `model: @plan`; `task.agentModelOverrides.planner` takes precedence, and OMP uses its native fallback only after frontmatter. Neither configuration nor frontmatter proves the running worker's model. Do not pass a model, switch models, or edit user configuration. Report configured routing separately from actual worker/model metadata when available. Stronger host policy can still prohibit the stage.
+When `plan` is enabled or a plan is explicitly requested, load the **Native model routing** guidance in `skill://us-workflow` before dispatching; that guidance does not launch the workflow. Ordinary installed startup supplies the narrowly scoped session-local policy for the bounded planner stage, so no host override, prompt file, or extra startup flag is needed. The parent first inspects source and owns scope, decomposition, and integration in the active session workspace; it never selects a repository globally. It dispatches the advertised native `planner` worker to draft a bounded implementation plan from available evidence. Existing mappings remain authoritative. The registration declares `model: @plan`; `task.agentModelOverrides.planner` takes precedence, and OMP uses native fallback only after frontmatter. Neither configuration nor frontmatter proves the running worker's model. Do not pass a model, switch models, or edit user configuration. Report configured routing separately from actual worker/model metadata when available. Stronger host policy can still prohibit the stage.
 
 ## Inputs
 
-Require the requested outcome, research brief, repository conventions, current constraints, and unresolved risks. If an essential consequence remains unknown, return to `skill://us-grill-me` or mark the smallest experiment needed; do not hide an assumption.
+Require the requested outcome, available source/research brief, repository conventions, current constraints, and unresolved risks. If an essential consequence remains unknown, return to source inspection or `skill://us-grill-me`, or mark the smallest experiment needed; do not hide an assumption.
 
 ## Dispatch and integrate one actionable plan
 
