@@ -1,6 +1,7 @@
 import { formatDoctor } from "./doctor.js";
 import { runUpdate } from "./updater.js";
 import { readWorkflowSettings, STAGES, writeWorkflowSetting } from "./workflow-settings.js";
+import { effectiveWorkflow } from "./workflow-policy.js";
 import { executeMemory, MEMORY_PARAMETERS } from "./memory.js";
 import {
   dangerousCommandReason, formatResources, listResources, parseCatalogArguments,
@@ -66,24 +67,18 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
     }
   }
 
-  function settingState(snapshot, key) {
-    return snapshot.errors[key] ? "unknown" : snapshot.values[key] ? "enabled" : "disabled";
-  }
-
   function status(snapshot) {
-    const workflow = settingState(snapshot, "workflow");
+    const policy = effectiveWorkflow(snapshot);
+    const workflow = policy.workflow;
 
     return [
       "Useful Skills profile settings:",
       ...(snapshot.directory ? [`Settings directory: ${snapshot.directory}`] : []),
-      `Workflow: saved ${workflow}, effective ${workflow}${snapshot.errors.workflow ? ` (${snapshot.errors.workflow})` : ""}`,
+      `Workflow: saved ${workflow.saved}, effective ${workflow.effective}${snapshot.errors.workflow ? ` (${snapshot.errors.workflow})` : ""}`,
       ...STAGES.map(stage => {
-        const saved = settingState(snapshot, stage);
-        const effective = saved === "disabled" || workflow === "disabled"
-          ? "disabled"
-          : saved === "unknown" || workflow === "unknown" ? "unknown" : "enabled";
+        const { saved, effective } = policy.stages[stage];
         const reason = snapshot.errors[stage] || (
-          workflow === "disabled" ? "workflow disabled" : workflow === "unknown" ? "workflow setting unreadable" : ""
+          workflow.saved === "disabled" ? "workflow disabled" : workflow.saved === "unknown" ? "workflow setting unreadable" : ""
         );
 
         return `${STAGE_LABELS[stage]}: saved ${saved}, effective ${effective}${reason ? ` (${reason})` : ""}`;
@@ -209,8 +204,9 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
 
       const snapshot = await refresh;
       if (!command && ctx.hasUI) {
-        const workflowChoice = `Workflow ${ctx.ui.theme.fg("muted", `(${settingState(snapshot, "workflow")})`)}`;
-        const stageChoices = STAGES.map(stage => `${STAGE_LABELS[stage]} ${ctx.ui.theme.fg("muted", `(${settingState(snapshot, stage)})`)}`);
+        const saved = effectiveWorkflow(snapshot);
+        const workflowChoice = `Workflow ${ctx.ui.theme.fg("muted", `(${saved.workflow.saved})`)}`;
+        const stageChoices = STAGES.map(stage => `${STAGE_LABELS[stage]} ${ctx.ui.theme.fg("muted", `(${saved.stages[stage].saved})`)}`);
         let menu = "root";
         let stage;
 
@@ -260,9 +256,9 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
             menu = "stage-mode";
           } else {
             const title = menu === "workflow"
-              ? `Workflow: ${settingState(snapshot, "workflow")}`
+              ? `Workflow: ${saved.workflow.saved}`
               : menu === "stage-mode"
-                ? `${STAGE_LABELS[stage]}: ${settingState(snapshot, stage)}`
+                ? `${STAGE_LABELS[stage]}: ${saved.stages[stage].saved}`
                 : "Update";
             const choices = menu === "update" ? ["Check", "Install"] : ["Enabled", "Disabled"];
             const { choice, left } = await selectChild(title, choices);
@@ -315,7 +311,8 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
         }
 
         const confirmed = await settings(ctx);
-        if (confirmed.errors[key] || settingState(confirmed, key) !== mode) {
+        const confirmedPolicy = effectiveWorkflow(confirmed);
+        if (confirmed.errors[key] || (key === "workflow" ? confirmedPolicy.workflow.saved : confirmedPolicy.stages[key].saved) !== mode) {
           return notify(ctx, `Cannot confirm ${key} setting: ${confirmed.errors[key] || "profile readback differs from the requested mode"}.\n${status(confirmed)}`, "error");
         }
         return notify(ctx, `Useful Skills ${key} ${mode} for this OMP profile.`);
@@ -353,12 +350,13 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
 
   pi.on("before_agent_start", async (event, ctx) => {
     const snapshot = await settings(ctx);
-    const mode = settingState(snapshot, "workflow");
+    const policy = effectiveWorkflow(snapshot);
+    const mode = policy.workflow.effective;
     const desired = mode === "unknown"
       ? [UNKNOWN_SETTINGS_HINT]
       : mode === "disabled"
         ? [FAST_LANE_HINT]
-        : [DISCOVERY_HINT, WORKFLOW_POLICY, ...STAGES.map(stage => STAGE_GUIDANCE[stage][settingState(snapshot, stage)])];
+        : [DISCOVERY_HINT, WORKFLOW_POLICY, ...STAGES.map(stage => STAGE_GUIDANCE[stage][policy.stages[stage].effective])];
 
     const retained = event.systemPrompt.filter(prompt => !OWNED_GUIDANCE.has(prompt));
     const next = [...retained, ...desired];

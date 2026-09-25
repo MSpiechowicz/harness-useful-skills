@@ -8,6 +8,7 @@ import {
   PLUGIN_ID,
   RELEASE_BASE,
   UpdateError,
+  checkUpdate,
   installUpdate,
   isNewerVersion,
   latestRelease,
@@ -66,6 +67,43 @@ test("rejects unstable or malformed latest-release metadata", async () => {
   );
 });
 
+
+test("legacy marketplace installation checks releases at the renamed repository", async (t) => {
+  const { home, installed } = await fixture(t);
+  const oldApi = "https://api.github.com/repos/MSpiechowicz/oh-my-pi-useful-skills/releases/latest";
+  const canonicalApi = "https://api.github.com/repos/MSpiechowicz/harness-useful-skills/releases/latest";
+  const fetched = [];
+  const report = await checkUpdate({
+    root: installed,
+    cwd: home,
+    runner: async (_file, args) => {
+      assert.deepEqual(args, ["plugin", "list", "--json"]);
+      return JSON.stringify(listing(installed));
+    },
+    fetcher: async (url, options) => {
+      fetched.push(url);
+      assert.equal(options.redirect, "error");
+      if (url === oldApi) {
+        return new Response(null, { status: 301, headers: { Location: canonicalApi } });
+      }
+      if (url === canonicalApi) {
+        return new Response(JSON.stringify({
+          draft: false,
+          prerelease: false,
+          tag_name: "v1.0.1",
+        }), { status: 200 });
+      }
+      throw new Error(`Unexpected release endpoint: ${url}`);
+    },
+  });
+
+  assert.deepEqual(fetched, [canonicalApi]);
+  assert.equal(report.currentVersion, "1.0.0");
+  assert.equal(report.latestVersion, "1.0.1");
+  assert.equal(report.updateAvailable, true);
+  assert.equal(report.managed, true);
+  assert.equal(report.releaseUrl, "https://github.com/MSpiechowicz/harness-useful-skills/releases/tag/v1.0.1");
+});
 
 test("refuses an unsafe source checkout before fetching or mutating native OMP", async (t) => {
   const { home, installed } = await fixture(t);

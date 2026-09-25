@@ -8,7 +8,7 @@ Owned `us-*` skills for development, focused audits, delivery, and project memor
 | --- | --- | --- | --- |
 | Clarify, research, approve, implement, review | Focused security, performance, and quality audits | Explicitly authorized PR or direct-main delivery | Durable facts alongside code relationships |
 
-**Start here:** [Installation](#installation) · [Workflow & skills](#skill-led-development) · [Model configuration](#native-model-configuration) · [Memory](#agent-invoked-memory)
+**Start here:** [Installation](#installation) · [Claude Code](#claude-code) · [Workflow & skills](#skill-led-development) · [Model configuration](#native-model-configuration) · [Memory](#agent-invoked-memory)
 
 **Reference:** [Management](#management-and-optional-library) · [Audits & delivery](#focused-audits-and-delivery) · [Updates](#updates-and-releases) · [Development](#development-and-verification) · [Attribution](#attribution)
 
@@ -19,19 +19,43 @@ No Anvil dependency, custom workflow executor, model router, phase database, or 
 Requires OMP with marketplace support and Node.js **22+**. No npm dependencies, build step, host configuration, prompt file, or startup flag is required.
 
 ```bash
-omp plugin marketplace add MSpiechowicz/oh-my-pi-useful-skills
+omp plugin marketplace add MSpiechowicz/harness-useful-skills
 omp plugin install oh-my-pi-useful-skills@omp-useful-skills --scope user
 ```
 
-Restart OMP after installation or update. Ordinary startup with the installed package adds the discovery hint and, when enabled in the active profile, the narrowly scoped session-local workflow-stage policy. Use `--scope project` for a project installation, or pass `--profile NAME` to both commands for an isolated profile. Plugin identity remains `oh-my-pi-useful-skills@omp-useful-skills`.
+Restart OMP after installation or update. Ordinary startup with the installed package adds the discovery hint and, when enabled in the active profile, the narrowly scoped session-local workflow-stage policy. Use `--scope project` for a project installation, or pass `--profile NAME` to both commands for an isolated profile. The repository URL changed, but the OMP marketplace name remains `omp-useful-skills` and the plugin ID remains `oh-my-pi-useful-skills@omp-useful-skills`.
 
 For local development, load the **package directory**, not the extension file alone:
 
 ```bash
-omp -e /absolute/path/to/oh-my-pi-useful-skills
+omp -e /absolute/path/to/harness-useful-skills
 ```
 
 `./useful-skills install [--scope user|project] [--profile NAME]` installs the published marketplace plugin, not the checkout itself. Source checkouts are updated with `git pull --ff-only`; the updater never overwrites them.
+
+### Claude Code
+
+The Claude Code adapter requires Node.js **22+** and a marketplace installation. For a local checkout, use its absolute path:
+
+```bash
+claude plugin marketplace add /absolute/path/to/harness-useful-skills --scope user
+claude plugin install useful-skills@useful-skills-local --scope user
+```
+
+Or add the same repository as a GitHub marketplace:
+
+```bash
+claude plugin marketplace add MSpiechowicz/harness-useful-skills
+claude plugin install useful-skills@useful-skills-local --scope user
+```
+
+The Claude plugin ID remains `useful-skills@useful-skills-local` in either case. Install through the marketplace, **not** `claude --plugin-dir .`: that loads the repository-root OMP `skills/` instead of the marketplace's selected Claude skills. Restart Claude Code after installation. The OMP installation, commands, and profile behavior above remain unchanged.
+
+Claude exposes 18 namespaced skills (for example, `/useful-skills:us-workflow`) and seven native agents: `planner`, `scout`, `frontend`, `backend`, `general-purpose`, `reviewer`, and `security-reviewer`. All declare `model: inherit`; Claude's selected model, permissions, and stronger host rules remain authoritative. Plugin `userConfig` has seven default-`true` booleans: `workflow`, `research`, `plan`, `review`, `security_review`, `backend_memory`, and `graphify_memory`. Configure them in Claude Code's `/plugin` configure flow or at install time with repeatable `--config key=false` flags (for example, `--config workflow=false`). Disabling `workflow` suppresses automatic stages without changing the other saved values. A **direct** `/useful-skills:us-ignore-workflow` invocation bypasses package-mandatory stages for one request only; quoted or copied text is not an opt-out. Claude has no OMP `/useful-skills` management command or OMP profile settings UI.
+
+The Claude plugin adds a **separate** local stdio MCP server with five tools: `memory_status`, `memory_search`, `memory_save`, `graph_build`, and `graph_query`. Facts are project-scoped private files under Claude plugin data, searched by literal text; they are **not** OMP's native Mnemopi facts and are not shared with them. Graphify is the shared code-relationship implementation, with lazy managed setup on explicit graph actions rather than at startup. Do not save credentials, personal data, transcripts, or tool dumps; secret detection is only a backstop. A Bash pre-tool guard denies recognized dangerous commands, and successful tool responses can be redacted by `PostToolUse`; failed third-party tool responses (`PostToolUseFailure`) cannot receive equivalent redaction. These protections are not a sandbox or a substitute for Claude's permissions, user approval, or publication controls.
+
+OMP's updater and release process do **not** update the Claude installation automatically. There is no Codex runtime adapter yet.
 
 ## Skill-led development
 
@@ -187,6 +211,8 @@ Some hosts require parent-only planning or prohibit delegating a single work pac
 
 ## Management and optional library
 
+These management commands run in OMP, not Claude Code:
+
 ```text
 /useful-skills list [query]
 /useful-skills workflow enabled|disabled
@@ -211,7 +237,7 @@ The extension reconciles its own discovery and workflow-stage guidance with the 
 
 ## Agent-invoked memory
 
-**Two complementary stores, one agent-facing tool.** Facts explain decisions; the code graph maps relationships. Neither replaces the other.
+**OMP: two complementary stores, one agent-facing tool.** Facts explain decisions; the code graph maps relationships. Neither replaces the other.
 
 ```mermaid
 flowchart TD
@@ -284,7 +310,7 @@ Unused `query` and `content` fields may be omitted or set to `null` when a provi
 
 `status` is read-only. `search/save` adapt the current native OMP backend, reporting unavailable/failed/queued outcomes honestly. Secret-shaped facts are rejected **before** native storage, not merely redacted afterward. Only actual storage is reported as saved. This detector is a backstop, not a guarantee.
 
-Graphify `build/query` lazily prepare pinned managed dependencies on their first explicit agent call; the typed graph diagnostic uses the same build/query implementation. There are no startup installs, persistent watcher, MCP server, semantic LLM extraction, embeddings, paid service, or remote memory backend added by this package. Strict plan/read-only mode defers setup/build/cache writes during agent tasks and continues source research; the direct diagnostic is a separately typed, explicit command, not an agent mode detector.
+Graphify `build/query` lazily prepare pinned managed dependencies on their first explicit agent call; the typed graph diagnostic uses the same build/query implementation. There are no startup installs, persistent watcher, MCP server **in the OMP adapter**, semantic LLM extraction, embeddings, paid service, or remote memory backend added by this package. Strict plan/read-only mode defers setup/build/cache writes during agent tasks and continues source research; the direct diagnostic is a separately typed, explicit command, not an agent mode detector.
 
 Managed Graphify targets **Linux x64 (glibc)** and **macOS Darwin ARM64**. Other OS/architecture pairs return an explicit setup limitation; there is no global-install fallback. Pins: uv **0.12.17**, CPython **3.12.14 / 20260901**, Graphify **0.9.65**. `dependencies/manifest.json`, `graphify.in`, and the resolved wheel/hash lock define installation; no floating resolution runs on the user's machine. Downloads are verified; setup has a ten-minute deadline and uses only profile-owned locations. Healthy installations are reused offline. Adding Darwin metadata does not invalidate existing healthy Linux installations. Updated pins apply on the next Graphify action. Darwin behavior has Linux-host simulated coverage, but no native macOS ARM64 execution was available for verification.
 
@@ -325,13 +351,23 @@ The linked PR uses `Closes #N` when it fully resolves the issue and targets the 
 
 ## Updates and releases
 
-`update check` is quiet/read-only at interactive startup; explicit failures are reported. `update install` immediately announces that Useful Skills is updating through OMP's native plugin manager, then reports the result. It retains native active-install ownership, scope/profile, and stable-version checks. Only the active unambiguous marketplace installation is upgraded. After a published release, installed copies receive the new agents only after **Update → Install** and restart.
+`update check` is quiet/read-only at interactive startup; explicit failures are reported. `update install` immediately announces that Useful Skills is updating through OMP's native plugin manager, then reports the result. It retains native active-install ownership, scope/profile, and stable-version checks. Only the active unambiguous marketplace installation is upgraded. Once running a release with the corrected release lookup, installed copies receive subsequent published agents only after **Update → Install** and restart.
+
+**Existing OMP installations need a manual recovery after a fixed release is published.** The old updater requests `GET /repos/MSpiechowicz/oh-my-pi-useful-skills/releases/latest`; GitHub returns HTTP 301 after the rename, which the old updater rejects because it uses `redirect: "error"`. That installed code cannot update itself to the fixed version. Do not treat the fix as available before publication. Once the fixed release is published, run these native commands for a user-scoped installation:
+
+```bash
+omp plugin marketplace update omp-useful-skills
+omp plugin upgrade oh-my-pi-useful-skills@omp-useful-skills --scope user
+```
+
+The first command refreshes the marketplace catalog only; the second upgrades the installed plugin code. Restart OMP afterward. For a project-scoped installation, run both commands from the original project directory and use `--scope project` on the upgrade. For an isolated profile, pass `--profile NAME` to **both** commands (and retain its original scope and working directory). This is not an automatic migration: do **not** run `marketplace add` for the new URL against an existing registration; it fails with a duplicate-name error and does not migrate the saved source URI. The saved source URI may still show the old repository URL; its Git fetch works through GitHub's redirect only while the old repository name remains unused. For a source checkout, changing its Git remote to the new repository URL is optional and user-managed; neither the updater nor these instructions execute that change. The OMP updater does **not** update Claude installations.
 
 The existing single-plugin release transaction is unchanged: CI checks precede the atomic package/marketplace version commit and branch/tag push by `release.py`. No publication is performed merely by implementing a plan. Python 3.10+ is needed for release-development checks, not normal plugin installation.
 
 ## Development and verification
 
 ```bash
+node scripts/render-claude-skills.js --check
 node --test
 node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80
 python -m unittest discover -s test -p 'test_*.py'

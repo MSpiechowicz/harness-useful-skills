@@ -56,6 +56,43 @@ test("safety blocks catastrophic commands independently of workflow stages", () 
   assert.equal(safetyEnabled({ OMP_ECC_SAFETY: "on" }), true);
 });
 
+test("recursive removal denies literal catastrophic and dynamic targets while permitting safe relative paths", () => {
+  for (const command of [
+    "rm -rf /",
+    'rm -rf "$HOME"',
+    'rm -rf "$HOME/"',
+    'rm -rf "${HOME}"',
+    "rm -rf ${HOME}",
+    "rm -f -r ${HOME}",
+    'rm -r -f "$HOME"',
+    'rm -rf --no-preserve-root "/"',
+    "rm --recursive -f '/'",
+    "rm --recursive ${HOME}",
+    'rm -f -r "/"',
+    "rm -f -r /",
+    "rm -f -r ~",
+    "rm -f -r .",
+    'rm -rf "."',
+    "rm -rf $(printf /)",
+    "rm -rf `pwd`",
+    "rm -rf *",
+    "rm -rf '$HOME'",
+  ]) {
+    assert.ok(dangerousCommandReason(command), command);
+  }
+  for (const command of [
+    'rm -rf "node_modules"',
+    'rm -rf "./build"',
+    "rm -f -r node_modules",
+    "rm -f -r build/",
+    "rm -rf build/",
+    "rm --version '$HOME'",
+    "rm --preserve-root '$HOME'",
+  ]) {
+    assert.equal(dangerousCommandReason(command), undefined, command);
+  }
+});
+
 test("redaction preserves clean and nontext results and removes secret-shaped output", () => {
   assert.equal(redactText("clean output"), "clean output");
   assert.equal(redactText(null), null);

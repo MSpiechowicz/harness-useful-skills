@@ -1,0 +1,72 @@
+{
+  "name": "useful-skills",
+  "displayName": "Useful Skills",
+  "description": "Claude Code engineering workflows, safety reviews, and local memory tools",
+  "author": {
+    "name": "MSpiechowicz"
+  },
+  "license": "GPL-3.0-only",
+  "agents": [
+    "./claude/agents/planner.md",
+    "./claude/agents/scout.md",
+    "./claude/agents/frontend.md",
+    "./claude/agents/backend.md",
+    "./claude/agents/general-purpose.md",
+    "./claude/agents/reviewer.md",
+    "./claude/agents/security-reviewer.md"
+  ],
+  "hooks": "./claude/hooks.json",
+  "mcpServers": {
+    "useful_skills": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/claude/mcp-server.js"],
+      "env": {
+        "CLAUDE_PLUGIN_DATA": "${CLAUDE_PLUGIN_DATA}"
+      }
+    }
+  },
+  "userConfig": {
+    "workflow": {
+      "type": "boolean",
+      "title": "Development workflow",
+      "description": "Enable skill-led development workflow stages.",
+      "default": true
+    },
+    "research": {
+      "type": "boolean",
+      "title": "Research stage",
+      "description": "Research relevant source and behavior before implementation.",
+      "default": true
+    },
+    "plan": {
+      "type": "boolean",
+      "title": "Plan stage",
+      "description": "Prepare a plan and request approval before implementation.",
+      "default": true
+    },
+    "review": {
+      "type": "boolean",
+      "title": "Correctness review stage",
+      "description": "Review authorized changes for correctness.",
+      "default": true
+    },
+    "security_review": {
+      "type": "boolean",
+      "title": "Security review stage",
+      "description": "Review authorized changes for security issues.",
+      "default": true
+    },
+    "backend_memory": {
+      "type": "boolean",
+      "title": "Backend memory stage",
+      "description": "Use local memory during development workflows.",
+      "default": true
+    },
+    "graphify_memory": {
+      "type": "boolean",
+      "title": "Graph memory stage",
+      "description": "Use project knowledge graph during development workflows.",
+      "default": true
+    }
+  }
+}

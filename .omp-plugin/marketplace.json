@@ -13,10 +13,10 @@
       "version": "0.2.23",
       "source": {
         "source": "github",
-        "repo": "MSpiechowicz/oh-my-pi-useful-skills",
+        "repo": "MSpiechowicz/harness-useful-skills",
         "ref": "v0.2.23"
       },
-      "homepage": "https://github.com/MSpiechowicz/oh-my-pi-useful-skills",
+      "homepage": "https://github.com/MSpiechowicz/harness-useful-skills",
       "license": "GPL-3.0-only"
     }
   ]

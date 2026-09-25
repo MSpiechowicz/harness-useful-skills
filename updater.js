@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export const REPOSITORY = "MSpiechowicz/oh-my-pi-useful-skills";
+export const REPOSITORY = "MSpiechowicz/harness-useful-skills";
 export const MARKETPLACE = "omp-useful-skills";
 export const PLUGIN_ID = "oh-my-pi-useful-skills@omp-useful-skills";
 export const RELEASE_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;

@@ -1,0 +1,34 @@
+{
+  "name": "useful-skills-local",
+  "owner": {
+    "name": "MSpiechowicz"
+  },
+  "description": "Claude Code native Useful Skills plugin",
+  "plugins": [
+    {
+      "name": "useful-skills",
+      "source": ".",
+      "description": "Claude Code engineering workflows, safety reviews, and local memory tools",
+      "skills": [
+        "./claude/skills/us-ignore-workflow/",
+        "./claude/skills/us-implement/",
+        "./claude/skills/us-plan/",
+        "./claude/skills/us-workflow/",
+        "./claude/skills/us-library/",
+        "./claude/skills/us-ship-backlog-item/",
+        "./claude/skills/us-improve-codebase-architecture/",
+        "./claude/skills/us-improve-code-coverage/",
+        "./claude/skills/us-memory/",
+        "./claude/skills/us-approve-work/",
+        "./claude/skills/us-open-pr/",
+        "./claude/skills/us-concise/",
+        "./claude/skills/us-review/",
+        "./claude/skills/us-research/",
+        "./claude/skills/us-grill-me/",
+        "./claude/skills/us-check-code-quality/",
+        "./claude/skills/us-check-performance/",
+        "./claude/skills/us-check-security/"
+      ]
+    }
+  ]
+}

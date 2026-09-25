@@ -19,11 +19,11 @@ const SECRET_PATTERNS = [
   /(\bBearer)\s+[A-Za-z0-9._~+/=-]{20,}/gi,
   /(\b(?:api[-_ ]?key|access[-_ ]?token|refresh[-_ ]?token|client[-_ ]?secret|token|password|passwd|secret)\b\s*[:=]\s*["']?)[^\s"'`]{8,}/gi,
 ];
+const RECURSIVE_RM_SEGMENT = /\brm\s+([^;&|\n]*)/gi;
+const RECURSIVE_RM_OPTION = /(?:^|\s)(?:-(?!-)[^\s]*r[^\s]*|--recursive)(?=\s|$)/i;
+const CATASTROPHIC_RM_TARGET = /(?:^|\s)(?:\/+(?=\s|$)|~(?=\/|\s|$)|\.{1,2}\/?(?=\s|$)|"\/+"(?=\s|$)|'\/+'(?=\s|$)|"\.{1,2}\/?"(?=\s|$)|'\.{1,2}\/?'(?=\s|$))/i;
+const RECURSIVE_RM_REASON = "blocked recursive deletion of a root, home, current, or dynamic target";
 const DANGEROUS_COMMANDS = [
-  {
-    pattern: /\brm\s+(?:-[^\s]*r[^\s]*|--recursive)(?:\s+[^;&|]*\/(?:\s|$)|\s+~(?:\/|\s|$)|\s+\$HOME(?:\/|\s|$)|\s+\.?(?:\/)?\.?(?:\s|$))/i,
-    reason: "blocked recursive deletion of a root, home, or current directory",
-  },
   {
     pattern: /\b(?:mkfs(?:\.[A-Za-z0-9_-]+)?|wipefs)\b[^\n]*\/(?:dev|sys|proc)\//i,
     reason: "blocked filesystem destruction against a system device",
@@ -99,6 +99,12 @@ export function safetyEnabled(environment = process.env) {
 export function dangerousCommandReason(command) {
   if (typeof command !== "string" || !command.trim()) {
     return undefined;
+  }
+
+  for (const [, segment] of command.matchAll(RECURSIVE_RM_SEGMENT)) {
+    if (RECURSIVE_RM_OPTION.test(segment) && (/[$`*?]/.test(segment) || CATASTROPHIC_RM_TARGET.test(segment))) {
+      return RECURSIVE_RM_REASON;
+    }
   }
 
   return DANGEROUS_COMMANDS.find(({ pattern }) => pattern.test(command))?.reason;

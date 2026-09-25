@@ -46,7 +46,7 @@ class ReleaseTransactionTests(unittest.TestCase):
                             "version": "1.0.0",
                             "source": {
                                 "source": "github",
-                                "repo": "MSpiechowicz/oh-my-pi-useful-skills",
+                                "repo": "MSpiechowicz/harness-useful-skills",
                                 "ref": "v1.0.0",
                             },
                         }
@@ -89,6 +89,10 @@ class ReleaseTransactionTests(unittest.TestCase):
         self.assertEqual(git(self.origin, "show", "-s", "--format=%P", commit), self.source)
         self.assertEqual(json.loads(git(self.origin, "show", f"{commit}:package.json"))["version"], "1.0.1")
         catalog = json.loads(git(self.origin, "show", f"{commit}:{CATALOG}"))
+        self.assertEqual(catalog["name"], "omp-useful-skills")
+        self.assertEqual(catalog["plugins"][0]["name"], PLUGIN)
+        self.assertEqual(catalog["plugins"][0]["source"]["source"], "github")
+        self.assertEqual(catalog["plugins"][0]["source"]["repo"], "MSpiechowicz/harness-useful-skills")
         self.assertEqual(catalog["plugins"][0]["version"], "1.0.1")
         self.assertEqual(catalog["plugins"][0]["source"]["ref"], "v1.0.1")
 
