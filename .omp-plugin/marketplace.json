@@ -10,11 +10,11 @@
     {
       "name": "harness-useful-skills",
       "description": "OMP-native ECC engineering workflows, safety, memory, and practical development skills",
-      "version": "0.2.24",
+      "version": "0.2.25",
       "source": {
         "source": "github",
         "repo": "MSpiechowicz/harness-useful-skills",
-        "ref": "v0.2.24"
+        "ref": "v0.2.25"
       },
       "homepage": "https://github.com/MSpiechowicz/harness-useful-skills",
       "license": "GPL-3.0-only"
