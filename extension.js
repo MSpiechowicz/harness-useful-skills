@@ -209,46 +209,77 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
 
       const snapshot = await refresh;
       if (!command && ctx.hasUI) {
-        const workflowChoice = `Workflow (${settingState(snapshot, "workflow")})`;
-        const choice = await ctx.ui.select("Useful Skills", ["List", "Libraries", "Doctor", "Status", workflowChoice, "Stages", "Update", "Help"]);
-        if (!choice) {
-          return;
-        }
+        const workflowChoice = `Workflow ${ctx.ui.theme.fg("muted", `(${settingState(snapshot, "workflow")})`)}`;
+        const stageChoices = STAGES.map(stage => `${STAGE_LABELS[stage]} ${ctx.ui.theme.fg("muted", `(${settingState(snapshot, stage)})`)}`);
+        let menu = "root";
+        let stage;
 
-        if (choice === workflowChoice) {
-          const mode = await ctx.ui.select(`Workflow: ${settingState(snapshot, "workflow")}`, ["Enabled", "Disabled"]);
-          if (!mode) {
-            return;
+        const selectChild = async (title, choices) => {
+          let left = false;
+          const choice = await ctx.ui.select(title, choices, {
+            onLeft: () => { left = true; },
+            helpText: "← Back · Esc Close",
+          });
+          return { choice, left };
+        };
+
+        while (!command) {
+          if (menu === "root") {
+            const choice = await ctx.ui.select(
+              "Useful Skills",
+              ["List", "Libraries", "Doctor", "Status", workflowChoice, "Workflow Stages", "Update", "Help"],
+              { helpText: "Esc Close" },
+            );
+            if (!choice) {
+              return;
+            }
+
+            if (choice === workflowChoice) {
+              menu = "workflow";
+            } else if (choice === "Workflow Stages") {
+              menu = "stages";
+            } else if (choice === "Update") {
+              menu = "update";
+            } else {
+              command = { List: "list", Libraries: "library list", Doctor: "doctor", Status: "status", Help: "help" }[choice];
+            }
+          } else if (menu === "stages") {
+            const { choice, left } = await selectChild("Workflow Stages", stageChoices);
+            if (left) {
+              menu = "root";
+              continue;
+            }
+            if (!choice) {
+              return;
+            }
+
+            stage = STAGES[stageChoices.indexOf(choice)];
+            if (!stage) {
+              return;
+            }
+            menu = "stage-mode";
+          } else {
+            const title = menu === "workflow"
+              ? `Workflow: ${settingState(snapshot, "workflow")}`
+              : menu === "stage-mode"
+                ? `${STAGE_LABELS[stage]}: ${settingState(snapshot, stage)}`
+                : "Update";
+            const choices = menu === "update" ? ["Check", "Install"] : ["Enabled", "Disabled"];
+            const { choice, left } = await selectChild(title, choices);
+            if (left) {
+              menu = menu === "stage-mode" ? "stages" : "root";
+              continue;
+            }
+            if (!choice) {
+              return;
+            }
+
+            command = menu === "workflow"
+              ? `workflow ${choice.toLowerCase()}`
+              : menu === "stage-mode"
+                ? `stage ${stage} ${choice.toLowerCase()}`
+                : `update ${choice.toLowerCase()}`;
           }
-
-          command = `workflow ${mode.toLowerCase()}`;
-        } else if (choice === "Stages") {
-          const choices = STAGES.map(stage => `${STAGE_LABELS[stage]} (${settingState(snapshot, stage)})`);
-          const selected = await ctx.ui.select("Automatic stages", choices);
-          if (!selected) {
-            return;
-          }
-
-          const stage = STAGES[choices.indexOf(selected)];
-          if (!stage) {
-            return;
-          }
-
-          const mode = await ctx.ui.select(`${STAGE_LABELS[stage]}: ${settingState(snapshot, stage)}`, ["Enabled", "Disabled"]);
-          if (!mode) {
-            return;
-          }
-
-          command = `stage ${stage} ${mode.toLowerCase()}`;
-        } else if (choice === "Update") {
-          const action = await ctx.ui.select("Update", ["Check", "Install"]);
-          if (!action) {
-            return;
-          }
-
-          command = `update ${action.toLowerCase()}`;
-        } else {
-          command = { List: "list", Libraries: "library list", Doctor: "doctor", Status: "status", Help: "help" }[choice];
         }
       }
 

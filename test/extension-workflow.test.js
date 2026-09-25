@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { chmod, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
-import { fixture } from "./helpers/extension-fixture.js";
+import { LEFT, fixture } from "./helpers/extension-fixture.js";
 import { STAGES, readWorkflowSettings } from "../workflow-settings.js";
 
 test("profile guidance refreshes across sessions and instances, reconciling only owned instructions", async t => {
@@ -183,7 +183,6 @@ test("headless help, status, stage menus, and cancellation behave without surpri
   assert.deepEqual(f.messages.at(-1).options, { triggerTurn: false });
   assert.match(f.messages.at(-1).message, /\/useful-skills stage/);
   assert.match(f.messages.at(-1).message, /\/useful-skills status/);
-  const initial = await readWorkflowSettings({ agentDir: f.agentDir });
   const interactive = { ...f.ctx, hasUI: true };
   const count = f.messages.length;
   await handler("", interactive);
@@ -191,24 +190,23 @@ test("headless help, status, stage menus, and cancellation behave without surpri
   f.selectResponses.push("Update");
   await handler("", interactive);
   assert.equal(f.messages.length, count);
-  assert.ok(f.selections.at(-2).choices.includes("Stages"));
-  assert.deepEqual(f.selections.at(-1), { title: "Update", choices: ["Check", "Install"] });
+  assert.ok(f.selections.at(-2).choices.includes("Workflow Stages"));
+  assert.equal(f.selections.at(-1).title, "Update");
   f.selectResponses.push("Workflow (enabled)");
   await handler("", interactive);
   assert.equal(f.messages.length, count);
-  assert.deepEqual(f.selections.at(-1), { title: "Workflow: enabled", choices: ["Enabled", "Disabled"] });
-  f.selectResponses.push("Stages");
+  assert.ok(f.selections.at(-1).choices.includes("Disabled"));
+  f.selectResponses.push("Workflow Stages");
   await handler("", interactive);
   assert.equal(f.messages.length, count);
   assert.ok(f.selections.at(-1).choices.includes("Review (enabled)"));
-  f.selectResponses.push("Stages", "Review (enabled)");
+  f.selectResponses.push("Workflow Stages", "Review (enabled)");
   await handler("", interactive);
   assert.equal(f.messages.length, count);
   assert.deepEqual(await readdir(f.agentDir), [], "cancelling menus must not create profile settings");
-  assert.deepEqual(f.selections.at(-1), { title: "Review: enabled", choices: ["Enabled", "Disabled"] });
-  assert.deepEqual((await readWorkflowSettings({ agentDir: f.agentDir })).values, initial.values);
+  assert.ok(f.selections.at(-1).choices.includes("Disabled"));
 
-  f.selectResponses.push("Stages", "Review (enabled)", "Disabled");
+  f.selectResponses.push("Workflow Stages", "Review (enabled)", "Disabled");
   await handler("", interactive);
   assert.equal((await readWorkflowSettings({ agentDir: f.agentDir })).values.review, false);
   f.selectResponses.push("Status");
@@ -220,4 +218,52 @@ test("headless help, status, stage menus, and cancellation behave without surpri
   f.selectResponses.push("Workflow (disabled)", "Enabled");
   await handler("", interactive);
   assert.ok((await f.events.get("before_agent_start")({ systemPrompt: [], prompt: "fix a bug" }, f.ctx)).systemPrompt.some(line => line.includes("automatic review stage disabled")));
+});
+
+test("Left returns through stage parents and other child menus without changing settings on Back", async t => {
+  const f = await fixture(t);
+  const handler = f.commands.get("useful-skills").handler;
+  f.selectResponses.push(
+    "Workflow (enabled)", LEFT,
+    "Update", LEFT,
+    "Workflow Stages", "Review (enabled)", LEFT, LEFT,
+    "Status",
+  );
+  await handler("", f.ctx);
+
+  assert.deepEqual(f.selectResponses, [], "Status is selected from root after backing out of the stage list");
+  assert.match(f.messages.at(-1).message, /Workflow: saved enabled, effective enabled/);
+  assert.match(f.messages.at(-1).message, /Review: saved enabled, effective enabled/);
+  assert.deepEqual(await readdir(f.agentDir), [], "Back from each menu leaves settings untouched");
+
+  f.selectResponses.push("Workflow Stages", "Review (enabled)", LEFT, "Plan (enabled)", "Disabled");
+  await handler("", f.ctx);
+
+  assert.deepEqual(f.selectResponses, [], "Plan is selected from the stage list after backing out of Review");
+  assert.deepEqual(await readdir(path.join(f.agentDir, "useful-skills", "workflow-settings")), ["plan.json"]);
+  const settings = await readWorkflowSettings({ agentDir: f.agentDir });
+  assert.equal(settings.values.plan, false);
+  assert.equal(settings.values.review, true);
+  assert.equal(settings.values.workflow, true);
+  assert.equal(f.messages.length, 2, "Back does not dispatch an action");
+});
+
+test("Escape closes the entire workbench, including after Left, without creating settings", async t => {
+  const f = await fixture(t);
+  const handler = f.commands.get("useful-skills").handler;
+  for (const responses of [
+    [],
+    ["Workflow (enabled)"],
+    ["Workflow Stages"],
+    ["Workflow Stages", "Plan (enabled)"],
+    ["Update"],
+    ["Workflow Stages", "Plan (enabled)", LEFT],
+    ["Update", LEFT],
+  ]) {
+    f.selectResponses.push(...responses);
+    await handler("", f.ctx);
+    assert.equal(f.selectResponses.length, 0, "Escape ends the invocation instead of opening another menu");
+    assert.deepEqual(await readdir(f.agentDir), [], "Escape and Left never write settings");
+    assert.equal(f.messages.length, 0);
+  }
 });

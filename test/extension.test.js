@@ -61,7 +61,7 @@ console.log(JSON.stringify({ marketplace: [] }));
         f.selectResponses.push("Update", "Install");
         await handler("", f.ctx);
         assert.ok(f.selections.at(-2).choices.includes("Update"));
-        assert.deepEqual(f.selections.at(-1), { title: "Update", choices: ["Check", "Install"] });
+        assert.ok(f.selections.at(-1).choices.includes("Install"));
         assert.match(f.messages[0].message, /updating.*useful skills/i);
         f.messages.length = 0;
         f.selectResponses.push("Update", "Check");

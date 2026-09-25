@@ -3,6 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import usefulSkills from "../../extension.js";
 
+export const LEFT = Symbol("select left");
+
 export async function fixture(t, hasUI = true, memoryAction, sharedAgentDir) {
   const parent = await mkdtemp(path.join(os.tmpdir(), "us-extension-"));
   const root = path.join(parent, "workspace");
@@ -36,10 +38,19 @@ export async function fixture(t, hasUI = true, memoryAction, sharedAgentDir) {
     cwd: root, hasUI,
     sessionManager: { getSessionId: () => currentSession },
     ui: {
+      theme: { fg: (_color, text) => text },
       notify: (message, level) => messages.push({ message, level }),
-      select: async (title, choices) => {
-        selections.push({ title, choices });
-        return selectResponses.shift();
+      select: async (title, choices, options) => {
+        selections.push({ title, choices, options });
+        const response = selectResponses.shift();
+        if (response === LEFT) {
+          if (typeof options?.onLeft !== "function") {
+            throw new Error("Left selection requires an onLeft handler");
+          }
+          options.onLeft();
+          return undefined;
+        }
+        return response;
       },
     },
     setTimeout: callback => timers.push(callback),
