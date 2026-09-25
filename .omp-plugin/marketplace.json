@@ -1,5 +1,5 @@
 {
-  "name": "omp-useful-skills",
+  "name": "harness-useful-skills",
   "owner": {
     "name": "MSpiechowicz"
   },
@@ -8,7 +8,7 @@
   },
   "plugins": [
     {
-      "name": "oh-my-pi-useful-skills",
+      "name": "harness-useful-skills",
       "description": "OMP-native ECC engineering workflows, safety, memory, and practical development skills",
       "version": "0.2.24",
       "source": {

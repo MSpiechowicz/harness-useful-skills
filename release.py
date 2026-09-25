@@ -14,7 +14,7 @@ import sys
 
 VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
 CATALOG = ".omp-plugin/marketplace.json"
-PLUGIN = "oh-my-pi-useful-skills"
+PLUGIN = "harness-useful-skills"
 
 
 def git(repo, *args):

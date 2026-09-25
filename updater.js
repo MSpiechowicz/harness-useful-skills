@@ -7,8 +7,8 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 
 export const REPOSITORY = "MSpiechowicz/harness-useful-skills";
-export const MARKETPLACE = "omp-useful-skills";
-export const PLUGIN_ID = "oh-my-pi-useful-skills@omp-useful-skills";
+export const MARKETPLACE = "harness-useful-skills";
+export const PLUGIN_ID = "harness-useful-skills@harness-useful-skills";
 export const RELEASE_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
 export const RELEASE_BASE = `https://github.com/${REPOSITORY}/releases/tag/`;
 export const PACKAGE_ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -78,7 +78,7 @@ export async function latestRelease(fetcher = fetch) {
       headers: {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "omp-useful-skills-updater",
+        "User-Agent": "harness-useful-skills-updater",
       },
       redirect: "error",
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),

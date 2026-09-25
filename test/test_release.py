@@ -9,7 +9,7 @@ import unittest
 from release import bump_version, plan_release
 
 
-PLUGIN = "oh-my-pi-useful-skills"
+PLUGIN = "harness-useful-skills"
 CATALOG = ".omp-plugin/marketplace.json"
 
 
@@ -32,14 +32,14 @@ class ReleaseTransactionTests(unittest.TestCase):
         git(self.root, "init", "--bare", "--initial-branch=main", str(self.origin))
         git(self.root, "clone", str(self.origin), str(self.checkout))
         (self.checkout / "package.json").write_text(
-            '{\n  "name": "release-fixture",\n  "version": "1.0.0",\n  "private": true\n}\n',
+            '{\n  "name": "harness-useful-skills",\n  "version": "1.0.0",\n  "private": true\n}\n',
             encoding="utf-8",
         )
         (self.checkout / ".omp-plugin").mkdir()
         (self.checkout / CATALOG).write_text(
             json.dumps(
                 {
-                    "name": "omp-useful-skills",
+                    "name": "harness-useful-skills",
                     "plugins": [
                         {
                             "name": PLUGIN,
@@ -89,7 +89,7 @@ class ReleaseTransactionTests(unittest.TestCase):
         self.assertEqual(git(self.origin, "show", "-s", "--format=%P", commit), self.source)
         self.assertEqual(json.loads(git(self.origin, "show", f"{commit}:package.json"))["version"], "1.0.1")
         catalog = json.loads(git(self.origin, "show", f"{commit}:{CATALOG}"))
-        self.assertEqual(catalog["name"], "omp-useful-skills")
+        self.assertEqual(catalog["name"], "harness-useful-skills")
         self.assertEqual(catalog["plugins"][0]["name"], PLUGIN)
         self.assertEqual(catalog["plugins"][0]["source"]["source"], "github")
         self.assertEqual(catalog["plugins"][0]["source"]["repo"], "MSpiechowicz/harness-useful-skills")

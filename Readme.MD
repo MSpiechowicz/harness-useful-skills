@@ -20,10 +20,25 @@ Requires OMP with marketplace support and Node.js **22+**. No npm dependencies, 
 
 ```bash
 omp plugin marketplace add MSpiechowicz/harness-useful-skills
-omp plugin install oh-my-pi-useful-skills@omp-useful-skills --scope user
+omp plugin install harness-useful-skills@harness-useful-skills --scope user
 ```
 
-Restart OMP after installation or update. Ordinary startup with the installed package adds the discovery hint and, when enabled in the active profile, the narrowly scoped session-local workflow-stage policy. Use `--scope project` for a project installation, or pass `--profile NAME` to both commands for an isolated profile. The repository URL changed, but the OMP marketplace name remains `omp-useful-skills` and the plugin ID remains `oh-my-pi-useful-skills@omp-useful-skills`.
+These commands and `./useful-skills install` below require a published release of the new catalog; until then, load this source checkout with `omp -e /absolute/path/to/harness-useful-skills` as shown below.
+
+Restart OMP after installation or update. Ordinary startup with the installed package adds the discovery hint and, when enabled in the active profile, the narrowly scoped session-local workflow-stage policy. Use `--scope project` from the project directory for a project installation, or prefix both commands with `omp --profile NAME` instead of `omp` for an isolated profile. The marketplace and plugin are both named `harness-useful-skills`; the OMP plugin ID is `harness-useful-skills@harness-useful-skills`. OMP does not import this plugin's Claude Code MCP server: its OMP manifest declares empty `mcpServers`. Claude Code still loads its own separate MCP tools when installed there.
+
+### Remove or migrate an OMP installation
+
+Uninstall each historic ID that is installed in the relevant scope; check `omp plugin list --json` if unsure. These commands remove installed plugins, not their marketplace registration:
+
+```bash
+omp plugin uninstall oh-my-pi-useful-skills@omp-useful-skills --scope user
+omp plugin uninstall useful-skills@omp-useful-skills --scope user
+```
+
+An old installation is not renamed by updating a checkout or publishing a release, and loading the checkout does not remove its startup message. You can uninstall it before the new catalog is published. If no plugins need the old marketplace, optionally remove its registration with `omp plugin marketplace remove omp-useful-skills`. After the new catalog is published, use the installation commands above to add the new marketplace and install the new ID. The updater does not migrate old installations or marketplace registrations.
+
+For a project installation, run these commands from that project directory with `--scope project` instead of `--scope user`. For an isolated profile, prefix **each** command with `omp --profile NAME` instead of `omp`, retaining the original scope and project directory. Restart OMP after installation.
 
 For local development, load the **package directory**, not the extension file alone:
 
@@ -351,16 +366,9 @@ The linked PR uses `Closes #N` when it fully resolves the issue and targets the 
 
 ## Updates and releases
 
-`update check` is quiet/read-only at interactive startup; explicit failures are reported. `update install` immediately announces that Useful Skills is updating through OMP's native plugin manager, then reports the result. It retains native active-install ownership, scope/profile, and stable-version checks. Only the active unambiguous marketplace installation is upgraded. Once running a release with the corrected release lookup, installed copies receive subsequent published agents only after **Update → Install** and restart.
+`update check` is quiet/read-only at interactive startup; explicit failures are reported. `update install` immediately announces that Useful Skills is updating through OMP's native plugin manager, then reports the result. It retains native active-install ownership, scope/profile, and stable-version checks. Only an active, unambiguous `harness-useful-skills@harness-useful-skills` marketplace installation is eligible for upgrade. After a newer release is published, use **Update → Install** and restart OMP to load it.
 
-**Existing OMP installations need a manual recovery after a fixed release is published.** The old updater requests `GET /repos/MSpiechowicz/oh-my-pi-useful-skills/releases/latest`; GitHub returns HTTP 301 after the rename, which the old updater rejects because it uses `redirect: "error"`. That installed code cannot update itself to the fixed version. Do not treat the fix as available before publication. Once the fixed release is published, run these native commands for a user-scoped installation:
-
-```bash
-omp plugin marketplace update omp-useful-skills
-omp plugin upgrade oh-my-pi-useful-skills@omp-useful-skills --scope user
-```
-
-The first command refreshes the marketplace catalog only; the second upgrades the installed plugin code. Restart OMP afterward. For a project-scoped installation, run both commands from the original project directory and use `--scope project` on the upgrade. For an isolated profile, pass `--profile NAME` to **both** commands (and retain its original scope and working directory). This is not an automatic migration: do **not** run `marketplace add` for the new URL against an existing registration; it fails with a duplicate-name error and does not migrate the saved source URI. The saved source URI may still show the old repository URL; its Git fetch works through GitHub's redirect only while the old repository name remains unused. For a source checkout, changing its Git remote to the new repository URL is optional and user-managed; neither the updater nor these instructions execute that change. The OMP updater does **not** update Claude installations.
+Historic installations cannot migrate through `update install`; follow [Remove or migrate an OMP installation](#remove-or-migrate-an-omp-installation) to remove them and install the current ID manually. Updating this source tree or publishing a release does not change anyone's installed plugins or registered marketplace. For a source checkout, changing its Git remote to the new repository URL is optional and user-managed. The OMP updater does **not** update Claude installations.
 
 The existing single-plugin release transaction is unchanged: CI checks precede the atomic package/marketplace version commit and branch/tag push by `release.py`. No publication is performed merely by implementing a plan. Python 3.10+ is needed for release-development checks, not normal plugin installation.
 
