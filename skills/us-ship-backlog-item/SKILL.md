@@ -15,7 +15,7 @@ Distinguish selection/research from shipment using the user's actual request, no
 - An explicit request to **ship a backlog item**, including an explicit `/skill:us-ship-backlog-item` invocation without a narrower restriction, requests the feature-branch and linked-PR lifecycle below. It authorizes committing/pushing only the verified selected-item work that satisfies enabled reviews and independent delivery requirements, opening its PR, and updating that item's existing backlog status. State this delivery scope when presenting the proposed work. With `plan` enabled, still obtain canonical implementation plan approval before edits; when disabled, a bounded shipment request can authorize implementation without a separate plan gate. Implementation authorization alone never grants publication authority.
 - A request only to implement/fix/pick up an item is not unambiguous PR authorization. Inspect and plan according to enabled stages; resolve the delivery choice before publication. Honor narrower limits such as local-only, draft-only, or no status changes.
 
-Shipping does not authorize merging, enabling auto-merge, direct-main delivery, deleting branches, changing project automation/permissions, or closing unrelated issues. An explicit direct-main request uses `skill://us-approve-work` instead; report actual delivery evidence without pretending a PR merged.
+Shipping does not authorize merging, enabling auto-merge, direct delivery to the base branch, deleting branches, changing project automation/permissions, or closing unrelated issues. Report actual delivery evidence without pretending a PR merged.
 
 ## Discover and select
 

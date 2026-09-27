@@ -1,26 +1,21 @@
 ---
 name: us-approve-work
-description: Commit explicitly approved work and push it directly to the remote main branch only when the user explicitly requests that delivery. Preserve unrelated work and refuse ambiguous, divergent, protected, non-fast-forward, or contaminated direct-main pushes.
+description: Commit explicitly approved work and, when publication is authorized, deliver it on a safely isolated feature branch through an exact PR against the verified GitHub default branch. Commit-only requests remain local; never push directly to the base.
 ---
 
-# Approve and push work to main
+# Approve work for feature-branch PR delivery
 
-Load `skill://us-concise` before preparing delivery prose. An approved implementation plan, successful review, or reading this skill is not permission to commit or publish. Require an explicit user request to commit approved work and push it to `main`; honor a narrower commit-only request without pushing.
+Load `skill://us-concise` before preparing delivery prose. A direct native `/skill:us-approve-work` invocation by the user without narrower limits authorizes committing only approved work, pushing a safe feature branch, and opening or reusing its exact PR against the verified GitHub default branch; do not ask again whether to commit, use a branch, or open a PR. A separately explicit request for that delivery also authorizes it. An explicit commit-only restriction authorizes only a local commit: do not push, open a PR, or require GitHub authentication for that path. Reading, automatic selection or loading of this skill, a quoted or copied invocation, implementation-plan approval, and review alone grant no publication authority. Invocation never waives verification, enabled reviews, or isolation of approved work.
 
-## Establish a safe delivery set
+## Establish the approved set
 
-1. Read repository guidance and inspect the current branch, worktree, index, remotes, upstream, protected-branch policy if visible, and the commits that `HEAD:refs/heads/main` would publish. Fetch the intended remote's `main` ref without rewriting local work.
-2. Resolve the approved files/hunks and existing approved commits from the conversation and actual diffs. Preserve unrelated staged/unstaged work, branches, and commits. Stage only approved files or hunks; inspect the entire staged diff immediately before committing. If already staged unrelated changes cannot be isolated without disturbing them, stop and report the isolation blocker.
-3. Commit only approved uncommitted work using repository convention. Reuse already committed approved work rather than create an empty commit. Direct delivery is blocked if any outgoing commit is unrelated, the target/writable remote is absent or ambiguous, `main` is protected, the work cannot be verified/reviewed for the exact delivery head, or the expected destination is not clearly `main`. Never silently substitute a PR.
+1. Read repository guidance and inspect the current branch, worktree, index, remotes, upstream, approved files/hunks, and existing commits against the intended base. Determine the actual user authorization from the conversation. Preserve unrelated staged/unstaged changes, commits, and branches; if the approved work cannot be isolated without disturbing them, stop and report the blocker.
+2. For PR delivery, **before any branch creation, staging, or commit**, check `gh auth status`, identify the repository and `defaultBranchRef.name` with `gh repo view --json nameWithOwner,defaultBranchRef`, and verify a writable intended remote and its relationship to that repository. Fetch the verified default branch and relevant feature ref without rewriting local work; inspect the complete outbound history and diffs that the feature push and PR would expose. Resolve ambiguous, unrelated, divergent, protected, or unreviewed outgoing work by stopping, not by silently publishing it. If GitHub access or remote identity is unavailable, stop without a local delivery mutation and report what is missing.
+3. If the checkout is the verified default branch and has approved uncommitted edits or approved already-committed outgoing work (with a clean or dirty index/worktree), record its index/worktree state and create a new repository-conventional feature branch **at the inspected `HEAD`**, before staging or committing, only when switching preserves that state and the whole outgoing commit set is approved. Verify the index/worktree is unchanged afterward. A default checkout without a safely isolatable branch, a colliding branch, or unrelated outgoing history blocks delivery; never commit or push the base branch as a shortcut. On an existing feature branch, reuse it only when its exact head/base, remote destination, index/worktree, and outgoing commits are safe for this delivery.
+4. Stage only approved files or hunks and inspect the complete staged diff immediately before committing. Commit only approved uncommitted work using repository convention, or reuse already committed approved work without an empty commit. For commit-only requests, stop after the verified local commit and report its SHA and what remains local; do not take the PR preflight or branch-isolation steps solely for publication.
 
-## Fast-forward-only direct push
+## Hand off authorized publication
 
-Before pushing, verify the fetched remote `main` tip is an ancestor of the exact delivery `HEAD`; otherwise the direct push is non-fast-forward and must stop. Confirm that the expected remote `main` tip has not changed before the push. Push only with the explicit non-force refspec:
+For PR delivery, pass the original invocation/request and restrictions, verified `OWNER/REPO`, `defaultBranchRef.name` as the required base, intended writable remote, exact feature head and approved scope, full outbound-history assessment, and verification/enabled-review outcomes to `skill://us-open-pr`. That skill owns the fast-forward-only feature push, exact head/base PR creation or reuse, and readback. Recheck the exact delivery head and outgoing set after the commit; if they differ from what was inspected or reviewed, stop before publication. Do not run a competing push/PR algorithm here.
 
-```text
-git push <authorized-remote> HEAD:refs/heads/main
-```
-
-Never use `--force`, `--force-with-lease`, rebase, reset, clean, stash, amend a published commit, bypass branch protection, modify repository permissions, or switch to a PR to evade a block. A rejected push preserves the local commit and is an honest delivery failure, not authority to retry destructively.
-
-After a successful push, obtain the remote `refs/heads/main` SHA and confirm it equals the delivery head SHA. Report the commit SHA, remote, destination, actual verification/review evidence, and observed remote tip. If any condition fails, state the exact blocker and recovery prerequisite; never claim the push succeeded.
+Never push directly to the default/base ref, force-push, rebase, reset, clean, stash, bypass branch protection, change permissions, or substitute another base to evade a block. “If possible” requests do not relax these requirements: if feature publication or PR creation fails, preserve any local commit/branch and successful partial remote state, report the exact blocker and recovery prerequisite, and never fall back to a direct base push or claim an unverified PR exists. Report the local commit SHA, branch, verified default base, and exact PR URL/head SHA only when each has been observed; distinguish commit-only and partial delivery from a completed PR.
