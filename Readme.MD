@@ -6,7 +6,7 @@ Owned `us-*` skills for development, focused audits, delivery, and project memor
 
 | Develop | Inspect | Deliver | Remember |
 | --- | --- | --- | --- |
-| Clarify, research, approve, implement, review | Focused security, performance, and quality audits | Explicitly authorized PR or direct-main delivery | Durable facts alongside code relationships |
+| Clarify, research, approve, implement, review | Focused security, performance, and quality audits | Explicitly authorized feature-branch PR delivery | Durable facts alongside code relationships |
 
 **Start here:** [Installation](#installation) · [Claude Code](#claude-code) · [Workflow & skills](#skill-led-development) · [Model configuration](#native-model-configuration) · [Memory](#agent-invoked-memory)
 
@@ -145,7 +145,7 @@ Disabling the workflow master suppresses **all** automatic stages without changi
 | `us-improve-code-coverage` | Measured coverage gaps, then approved behavior-focused test improvements |
 | `us-ship-backlog-item` | One item, isolated feature branch, reviewed linked PR, and Done only after confirmed merge |
 | `us-open-pr` | Explicitly authorized reviewed feature-branch PR delivery |
-| `us-approve-work` | Explicitly authorized commit and fast-forward direct push to `main` |
+| `us-approve-work` | Explicitly authorized approved-only commit and safe feature-branch PR against the verified GitHub default branch; commit-only stays local |
 | `us-library` | Explicit, bounded consultation of optional ECC reference material |
 
 Direct invocation uses OMP's actual syntax:
@@ -362,7 +362,7 @@ The linked PR uses `Closes #N` when it fully resolves the issue and targets the 
 
 `us-open-pr` inspects all outgoing history/diffs, preserves unrelated staged/worktree changes, pushes the reviewed feature head, creates or reuses the exact head/base PR, and verifies URL and head SHA. It never silently rebases, force-pushes, changes destination, or merges.
 
-`us-approve-work` requires an explicit delivery request. It commits only approved work and uses non-force `HEAD:refs/heads/main` only when the fetched remote main is an ancestor. Ambiguous, divergent, protected, or unrelated outgoing work blocks delivery. No silent PR substitution or branch-protection bypass. Remote tip verification is required before reporting success.
+`us-approve-work` treats a direct native `/skill:us-approve-work` invocation by the user without narrower limits as authorization to commit only approved work, push a safely isolated feature branch, and open or reuse its exact PR against GitHub's verified `defaultBranchRef.name` (including `main`, `master`, or `prod`), without asking the delivery choice twice. An explicit commit-only restriction remains local and does not require `gh` authentication. Reading, automatic discovery or loading, a quoted or copied invocation, plan approval, and review alone do not authorize publication. For PR delivery, authentication, repository/default-branch identity, writable remote, and complete outbound history must be checked before branch creation or staging. If approved edits are on the default checkout, a feature branch may be created at the inspected `HEAD` only when it preserves the index/worktree and includes no unrelated outgoing commits. `us-open-pr` performs the non-force feature push and exact PR readback; it cannot push directly to the base, change the verified base for this route, or bypass isolation or enabled reviews. If publication is unavailable, preserve local/partial state and report the blocker; never fall back to a direct base push or claim an unverified PR.
 
 ## Updates and releases
 
