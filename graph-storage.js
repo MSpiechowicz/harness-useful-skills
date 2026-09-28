@@ -6,7 +6,7 @@ import { graphValidationError } from "./graph-validation.js";
 import { errorMessage, isObject } from "./graph-safety.js";
 import { minimalEnvironment } from "./process.js";
 
-const MAX_GRAPH_BYTES = 512 * 1024 * 1024;
+export const MAX_GRAPH_BYTES = 512 * 1024 * 1024;
 const MAX_POINTER_BYTES = 4 * 1024;
 export const PRIVATE_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
@@ -21,33 +21,52 @@ async function regularFile(file, description) {
   return details;
 }
 
-export async function graphContents(graphPath, workspace) {
+async function unvalidatedGraphContents(graphPath, description) {
   let details;
 
   try {
-    details = await regularFile(graphPath, "Active graph");
+    details = await regularFile(graphPath, description);
   } catch (error) {
     if (error?.code === "ENOENT") {
       return { available: false };
     }
 
-    return { available: false, error: `Cannot inspect active graph: ${errorMessage(error)}` };
+    return { available: false, error: `Cannot inspect ${description.toLowerCase()}: ${errorMessage(error)}` };
   }
 
   if (details.size > MAX_GRAPH_BYTES) {
-    return { available: false, error: "Active graph exceeds the 512 MiB safety limit." };
+    return { available: false, error: `${description} exceeds the 512 MiB safety limit.` };
   }
 
   try {
     const text = await readFile(graphPath, "utf8");
     const contents = JSON.parse(text);
-    const error = graphValidationError(contents, workspace);
+    return { available: true, contents, text };
+  } catch (error) {
+    return { available: false, error: `${description} is invalid: ${errorMessage(error)}` };
+  }
+}
+
+/** Read extraction output before its stage-only repair; callers must validate before publishing. */
+export async function stagedGraphContents(graphPath) {
+  return unvalidatedGraphContents(graphPath, "Staged graph");
+}
+
+export async function graphContents(graphPath, workspace) {
+  const graph = await unvalidatedGraphContents(graphPath, "Active graph");
+
+  if (!graph.available) {
+    return graph;
+  }
+
+  try {
+    const error = graphValidationError(graph.contents, workspace);
 
     if (error) {
       return { available: false, error };
     }
 
-    return { available: true, contents, text };
+    return graph;
   } catch (error) {
     return { available: false, error: `Active graph is invalid: ${errorMessage(error)}` };
   }

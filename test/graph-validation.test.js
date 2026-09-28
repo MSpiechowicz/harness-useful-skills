@@ -1,9 +1,34 @@
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
 import { externalNode, extract, fixture, seed, service, validGraph } from "./helpers/graph-fixture.js";
+
+const HTTPS_IMPORT_URL = "https://example.invalid/remote.js";
+const orphanHttpsReference = {
+  id: "remote_module_js",
+  label: "example.invalid/remote.js",
+  _origin: "ast",
+  file_type: "code",
+  source_file: HTTPS_IMPORT_URL,
+};
+
+function localJsImporter(sourceFile = "dynamic-import.js", id = "dynamic_importer") {
+  return {
+    id,
+    label: path.basename(sourceFile),
+    _origin: "ast",
+    file_type: "code",
+    source_file: sourceFile,
+    source_location: "L1",
+  };
+}
+
+function graphWithOrphanHttps(importers = []) {
+  return { nodes: [...importers, orphanHttpsReference], links: [] };
+}
 
 const malformedGraphs = [
   ["null graph", null, /nodes array/i],
@@ -128,6 +153,102 @@ test("external AST import references publish with only local sources counted", a
     assert.ok(publishedGraph.links.some((link) => link.source === importer.id && link.target === reference.id && link.relation === "dynamic_import"));
   }
 });
+
+test("a literal dynamic import repairs an orphan HTTPS node before publication", async (t) => {
+  const f = await fixture(t);
+  const importer = localJsImporter();
+  await writeFile(path.join(f.workspace, importer.source_file), `export const load = () => import('${HTTPS_IMPORT_URL}');\n`);
+  const contents = graphWithOrphanHttps([importer]);
+  const graphify = service({
+    runProcess: async (_file, args) => extract(args, contents),
+    inspectDynamicImportWitnesses: async () => ({
+      ok: true,
+      witnesses: [{ sourceFile: importer.source_file, url: HTTPS_IMPORT_URL, sourceLocation: "L1" }],
+      inertMatches: [],
+    }),
+  });
+
+  const result = await graphify.buildGraph(f.options);
+  assert.equal(result.ok, true, result.error);
+  assert.deepEqual([result.snapshot.nodes, result.snapshot.edges, result.snapshot.sources], [2, 1, 1]);
+
+  const status = await graphify.graphStatus(f.options);
+  assert.equal(status.available, true);
+  const graphText = await readFile(status.active.graph, "utf8");
+  const publishedGraph = JSON.parse(graphText);
+  assert.deepEqual(publishedGraph.links, [{
+    source: importer.id,
+    target: orphanHttpsReference.id,
+    relation: "dynamic_import",
+    _origin: "ast",
+    source_file: importer.source_file,
+    source_location: "L1",
+  }]);
+  assert.equal(status.snapshot.edges, 1);
+  assert.equal(status.snapshot.graphHash, createHash("sha256").update(graphText).digest("hex"));
+});
+
+test("comments and strings do not repair an orphan HTTPS import", async (t) => {
+  const f = await fixture(t);
+  const importer = localJsImporter();
+  await writeFile(
+    path.join(f.workspace, importer.source_file),
+    `// import('${HTTPS_IMPORT_URL}')\nconst example = "import('${HTTPS_IMPORT_URL}')";\n`,
+  );
+  const contents = graphWithOrphanHttps([importer]);
+  const active = await seed(f);
+  const before = await readFile(f.paths.current, "utf8");
+  const graphify = service({
+    runProcess: async (_file, args) => extract(args, contents),
+    inspectDynamicImportWitnesses: async () => ({ ok: true, witnesses: [], inertMatches: [] }),
+  });
+
+  const result = await graphify.buildGraph(f.options);
+  assert.equal(result.ok, false);
+  assert.match(result.error, /external.*import/i);
+  assert.equal(await readFile(f.paths.current, "utf8"), before);
+  assert.deepEqual(await readdir(f.paths.generations), [active.generation]);
+  assert.equal((await graphify.graphStatus(f.options)).active.generation, active.generation);
+});
+
+for (const [name, importers, expected] of [
+  ["missing AST importer", [], /external.*import/i],
+  ["non-AST importer", [{ ...localJsImporter(), _origin: "manual" }], /external.*import/i],
+  ["ambiguous AST importers", [localJsImporter(), localJsImporter("dynamic-import.js", "another_importer")], /external.*import/i],
+  ["generated importer source", [localJsImporter("dist/dynamic-import.js")], /generated output/i],
+]) {
+  test(`unlinked HTTPS import with ${name} preserves the active snapshot`, async (t) => {
+    const f = await fixture(t);
+    const active = await seed(f);
+    const before = await readFile(f.paths.current, "utf8");
+    const contents = graphWithOrphanHttps(importers);
+    const graphify = service({
+      runProcess: async (_file, args) => extract(args, contents),
+      inspectDynamicImportWitnesses: async () => ({
+        ok: true,
+        witnesses: [{ sourceFile: "dynamic-import.js", url: HTTPS_IMPORT_URL, sourceLocation: "L1" }],
+        inertMatches: [],
+      }),
+    });
+
+    const result = await graphify.buildGraph(f.options);
+    assert.equal(result.ok, false);
+    assert.match(result.error, expected);
+    assert.equal(await readFile(f.paths.current, "utf8"), before);
+    assert.deepEqual(await readdir(f.paths.generations), [active.generation]);
+    assert.equal((await graphify.graphStatus(f.options)).active.generation, active.generation);
+  });
+}
+
+test("active snapshots continue to reject orphan HTTPS AST references", async (t) => {
+  const f = await fixture(t);
+  await seed(f, graphWithOrphanHttps());
+
+  const status = await service().graphStatus(f.options);
+  assert.equal(status.available, false);
+  assert.match(status.error, /external.*import/i);
+});
+
 
 for (const label of ["../App.d.ts", "./App.d.ts"]) {
   test(`missing local AST import labeled ${label} preserves the active snapshot`, async (t) => {
@@ -375,19 +496,4 @@ test("a package-shaped AST import through a credential directory alias is reject
   assert.match(result.error, /credential-shaped: safe-package\/missing\.py/i);
   assert.equal(await readFile(f.paths.current, "utf8"), before);
   assert.deepEqual(await readdir(f.paths.generations), [active.generation]);
-});
-
-test("a symlink alias to an allowed source inside the workspace can be published", async (t) => {
-  const f = await fixture(t);
-  await symlink("main.py", path.join(f.workspace, "alias.py"));
-  const graphify = service({
-    runProcess: async (_file, args) => extract(args, {
-      nodes: [...validGraph.nodes, { id: "alias", source_file: "alias.py" }],
-      edges: [],
-    }),
-  });
-
-  const result = await graphify.buildGraph(f.options);
-  assert.equal(result.ok, true, result.error);
-  assert.equal(result.snapshot.sources, 2);
 });

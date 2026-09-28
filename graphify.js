@@ -1,11 +1,13 @@
+import { Buffer } from "node:buffer";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, realpath, rename, rm } from "node:fs/promises";
 import path from "node:path";
 
 import { dependencyStatus, ensureDependencies } from "./dependencies.js";
 import { errorMessage, truncateUtf8 } from "./graph-safety.js";
-import { activeSnapshot, checkExistingManagedPath, existingDirectory, graphContents, prepareRuntime, prepareStorage, PRIVATE_MODE, writeAtomic } from "./graph-storage.js";
-import { importRelations, isExternalImportReference, isSourceLessReference, validateExternalImportSource, validateSource } from "./graph-validation.js";
+import { activeSnapshot, checkExistingManagedPath, existingDirectory, MAX_GRAPH_BYTES, prepareRuntime, prepareStorage, PRIVATE_MODE, stagedGraphContents, writeAtomic } from "./graph-storage.js";
+import { graphValidationError, importRelations, isExternalImportReference, isSourceLessReference, validateExternalImportSource, validateSource } from "./graph-validation.js";
+import { inspectDynamicImportWitnesses, repairMissingExternalImportEdges } from "./graph-import-provenance.js";
 import { isPathWithin } from "./path-boundary.js";
 import { runProcess } from "./process.js";
 
@@ -92,6 +94,7 @@ export function createGraphify(overrides = {}) {
     dependencyStatus: overrides.dependencyStatus ?? dependencyStatus,
     ensureDependencies: overrides.ensureDependencies ?? ensureDependencies,
     runProcess: overrides.runProcess ?? runProcess,
+    inspectDynamicImportWitnesses: overrides.inspectDynamicImportWitnesses ?? inspectDynamicImportWitnesses,
   });
 
   async function graphStatusFor({ cwd, agentDir }) {
@@ -156,14 +159,39 @@ export function createGraphify(overrides = {}) {
       });
       assertBuildActive(deadline);
 
-      const stagedGraph = await graphContents(path.join(staging, "graphify-out", "graph.json"), paths.workspace);
+      const stagedGraph = await stagedGraphContents(path.join(staging, "graphify-out", "graph.json"));
       assertBuildActive(deadline);
 
       if (!stagedGraph.available) {
         throw new Error(stagedGraph.error ?? "Graphify did not produce a graph.");
       }
 
-      const graphHash = createHash("sha256").update(stagedGraph.text).digest("hex");
+      const repairedStagedImports = await repairMissingExternalImportEdges({
+        contents: stagedGraph.contents,
+        workspace: paths.workspace,
+        python: dependencies.python,
+        environment,
+        runProcess: runtime.runProcess,
+        staging,
+        signal: deadline.signal,
+        assertActive: () => assertBuildActive(deadline),
+        inspectWitnesses: runtime.inspectDynamicImportWitnesses,
+      }).catch((error) => {
+        assertBuildActive(deadline);
+        throw error;
+      });
+      assertBuildActive(deadline);
+
+      const graphError = graphValidationError(stagedGraph.contents, paths.workspace);
+      if (graphError) {
+        throw new Error(graphError);
+      }
+
+      const graphText = repairedStagedImports ? JSON.stringify(stagedGraph.contents) : stagedGraph.text;
+      if (Buffer.byteLength(graphText) > MAX_GRAPH_BYTES) {
+        throw new Error("Staged graph exceeds the 512 MiB safety limit.");
+      }
+      const graphHash = createHash("sha256").update(graphText).digest("hex");
       const sourceFiles = new Set();
       const externalSources = new Set();
       const edges = stagedGraph.contents.edges ?? stagedGraph.contents.links;
@@ -215,7 +243,7 @@ export function createGraphify(overrides = {}) {
         sources: sourceFiles.size,
       };
       assertBuildActive(deadline);
-      await writeAtomic(path.join(staging, "graph.json"), stagedGraph.text);
+      await writeAtomic(path.join(staging, "graph.json"), graphText);
       assertBuildActive(deadline);
       await writeAtomic(path.join(staging, "snapshot.json"), `${JSON.stringify(metadata)}\n`);
       assertBuildActive(deadline);
