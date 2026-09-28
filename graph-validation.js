@@ -41,6 +41,41 @@ function validPackagePart(part) {
   return part !== "." && part !== ".." && /^[A-Za-z0-9._~-]+$/.test(part);
 }
 
+function isLocalhostHttpImportSpecifier(sourceFile) {
+  if (typeof sourceFile !== "string" || !/^http:\/\/localhost(?::[0-9]+)?\//.test(sourceFile)) {
+    return false;
+  }
+
+  const match = sourceFile.match(/^http:\/\/localhost(?::[0-9]+)?(\/[^?#]*)$/);
+  if (!match) {
+    return false;
+  }
+
+  const parts = match[1].slice(1).split("/");
+  if (!parts.length || parts.some((part) => !validPackagePart(part))) {
+    return false;
+  }
+
+  try {
+    const url = new URL(sourceFile);
+    return url.protocol === "http:"
+      && url.hostname === "localhost"
+      && !url.username
+      && !url.password
+      && !url.search
+      && !url.hash
+      && url.pathname === match[1];
+  } catch {
+    return false;
+  }
+}
+
+export function isLocalhostHttpImportCandidate(node) {
+  return isExternalImportCandidate(node)
+    && !isRelativeImportSpecifier(node.label)
+    && isLocalhostHttpImportSpecifier(node.source_file);
+}
+
 function isExternalImportSpecifier(sourceFile) {
   if (typeof sourceFile !== "string" || !sourceFile || /[\s\\\u0000-\u001f]/.test(sourceFile)) {
     return false;
@@ -57,6 +92,10 @@ function isExternalImportSpecifier(sourceFile) {
     } catch {
       return false;
     }
+  }
+
+  if (/^http:\/\//i.test(sourceFile)) {
+    return isLocalhostHttpImportSpecifier(sourceFile);
   }
 
   if (isRelativeImportSpecifier(sourceFile) || sourceFile.startsWith("~") || sourceFile.startsWith("#")) {
@@ -81,6 +120,13 @@ function isExternalImportSpecifier(sourceFile) {
   }
 
   return parts.every(validPackagePart);
+}
+
+export function isHttpsImportCandidate(node) {
+  return isExternalImportCandidate(node)
+    && !isRelativeImportSpecifier(node.label)
+    && /^https:\/\//i.test(node.source_file)
+    && isExternalImportSpecifier(node.source_file);
 }
 
 export function importRelations(edges) {
@@ -248,6 +294,10 @@ export async function validateExternalImportSource(sourceFile, workspace) {
     return policyError;
   }
 
+  if (isLocalhostHttpImportSpecifier(sourceFile)) {
+    return undefined;
+  }
+
   const segments = path.relative(workspace, path.resolve(workspace, sourceFile)).split(path.sep);
   let current = workspace;
   let existingWorkspaceDirectory = false;
@@ -317,6 +367,14 @@ export function graphValidationError(contents, workspace) {
   const relations = importRelations(edges);
 
   for (const node of contents.nodes) {
+    if (typeof node.source_file === "string"
+      && /^http:/i.test(node.source_file)
+      && (!isLocalhostHttpImportSpecifier(node.source_file)
+        || !isExternalImportCandidate(node)
+        || isRelativeImportSpecifier(node.label))) {
+      return "Graphify HTTP import references must use a safe literal http://localhost URL.";
+    }
+
     if (isSourceLessReference(node)) {
       continue;
     }
