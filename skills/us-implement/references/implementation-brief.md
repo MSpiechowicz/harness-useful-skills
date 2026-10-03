@@ -1,10 +1,10 @@
 # Native implementation work-package brief
 
-Load `skill://us-concise` before responding. This brief assigns one authorized, classified work package to its selected native worker: frontend uses `frontend` (`@frontend`, then `@implementation`), backend uses `backend` (`@backend`, then `@implementation`), and genuinely neither uses `task` (normally `@implementation`). Authorization is the approved plan when `plan` is enabled, or the bounded user request when automatic `plan` is disabled; independent approval requirements remain in force. `task.agentModelOverrides[agentName]` always wins; agent frontmatter and configured roles do not prove the observed running model. The parent selects the classification and worker; the worker must not select or claim a model. Perform only the assigned task. Do not launch the full workflow, delegate again, publish, commit, push, merge, open a PR, or alter files outside this assignment.
+Load `skill://us-concise` before responding. This brief assigns one authorized classified package: frontend uses `frontend` (`@frontend`, then `@implementation`), backend uses `backend` (`@backend`, then `@implementation`), and genuinely neither uses `task` (normally `@implementation`). Authorization is the applicable approved plan, prior approval for in-scope repairs, or the bounded current request when no plan stage applies, including eligible focused work; enabled `plan` alone does not require a new plan/approval for focused repair. Independent approval requirements remain. `task.agentModelOverrides[agentName]` always wins; declarations do not prove the running model. The parent selects lane, classification, and worker; do not choose or claim a model. Perform only the assigned task. Do not launch a full workflow, delegate, publish, commit, push, merge, open a PR, or alter files outside the assignment.
 
 ## Objective
 
-`<Parent fills: authorized task, requested observable behavior, and approved plan path/excerpt when applicable or bounded user-request scope when plan is disabled.>`
+`<Parent fills: authorized task, observable acceptance, selected lane/required stages, and applicable plan excerpt, prior in-scope approval, or bounded current request.>`
 
 ## Evidence
 
@@ -18,6 +18,7 @@ Own only: `<Parent fills package classification, selected worker, exact files to
 ## Constraints
 
 - The authorized scope is the boundary; report material scope or interface drift instead of expanding work.
+- Respect the parent's lane and selected stages. Optional focused delegation does not restart planning/full reviews/memory. Active normal-workflow repairs retain required fresh reviews, owned by the parent, without routine new planning/approval.
 - Reuse local patterns and preserve unrelated edits.
 - Keep code easy to read: group related declarations with the logic that uses them, separate distinct logical stages and conditional branches with whitespace rather than packing declarations or `if`/`return` statements together, and favor straightforward control flow. Expand complex inline conditionals into clear branches; simple inline cases are fine when clear.
 - For a bug or uncertain behavior, establish a behavioral regression before changing implementation when practical.

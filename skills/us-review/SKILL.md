@@ -1,11 +1,11 @@
 ---
 name: us-review
-description: Use after implementing or repairing an authorized software change when the profile's correctness review stage is enabled, or when explicitly requested. Obtain a fresh evidence-based review against authorized acceptance.
+description: Use after authorized changes when correctness review applies in normal workflow, is selected for an eligible focused repair, or is explicitly requested. Obtain a fresh evidence-based review against authorized acceptance.
 ---
 
 # Fresh correctness review
 
-Load `skill://us-concise`. Review the resulting source and observed verification against authorized acceptance (the approved plan when `plan` is enabled, otherwise the bounded user request), not the implementer's confidence. This skill is read-only: it reports findings and does not edit, publish, approve, or replace security review. If automatic `review` is disabled, do not request or report a package-mandatory correctness review; independent review requirements remain in force.
+Load `skill://us-concise`. Apply lane selection in `skill://us-workflow`, including on direct loading; enabled `review` alone does not force a focused repair into a full cycle. Review current source and observed verification against authorized acceptance (applicable approved plan, prior in-scope approval, or bounded request), not implementer confidence. This skill is read-only and does not edit, publish, approve, or replace security review. Disabled/unknown automatic review is not selected automatically; independent review requests remain binding. A selected focused review must be fresh after affected changes, just like a required normal-workflow review.
 
 ## Inputs
 
@@ -21,11 +21,11 @@ Sort findings by material impact. Each finding includes severity, confidence, ex
 
 ## Repair loop
 
-Send verified acceptance failures and material issues to `skill://us-implement` for in-scope repair. Re-run affected verification, then obtain fresh reviews only for enabled `review` and `security-review` stages. Do not reuse an enabled prior review after code changes. After three unsuccessful repair rounds or repeated no-progress findings, preserve the work and explain the blocker instead of weakening acceptance or looping indefinitely.
+Send verified acceptance failures and material issues to `skill://us-implement` for authorized in-scope repair, retaining the active lane and its required workers. Rerun affected verification and obtain fresh required or selected correctness/security reviews after affected changes; never reuse earlier review evidence for newly changed code or restart unrelated stages. Prior approval covers in-scope repair without routine new planning/approval. After three unsuccessful repair rounds or repeated no-progress findings, preserve work and explain the blocker rather than weakening acceptance.
 
 ## Completion evidence
 
-Return review scope, reviewer capability used, source revision/paths inspected, evidence considered, findings with disposition, and explicit residual limitations. After correctness review, load `skill://us-check-security` only when its automatic stage is enabled or independently requested; correctness review alone does not satisfy an enabled security stage.
+Return scope, reviewer capability, source revision/paths, evidence, findings/disposition, and residual limitations. Load `skill://us-check-security` only when applicable and enabled in normal composition, selected and eligible for focused work, or independently requested. Correctness review does not satisfy required security review; omitted stages are skipped, not completed.
 
 ## Failure behavior
 

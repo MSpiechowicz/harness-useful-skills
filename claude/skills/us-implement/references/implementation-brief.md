@@ -1,10 +1,10 @@
 # Native implementation work-package brief
 
-Load `/useful-skills:us-concise` before responding. This brief assigns one authorized classified package: `useful-skills:frontend` for frontend, `useful-skills:backend` for backend, or `useful-skills:general-purpose` for genuinely neither. Authorization is the approved plan when `plan` is enabled, otherwise the bounded user request; independent approval still applies. All plugin agents inherit the host model and permissions. The parent selects package and agent; the worker must not claim an observed model without runtime evidence. Do not launch another workflow, delegate, publish, commit, push, merge, open a PR, or expand the assignment.
+Load `/useful-skills:us-concise` before responding. This brief assigns one authorized classified package: `useful-skills:frontend`, `useful-skills:backend`, or `useful-skills:general-purpose` for genuinely neither. Authorization is the applicable approved plan, prior approval for in-scope repairs, or bounded current request with no applicable plan stage, including eligible focused work. Enabled `plan` alone does not require a new focused plan/approval; independent approval still applies. Plugin agents inherit host model and permissions. The parent selects lane, package, and agent; do not claim a running model without runtime metadata. Do not launch another workflow, delegate, publish, commit, push, merge, open a PR, or expand the assignment.
 
 ## Objective
 
-`<Parent fills: authorized task, requested observable behavior, and approved plan path/excerpt when applicable or bounded user-request scope when plan is disabled.>`
+`<Parent fills: authorized task, observable acceptance, selected lane/required stages, and applicable plan excerpt, prior in-scope approval, or bounded current request.>`
 
 ## Evidence
 
@@ -18,6 +18,7 @@ Own only: `<Parent fills package classification, selected worker, exact files to
 ## Constraints
 
 - The authorized scope is the boundary; report material scope or interface drift instead of expanding work.
+- Respect the parent's lane and selected stages. Optional focused delegation does not restart planning/full reviews/memory. Active normal-workflow repairs retain required fresh reviews, owned by the parent, without routine new planning/approval.
 - Reuse local patterns and preserve unrelated edits.
 - Keep code easy to read: group related declarations with the logic that uses them, separate distinct logical stages and conditional branches with whitespace rather than packing declarations or `if`/`return` statements together, and favor straightforward control flow. Expand complex inline conditionals into clear branches; simple inline cases are fine when clear.
 - For a bug or uncertain behavior, establish a behavioral regression before changing implementation when practical.

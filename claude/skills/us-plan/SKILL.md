@@ -1,13 +1,13 @@
 ---
 name: us-plan
-description: Use after clarification and source inspection when the Claude plugin's plan stage is enabled, or when explicitly requested, to draft an actionable implementation plan and obtain the required approval before edits.
+description: Use after clarification and source inspection when planning applies in normal workflow, is selected for an eligible focused repair, or is explicitly requested. Draft an actionable plan and obtain approval before implementing that proposed plan.
 ---
 
 # Plan a proposed change
 
-Load `/useful-skills:us-concise`. Use available evidence from `/useful-skills:us-research` when enabled and settled decisions from `/useful-skills:us-grill-me`; inspect additional source to close concrete gaps. A plan is a human-readable handoff, not a workflow database. When automatic `plan` is disabled, this skill imposes no planner dispatch or separate plan approval on ordinary implementation; a bounded user request can authorize it, subject to independent authorization requirements. An explicitly requested plan is separate from that automatic stage.
+Load `/useful-skills:us-concise`. Apply lane selection in `/useful-skills:us-workflow` before composing stages, even on direct loading. Use applicable research and settled decisions from `/useful-skills:us-grill-me`; inspect source to close concrete gaps. A plan is a human-readable handoff, not a workflow database. An enabled plan switch alone does not require a new planner or approval for an eligible focused correction: current bounded authorization or prior in-scope approval suffices, subject to independent requirements. With no applicable automatic plan stage, a bounded user request may authorize implementation. An explicit plan request remains independent.
 
-When `plan` is enabled or a plan is explicitly requested, read the **Native model routing** guidance in `/useful-skills:us-workflow` without starting the full workflow. The parent first inspects source, owns scope and integration, then dispatches `useful-skills:planner` with Claude Code’s `Agent` tool for a bounded read-only draft. All plugin agents declare `model: inherit`; host routing and permissions apply. A missing, disallowed, or unavailable agent is a limitation, not permission to substitute another stage.
+When planning is applicable and enabled in normal composition, selected and eligible for focused work, or explicitly requested, read **Native model routing** in `/useful-skills:us-workflow` without starting the full workflow. The parent inspects source, owns scope and integration, and dispatches `useful-skills:planner` with Claude Code’s `Agent` tool for a bounded read-only draft. Enabled `plan` alone does not force focused planning or re-approval. All plugin agents use `model: inherit`; host routing/permissions remain authoritative. A missing or prohibited required agent is a limitation, not permission to substitute another stage.
 
 ## Inputs
 
@@ -30,7 +30,7 @@ Keep every package specific enough for the selected Claude agent: classification
 
 ## Approval boundary
 
-After integrating the planner draft, present the complete plan once and request explicit user approval before implementation. Native plan approval is preferred when available; otherwise wait for an explicit conversational approval. A clarification answer is not approval. Once approved, in-scope implementation, verification, and repair continue without routine extra gates. A material scope change must be explained and returned to the user.
+After integrating a selected planner draft, present the complete proposed plan once and request explicit approval before implementing it. Prefer native approval; otherwise wait for explicit conversational approval. Clarification is not approval. This gate applies to the selected plan, not every focused repair just because `plan` is enabled. Approved in-scope implementation, verification, and repair continue without routine new planning or approval; keep active normal-workflow required reviews fresh. Explain material scope changes and return them to the user.
 
 Approval does not authorize commits, pushes, merges, releases, or PRs.
 
