@@ -1,11 +1,13 @@
 ---
 name: us-check-security
-description: Perform a focused, evidence-backed security audit when the user explicitly requests one, or after implementation when the profile's security-review stage is enabled. Inspect the current revision read-only; do not implement fixes, publish findings, or probe production.
+description: Perform a focused evidence-backed security audit when explicitly requested, or after implementation when security review applies in normal workflow or is selected and eligible for focused repair. Inspect read-only; do not implement fixes, publish findings, or probe production.
 ---
 
 # Security review
 
 Load `skill://us-concise` before preparing context or findings. This skill audits the current checkout; it does not authorize changes, deployment, publication, or testing against production. Disabling automatic `security-review` suppresses only that workflow stage, not an explicit security audit or another independent requirement; never report a skipped stage as completed.
+
+Apply pre-composition lane selection in `skill://us-workflow`, including on direct loading. Enabled `security-review` alone does not require an automatic audit for a clear low-risk focused correction. Actual security-sensitive changes require normal applicable stages and any independent security obligations, never a size-based exemption. Disabled/unknown stages are not activated automatically. A selected focused audit remains independent and fresh after affected changes; it does not trigger unrelated full-workflow stages.
 
 ## Scope and evidence
 
@@ -18,9 +20,9 @@ Load `skill://us-concise` before preparing context or findings. This skill audit
 
 Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `skill://us-workflow`; loading that guidance does not launch the workflow.
 
-For an enabled workflow security review, request a fresh read-only reviewer after correctness review when `review` is enabled, or after combined verification when it is disabled. Use the advertised native `security-reviewer` worker when available; otherwise use the advertised general-purpose worker with the role brief below. Use native task delegation only when the current tool advertises it. A reviewer report is evidence, not permission to change code.
+For an applicable enabled normal-workflow or selected eligible focused security review, request a fresh read-only reviewer after required/selected correctness review, otherwise after changed-surface verification. Use advertised native `security-reviewer` when available; otherwise use an advertised general-purpose worker with the role brief below only when host policy permits. Use native task delegation only when advertised. A reviewer report is evidence, not authorization to change code.
 
-Read `skill://us-check-security/references/security-reviewer-brief.md` and fill every bracketed field using the approved plan when available or authorized bounded request otherwise. If a worker cannot be dispatched, perform the same bounded analysis yourself and report that limitation; in the development workflow, author self-review does not satisfy an enabled independent-review requirement. Pass material findings to `skill://us-implement` for in-scope repair, then obtain fresh reviews only for enabled correctness and security stages after the repair. Do not loop indefinitely: after three unsuccessful repair rounds or repeated no-progress findings, preserve the work and explain the blocker.
+Read `skill://us-check-security/references/security-reviewer-brief.md` and fill every field from the applicable approved plan, prior in-scope approval, or authorized bounded request. If a worker cannot be dispatched, perform reachable bounded analysis and report that limitation; author self-review does not satisfy a required or selected independent workflow review. Pass material findings to `skill://us-implement` for authorized repairs within the active lane, rerun affected verification, then obtain fresh required/selected correctness and security reviews over affected changes. Do not restart unrelated stages or seek routine re-approval within scope. After three unsuccessful repair rounds or repeated no-progress findings, preserve work and explain the blocker.
 
 ## Findings and completion
 

@@ -19,7 +19,7 @@ Read only: `<Parent fills changed files plus required callers, tests, and config
 - Inspect the resulting source and actual consumer paths against authorized acceptance, not generic preferences.
 - Check behavioral boundaries, error paths, transitions, precedence, and whether verification proves the contract.
 - Separate acceptance failures from risks, missing evidence, and minor suggestions.
-- Do not claim security review; the parent invokes `skill://us-check-security` separately when its automatic stage is enabled or independently required.
+- Do not claim security review; the parent invokes `skill://us-check-security` separately when applicable and enabled in normal composition, selected and eligible for focused work, or independently required. This brief does not restart unselected stages.
 
 ## Acceptance
 

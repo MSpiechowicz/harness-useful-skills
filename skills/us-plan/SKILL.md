@@ -1,13 +1,13 @@
 ---
 name: us-plan
-description: Use after clarification and source inspection when the profile's plan stage is enabled, or when explicitly requested, to draft an actionable implementation plan and obtain the required approval before edits.
+description: Use after clarification and source inspection when planning applies in normal workflow, is selected for an eligible focused repair, or is explicitly requested. Draft an actionable plan and obtain approval before implementing that proposed plan.
 ---
 
 # Plan a proposed change
 
-Load `skill://us-concise`. Use available evidence from `skill://us-research` when enabled and settled decisions from `skill://us-grill-me`; inspect additional source to close concrete gaps. A plan is a human-readable handoff, not a workflow database. When automatic `plan` is disabled, this skill imposes no planner dispatch or separate plan approval on ordinary implementation; a bounded user request can authorize it, subject to independent authorization requirements. An explicitly requested plan is separate from that automatic stage.
+Load `skill://us-concise`. Apply lane selection in `skill://us-workflow` before composing stages, even on direct loading. Use applicable research and settled decisions from `skill://us-grill-me`; inspect source to close concrete gaps. A plan is a human-readable handoff, not a workflow database. An enabled plan switch alone does not require a new planner or approval for an eligible focused correction: current bounded authorization or prior in-scope approval suffices, subject to independent requirements. With no applicable automatic plan stage, a bounded user request may authorize implementation. An explicit plan request remains independent.
 
-When `plan` is enabled or a plan is explicitly requested, load the **Native model routing** guidance in `skill://us-workflow` before dispatching; that guidance does not launch the workflow. Ordinary installed startup supplies the narrowly scoped session-local policy for the bounded planner stage, so no host override, prompt file, or extra startup flag is needed. The parent first inspects source and owns scope, decomposition, and integration in the active session workspace; it never selects a repository globally. It dispatches the advertised native `planner` worker to draft a bounded implementation plan from available evidence. Existing mappings remain authoritative. The registration declares `model: @plan`; `task.agentModelOverrides.planner` takes precedence, and OMP uses native fallback only after frontmatter. Neither configuration nor frontmatter proves the running worker's model. Do not pass a model, switch models, or edit user configuration. Report configured routing separately from actual worker/model metadata when available. Stronger host policy can still prohibit the stage.
+When planning is applicable and enabled in normal composition, selected and eligible for focused work, or explicitly requested, load **Native model routing** in `skill://us-workflow` before dispatching; this does not launch the workflow. The parent inspects source and owns scope, decomposition, and integration in the active workspace, never a globally selected repository. Dispatch advertised native `planner` for a bounded read-only draft. Existing mappings remain authoritative: `model: @plan` is overridden by `task.agentModelOverrides.planner`; configured roles are not observed worker metadata. Do not edit configuration. No startup flag or host override is required for the narrow session policy, which cannot bypass stronger controls.
 
 ## Inputs
 
@@ -30,7 +30,7 @@ Keep every package specific enough for its selected implementation worker: class
 
 ## Approval boundary
 
-After integrating the planner draft, present the complete plan once and request explicit user approval before implementation. Native plan approval is preferred when available; otherwise wait for an explicit conversational approval. A clarification answer is not approval. Once approved, in-scope implementation, verification, and repair continue without routine extra gates. A material scope change must be explained and returned to the user.
+After integrating a selected planner draft, present the complete proposed plan once and request explicit approval before implementing it. Prefer native approval; otherwise wait for explicit conversational approval. Clarification is not approval. This gate applies to the selected plan, not every focused repair just because `plan` is enabled. Approved in-scope implementation, verification, and repair continue without routine new planning or approval; keep active normal-workflow required reviews fresh. Explain material scope changes and return them to the user.
 
 Approval does not authorize commits, pushes, merges, releases, or PRs.
 

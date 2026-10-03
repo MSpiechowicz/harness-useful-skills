@@ -1,11 +1,13 @@
 ---
 name: us-check-security
-description: Perform a focused, evidence-backed security audit when the user explicitly requests one, or after implementation when the Claude plugin's security_review stage is enabled. Inspect the current revision read-only; do not implement fixes, publish findings, or probe production.
+description: Perform a focused evidence-backed security audit when explicitly requested, or after implementation when security review applies in normal workflow or is selected and eligible for focused repair. Inspect read-only; do not implement fixes, publish findings, or probe production.
 ---
 
 # Security review
 
 Load `/useful-skills:us-concise` before preparing context or findings. This skill audits the current checkout; it does not authorize changes, deployment, publication, or testing against production. Disabling automatic `security_review` suppresses only that workflow stage, not an explicit security audit or another independent requirement; never report a skipped stage as completed.
+
+Apply pre-composition lane selection in `/useful-skills:us-workflow`, including on direct loading. Enabled `security_review` alone does not require an automatic audit for a clear low-risk focused correction. Actual security-sensitive changes require normal applicable stages and any independent security obligations, never a size-based exemption. Disabled/unknown stages are not activated automatically. A selected focused audit remains independent and fresh after affected changes; it does not trigger unrelated full-workflow stages.
 
 ## Scope and evidence
 
@@ -18,9 +20,9 @@ Load `/useful-skills:us-concise` before preparing context or findings. This skil
 
 Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `/useful-skills:us-workflow`; loading that guidance does not launch the workflow.
 
-For an enabled security review, dispatch a fresh `useful-skills:security-reviewer` after correctness review if enabled, otherwise after combined verification. Only if unavailable and permitted by host policy, use `useful-skills:general-purpose` with explicit read-only security instructions and report the fallback. Dispatch through Claude Code’s `Agent` tool. A report is evidence, not permission to edit.
+For an applicable enabled normal-workflow or selected eligible focused security review, dispatch a fresh `useful-skills:security-reviewer` after required/selected correctness review, otherwise after changed-surface verification. Only if unavailable and host policy permits, use `useful-skills:general-purpose` with explicit read-only security instructions and report the fallback. Use Claude Code’s `Agent` tool. A report is evidence, not permission to edit; selected reviews remain fresh after affected changes.
 
-Read `${CLAUDE_PLUGIN_ROOT}/claude/skills/us-check-security/references/security-reviewer-brief.md` and fill every bracketed field using the approved plan when available or authorized bounded request otherwise. If a worker cannot be dispatched, perform the same bounded analysis yourself and report that limitation; in the development workflow, author self-review does not satisfy an enabled independent-review requirement. Pass material findings to `/useful-skills:us-implement` for in-scope repair, then obtain fresh reviews only for enabled correctness and security stages after the repair. Do not loop indefinitely: after three unsuccessful repair rounds or repeated no-progress findings, preserve the work and explain the blocker.
+Read `${CLAUDE_PLUGIN_ROOT}/claude/skills/us-check-security/references/security-reviewer-brief.md` and fill every field from the applicable approved plan, prior in-scope approval, or authorized bounded request. If a worker cannot be dispatched, perform reachable bounded analysis and report that limitation; author self-review does not satisfy a required or selected independent workflow review. Pass material findings to `/useful-skills:us-implement` for authorized repairs within the active lane, rerun affected verification, then obtain fresh required/selected correctness and security reviews over affected changes. Do not restart unrelated stages or seek routine re-approval within scope. After three unsuccessful repair rounds or repeated no-progress findings, preserve work and explain the blocker.
 
 ## Findings and completion
 

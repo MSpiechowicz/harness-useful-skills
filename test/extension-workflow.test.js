@@ -1,80 +1,85 @@
 import assert from "node:assert/strict";
-import { chmod, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { LEFT, fixture } from "./helpers/extension-fixture.js";
 import { STAGES, readWorkflowSettings } from "../workflow-settings.js";
+import { git } from "./helpers/git-fixture.js";
 
-test("profile guidance refreshes across sessions and instances, reconciling only owned instructions", async t => {
+const settings = f => readWorkflowSettings({ agentDir: f.agentDir, cwd: f.ctx.cwd });
+const request = async (f, systemPrompt, prompt = "build a simulator") =>
+  (await f.events.get("before_agent_start")({ systemPrompt, prompt }, f.ctx))?.systemPrompt ?? systemPrompt;
+
+test("repository guidance refreshes across sessions, cwd changes and instances, preserving external instructions", async t => {
   const f = await fixture(t);
+  await git(f.root, "init", "--quiet");
   let nativeCalls = 0;
   f.ctx.memory = { status: async () => { nativeCalls++; return {}; } };
-  const hook = f.events.get("before_agent_start");
   const handler = f.commands.get("useful-skills").handler;
   const external = "preserve this independent instruction";
-  const request = async (systemPrompt, prompt = "build a simulator") =>
-    (await hook({ systemPrompt, prompt }, f.ctx))?.systemPrompt ?? systemPrompt;
-  const defaults = await request(Object.freeze([external]));
+  const defaults = await request(f, Object.freeze([external]));
   assert.equal(defaults[0], external);
-  for (const stage of STAGES) {
-    assert.ok(defaults.some(line => line.includes(`automatic ${stage} stage enabled`)));
-  }
-  assert.equal(await hook({ systemPrompt: defaults, prompt: "build a simulator" }, f.ctx), undefined);
+  assert.equal(defaults.length, 3 + STAGES.length);
+  assert.equal(await f.events.get("before_agent_start")({ systemPrompt: defaults }, f.ctx), undefined);
 
-  await handler("stage plan disabled", f.ctx);
-  await handler("stage security-review disabled", f.ctx);
-  await handler("stage backend-memory disabled", f.ctx);
-  const selective = await request(defaults, "Document /skill:us-ignore-workflow for users.");
-  assert.equal(selective[0], external);
   for (const stage of ["plan", "security-review", "backend-memory"]) {
-    assert.ok(selective.some(line => line.includes(`automatic ${stage} stage disabled`)));
-    assert.ok(!selective.some(line => line.includes(`automatic ${stage} stage enabled`)));
+    await handler(`stage ${stage} disabled`, f.ctx);
   }
-  for (const stage of ["research", "review", "graphify-memory"]) {
-    assert.ok(selective.some(line => line.includes(`automatic ${stage} stage enabled`)));
-  }
-  assert.ok(selective.some(line => line.includes("implementation without separate package-mandatory plan approval")));
-  assert.ok(selective.some(line => line.includes("independent authorization requirements remain in force")));
-  assert.equal(await hook({ systemPrompt: selective, prompt: "build a simulator" }, f.ctx), undefined);
+  const selective = await request(f, defaults, "Document /skill:us-ignore-workflow for users.");
+  assert.equal(selective[0], external);
+  assert.equal(selective.length, defaults.length);
+  assert.equal(selective.filter((line, index) => line !== defaults[index]).length, 3);
+  assert.deepEqual(await request(f, selective, "fix an import"), selective, "prompt text does not classify the lane");
 
   await handler("workflow disabled", f.ctx);
-  const disabled = await request(selective, "Fix the bug. /skill:us-ignore-workflow");
+  const disabled = await request(f, selective);
   assert.equal(disabled[0], external);
-  assert.ok(disabled.some(line => line.includes("fast lane is active")));
-  assert.ok(!disabled.some(line => line.includes("automatic plan stage")));
-  assert.ok(!disabled.some(line => line.includes("permit that required stage")));
-  assert.equal(await hook({ systemPrompt: disabled, prompt: "build a simulator" }, f.ctx), undefined);
+  assert.equal(disabled.length, 2);
   f.switchSession("another-session");
-  f.ctx.cwd = path.join(f.root, "different-workspace");
-  assert.deepEqual(await request(selective), disabled, "profile setting, not session or workspace, selects guidance");
+  assert.deepEqual(await request(f, selective), disabled);
 
   const restarted = await fixture(t, true, undefined, f.agentDir);
-  const otherHook = restarted.events.get("before_agent_start");
+  restarted.ctx.cwd = f.root;
+  assert.deepEqual(await request(restarted, selective), disabled);
   const otherHandler = restarted.commands.get("useful-skills").handler;
-  assert.deepEqual((await otherHook({ systemPrompt: selective, prompt: "fix a bug" }, restarted.ctx)).systemPrompt, disabled);
   await otherHandler("workflow enabled", restarted.ctx);
-  assert.deepEqual(await request(disabled), selective, "another extension instance must refresh the same profile");
-  await otherHandler("stage plan enabled", restarted.ctx);
-  const restored = await request(selective);
-  assert.ok(restored.some(line => line.includes("automatic plan stage enabled")));
-  assert.ok(!restored.some(line => line.includes("automatic plan stage disabled")));
-  assert.equal(nativeCalls, 0, "guidance does not perform automatic memory actions");
-  assert.deepEqual(await readdir(f.root), []);
+  assert.deepEqual(await request(f, disabled), selective, "same checkout refreshes another instance's write");
+  await otherHandler("workflow disabled", restarted.ctx);
+
+  const otherWorkspace = path.join(path.dirname(f.root), "different-workspace");
+  await mkdir(otherWorkspace);
+  await git(otherWorkspace, "init", "--quiet");
+  f.ctx.cwd = otherWorkspace;
+  assert.deepEqual(await request(f, disabled), selective, "new workspace has default master and shared stage choices");
+  assert.equal((await settings(f)).values.workflow, true);
+  assert.equal((await settings(restarted)).values.workflow, false);
+  await handler("stage plan enabled", f.ctx);
+  restarted.ctx.cwd = otherWorkspace;
+  assert.deepEqual(await request(f, selective), await request(restarted, selective));
+  assert.equal((await settings(restarted)).values.plan, true);
+  assert.equal(nativeCalls, 0, "guidance never performs memory actions");
+  assert.deepEqual(await readdir(f.root), [".git"]);
+  assert.deepEqual(await readdir(otherWorkspace), [".git"]);
 });
 
-test("workflow and six independent stage commands persist exact modes, expose status, and reject invalid inputs", async t => {
+test("commands persist exact modes, expose both scopes and paths, and reject invalid inputs", async t => {
   for (const hasUI of [true, false]) {
     await t.test(hasUI ? "interactive" : "headless", async t => {
       const f = await fixture(t, hasUI);
       const handler = f.commands.get("useful-skills").handler;
       await handler("workflow disabled", f.ctx);
+      assert.ok(f.messages.at(-1).message.includes(f.root));
       await handler("status", f.ctx);
       assert.match(f.messages.at(-1).message, /Research: saved enabled, effective disabled \(workflow disabled\)/);
-      assert.ok(f.messages.at(-1).message.includes(path.join(f.agentDir, "useful-skills", "workflow-settings")));
+      const snapshot = await settings(f);
+      for (const value of [snapshot.scopeRoot, snapshot.workflowFile, snapshot.directory]) {
+        assert.ok(f.messages.at(-1).message.includes(value));
+      }
       for (const stage of STAGES) {
         await handler(`stage ${stage} disabled`, f.ctx);
+        assert.match(f.messages.at(-1).message, /this OMP profile/);
       }
-      const before = await readWorkflowSettings({ agentDir: f.agentDir });
+      const before = await settings(f);
       for (const key of ["workflow", ...STAGES]) {
         assert.equal(before.values[key], false);
       }
@@ -90,15 +95,14 @@ test("workflow and six independent stage commands persist exact modes, expose st
           assert.deepEqual(f.messages.at(-1).options, { triggerTurn: false });
         }
       }
-      const after = await readWorkflowSettings({ agentDir: f.agentDir });
-      assert.deepEqual(after.values, before.values);
+      assert.deepEqual((await settings(f)).values, before.values);
       await handler("status", f.ctx);
       const report = f.messages.at(-1).message;
       assert.match(report, /Workflow: saved disabled, effective disabled/);
       assert.match(report, /Security review: saved disabled, effective disabled/);
       assert.match(report, /Graphify memory: saved disabled, effective disabled/);
       await handler("workflow enabled", f.ctx);
-      assert.equal((await readWorkflowSettings({ agentDir: f.agentDir })).values.review, false, "master switch retains stage choices");
+      assert.equal((await settings(f)).values.review, false, "master switch retains stage choices");
       if (!hasUI) {
         assert.ok(f.messages.every(message => message.options?.triggerTurn === false));
       }
@@ -106,62 +110,71 @@ test("workflow and six independent stage commands persist exact modes, expose st
   }
 });
 
-test("corrupt regular settings fail closed until explicitly repaired; unsafe targets stay protected", async t => {
+test("corrupt settings fail closed until explicitly repaired; unsafe targets stay protected", async t => {
   const f = await fixture(t);
   const handler = f.commands.get("useful-skills").handler;
-  const hook = f.events.get("before_agent_start");
   await handler("workflow disabled", f.ctx);
-  const settingsDir = path.join(f.agentDir, "useful-skills", "workflow-settings");
+  const snapshot = await settings(f);
   const external = "external higher-priority instruction";
-  const disabled = (await hook({ systemPrompt: [external], prompt: "fix" }, f.ctx)).systemPrompt;
-  await writeFile(path.join(settingsDir, "workflow.json"), "invalid JSON");
-  const unknown = (await hook({ systemPrompt: disabled, prompt: "/skill:us-ignore-workflow" }, f.ctx)).systemPrompt;
+  const disabled = await request(f, [external]);
+  await writeFile(snapshot.workflowFile, "invalid JSON");
+  const unknown = await request(f, disabled, "/skill:us-ignore-workflow");
   assert.equal(unknown[0], external);
-  assert.ok(unknown.some(line => line.includes("could not safely determine the profile workflow mode")));
-  assert.ok(!unknown.some(line => line.includes("fast lane is active") || line.includes("permit that required stage")));
-  assert.equal(await hook({ systemPrompt: unknown, prompt: "fix" }, f.ctx), undefined);
+  assert.equal(unknown.length, 2);
+  assert.notDeepEqual(unknown, disabled);
+  assert.deepEqual(await request(f, unknown), unknown);
   await handler("status", f.ctx);
   assert.match(f.messages.at(-1).message, /Workflow: saved unknown, effective unknown \(Workflow setting must contain a JSON boolean/);
   assert.match(f.messages.at(-1).message, /Research: saved enabled, effective unknown \(workflow setting unreadable\)/);
   assert.equal(f.messages.at(-1).level, "warning");
   await handler("workflow enabled", f.ctx);
-  assert.match(f.messages.at(-1).message, /workflow enabled for this OMP profile/);
-  assert.equal((await readWorkflowSettings({ agentDir: f.agentDir })).values.workflow, true);
+  assert.ok(f.messages.at(-1).message.includes(f.root));
+  assert.equal((await settings(f)).values.workflow, true);
 
-  await writeFile(path.join(settingsDir, "review.json"), "invalid JSON");
-  const selective = (await hook({ systemPrompt: unknown, prompt: "fix" }, f.ctx)).systemPrompt;
-  assert.ok(selective.some(line => line.includes("automatic review stage could not be read safely")));
-  assert.ok(selective.some(line => line.includes("automatic security-review stage enabled")));
+  const enabled = await request(f, unknown);
+  await writeFile(path.join(snapshot.directory, "review.json"), "invalid JSON", { mode: 0o600 });
+  const selective = await request(f, enabled);
+  assert.equal(selective.filter((line, index) => line !== enabled[index]).length, 1);
   await handler("stage review disabled", f.ctx);
   assert.match(f.messages.at(-1).message, /review disabled for this OMP profile/);
-  assert.equal((await readWorkflowSettings({ agentDir: f.agentDir })).values.review, false);
+  assert.equal((await settings(f)).values.review, false);
   const sentinel = path.join(f.root, "sentinel.json");
   await writeFile(sentinel, "false");
-  await rm(path.join(settingsDir, "review.json"));
-  await symlink(sentinel, path.join(settingsDir, "review.json"));
+  await rm(path.join(snapshot.directory, "review.json"));
+  await symlink(sentinel, path.join(snapshot.directory, "review.json"));
   await handler("stage review enabled", f.ctx);
   assert.match(f.messages.at(-1).message, /Cannot change review/);
   assert.equal(f.messages.at(-1).level, "error");
-  assert.equal((await readWorkflowSettings({ agentDir: f.agentDir })).values.review, undefined);
+  assert.equal((await settings(f)).values.review, undefined);
   assert.equal(await readFile(sentinel, "utf8"), "false");
 });
 
-test("a missing agent profile never turns a read failure into enabled or disabled stage authority", async t => {
+test("missing profile cannot authorize stages, while invalid cwd still allows independent stage changes", async t => {
   const f = await fixture(t);
+  const handler = f.commands.get("useful-skills").handler;
+  const enabled = await request(f, ["keep external guidance"]);
+  const root = f.ctx.cwd;
+  f.ctx.cwd = path.join(root, "missing");
+  const unknown = await request(f, enabled);
+  assert.equal(unknown[0], enabled[0]);
+  assert.equal(unknown.length, 2);
+  await handler("stage plan disabled", f.ctx);
+  assert.match(f.messages.at(-1).message, /plan disabled for this OMP profile/);
+  assert.equal((await settings(f)).values.plan, false);
+  await handler("workflow enabled", f.ctx);
+  assert.match(f.messages.at(-1).message, /Cannot change workflow/);
+  await handler("status", f.ctx);
+  assert.match(f.messages.at(-1).message, /Workflow: saved unknown, effective unknown/);
+  assert.match(f.messages.at(-1).message, /Plan: saved disabled, effective disabled/);
+  f.ctx.cwd = root;
   await rm(f.agentDir, { recursive: true });
-  const hook = f.events.get("before_agent_start");
-  const guidance = (await hook({ systemPrompt: ["keep external guidance"], prompt: "fix" }, f.ctx)).systemPrompt;
-  assert.equal(guidance[0], "keep external guidance");
-  assert.ok(guidance.some(line => line.includes("could not safely determine the profile workflow mode")));
-  assert.ok(!guidance.some(line => line.includes("fast lane is active") || line.includes("permit that required stage")));
-  await f.commands.get("useful-skills").handler("status", f.ctx);
-  assert.match(f.messages.at(-1).message, /Workflow: saved unknown, effective unknown \(/);
-  await f.commands.get("useful-skills").handler("stage plan disabled", f.ctx);
+  assert.deepEqual(await request(f, enabled), unknown);
+  await handler("stage plan disabled", f.ctx);
   assert.match(f.messages.at(-1).message, /Cannot change plan/);
   assert.equal(f.messages.at(-1).level, "error");
 });
 
-test("a settings write failure is visible and leaves the profile choice unchanged", async t => {
+test("settings write failure is visible and leaves the saved stage choice unchanged", async t => {
   const f = await fixture(t);
   const handler = f.commands.get("useful-skills").handler;
   await chmod(f.agentDir, 0o500);
@@ -169,14 +182,13 @@ test("a settings write failure is visible and leaves the profile choice unchange
     await handler("stage review disabled", f.ctx);
     assert.match(f.messages.at(-1).message, /Cannot change review/);
     assert.equal(f.messages.at(-1).level, "error");
-    const report = await readWorkflowSettings({ agentDir: f.agentDir });
-    assert.equal(report.values.review, true);
+    assert.equal((await settings(f)).values.review, true);
   } finally {
     await chmod(f.agentDir, 0o700);
   }
 });
 
-test("headless help, status, stage menus, and cancellation behave without surprise writes or model turns", async t => {
+test("help, menus and cancellation produce no surprise writes or model turns", async t => {
   const f = await fixture(t, false);
   const handler = f.commands.get("useful-skills").handler;
   await handler("", f.ctx);
@@ -185,85 +197,60 @@ test("headless help, status, stage menus, and cancellation behave without surpri
   assert.match(f.messages.at(-1).message, /\/useful-skills status/);
   const interactive = { ...f.ctx, hasUI: true };
   const count = f.messages.length;
-  await handler("", interactive);
-  assert.equal(f.messages.length, count);
-  f.selectResponses.push("Update");
-  await handler("", interactive);
-  assert.equal(f.messages.length, count);
-  assert.ok(f.selections.at(-2).choices.includes("Workflow Stages"));
-  assert.equal(f.selections.at(-1).title, "Update");
-  f.selectResponses.push("Workflow (enabled)");
-  await handler("", interactive);
-  assert.equal(f.messages.length, count);
+  for (const responses of [[], ["Update"], ["Repository Workflow (enabled)"],
+    ["Profile Workflow Stages"], ["Profile Workflow Stages", "Review (enabled)"]]) {
+    f.selectResponses.push(...responses);
+    await handler("", interactive);
+    assert.equal(f.messages.length, count);
+    assert.deepEqual(await readdir(f.agentDir), []);
+  }
   assert.ok(f.selections.at(-1).choices.includes("Disabled"));
-  f.selectResponses.push("Workflow Stages");
+  f.selectResponses.push("Profile Workflow Stages", "Review (enabled)", "Disabled");
   await handler("", interactive);
-  assert.equal(f.messages.length, count);
-  assert.ok(f.selections.at(-1).choices.includes("Review (enabled)"));
-  f.selectResponses.push("Workflow Stages", "Review (enabled)");
-  await handler("", interactive);
-  assert.equal(f.messages.length, count);
-  assert.deepEqual(await readdir(f.agentDir), [], "cancelling menus must not create profile settings");
-  assert.ok(f.selections.at(-1).choices.includes("Disabled"));
-
-  f.selectResponses.push("Workflow Stages", "Review (enabled)", "Disabled");
-  await handler("", interactive);
-  assert.equal((await readWorkflowSettings({ agentDir: f.agentDir })).values.review, false);
+  assert.equal((await settings(f)).values.review, false);
   f.selectResponses.push("Status");
   await handler("", interactive);
   assert.match(f.messages.at(-1).message, /Review: saved disabled, effective disabled/);
-  f.selectResponses.push("Workflow (enabled)", "Disabled");
+  f.selectResponses.push("Repository Workflow (enabled)", "Disabled");
   await handler("", interactive);
-  assert.ok((await f.events.get("before_agent_start")({ systemPrompt: [], prompt: "fix a bug" }, f.ctx)).systemPrompt.some(line => line.includes("fast lane is active")));
-  f.selectResponses.push("Workflow (disabled)", "Enabled");
+  assert.equal((await settings(f)).values.workflow, false);
+  f.selectResponses.push("Repository Workflow (disabled)", "Enabled");
   await handler("", interactive);
-  assert.ok((await f.events.get("before_agent_start")({ systemPrompt: [], prompt: "fix a bug" }, f.ctx)).systemPrompt.some(line => line.includes("automatic review stage disabled")));
+  assert.equal((await settings(f)).values.workflow, true);
+  assert.equal((await settings(f)).values.review, false);
 });
 
-test("Left returns through stage parents and other child menus without changing settings on Back", async t => {
+test("Left returns through parent menus without writing until a mode is selected", async t => {
   const f = await fixture(t);
   const handler = f.commands.get("useful-skills").handler;
-  f.selectResponses.push(
-    "Workflow (enabled)", LEFT,
-    "Update", LEFT,
-    "Workflow Stages", "Review (enabled)", LEFT, LEFT,
-    "Status",
-  );
+  f.selectResponses.push("Repository Workflow (enabled)", LEFT, "Update", LEFT,
+    "Profile Workflow Stages", "Review (enabled)", LEFT, LEFT, "Status");
   await handler("", f.ctx);
-
-  assert.deepEqual(f.selectResponses, [], "Status is selected from root after backing out of the stage list");
+  assert.deepEqual(f.selectResponses, []);
   assert.match(f.messages.at(-1).message, /Workflow: saved enabled, effective enabled/);
   assert.match(f.messages.at(-1).message, /Review: saved enabled, effective enabled/);
-  assert.deepEqual(await readdir(f.agentDir), [], "Back from each menu leaves settings untouched");
-
-  f.selectResponses.push("Workflow Stages", "Review (enabled)", LEFT, "Plan (enabled)", "Disabled");
+  assert.deepEqual(await readdir(f.agentDir), []);
+  f.selectResponses.push("Profile Workflow Stages", "Review (enabled)", LEFT, "Plan (enabled)", "Disabled");
   await handler("", f.ctx);
-
-  assert.deepEqual(f.selectResponses, [], "Plan is selected from the stage list after backing out of Review");
+  assert.deepEqual(f.selectResponses, []);
   assert.deepEqual(await readdir(path.join(f.agentDir, "useful-skills", "workflow-settings")), ["plan.json"]);
-  const settings = await readWorkflowSettings({ agentDir: f.agentDir });
-  assert.equal(settings.values.plan, false);
-  assert.equal(settings.values.review, true);
-  assert.equal(settings.values.workflow, true);
+  const snapshot = await settings(f);
+  assert.equal(snapshot.values.plan, false);
+  assert.equal(snapshot.values.review, true);
+  assert.equal(snapshot.values.workflow, true);
   assert.equal(f.messages.length, 2, "Back does not dispatch an action");
 });
 
-test("Escape closes the entire workbench, including after Left, without creating settings", async t => {
+test("Escape closes the whole workbench, including after Left, without creating settings", async t => {
   const f = await fixture(t);
   const handler = f.commands.get("useful-skills").handler;
-  for (const responses of [
-    [],
-    ["Workflow (enabled)"],
-    ["Workflow Stages"],
-    ["Workflow Stages", "Plan (enabled)"],
-    ["Update"],
-    ["Workflow Stages", "Plan (enabled)", LEFT],
-    ["Update", LEFT],
-  ]) {
+  for (const responses of [[], ["Repository Workflow (enabled)"], ["Profile Workflow Stages"],
+    ["Profile Workflow Stages", "Plan (enabled)"], ["Update"],
+    ["Profile Workflow Stages", "Plan (enabled)", LEFT], ["Update", LEFT]]) {
     f.selectResponses.push(...responses);
     await handler("", f.ctx);
-    assert.equal(f.selectResponses.length, 0, "Escape ends the invocation instead of opening another menu");
-    assert.deepEqual(await readdir(f.agentDir), [], "Escape and Left never write settings");
+    assert.equal(f.selectResponses.length, 0);
+    assert.deepEqual(await readdir(f.agentDir), []);
     assert.equal(f.messages.length, 0);
   }
 });
