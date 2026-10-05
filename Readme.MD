@@ -66,7 +66,7 @@ claude plugin install useful-skills@useful-skills-local --scope user
 
 The Claude plugin ID remains `useful-skills@useful-skills-local` in either case. Install through the marketplace, **not** `claude --plugin-dir .`: that loads the repository-root OMP `skills/` instead of the marketplace's selected Claude skills. Restart Claude Code after installation. The OMP installation, commands, and profile behavior above remain unchanged.
 
-Claude exposes 18 namespaced skills (for example, `/useful-skills:us-workflow`) and seven native agents: `planner`, `scout`, `frontend`, `backend`, `general-purpose`, `reviewer`, and `security-reviewer`. All declare `model: inherit`; Claude's selected model, permissions, and stronger host rules remain authoritative. Plugin `userConfig` has seven default-`true` booleans: `workflow`, `research`, `plan`, `review`, `security_review`, `backend_memory`, and `graphify_memory`. Configure them in Claude Code's `/plugin` configure flow or at install time with repeatable `--config key=false` flags (for example, `--config workflow=false`). Disabling `workflow` suppresses automatic stages without changing the other saved values. A **direct** `/useful-skills:us-ignore-workflow` invocation bypasses package-mandatory stages for one request only; quoted or copied text is not an opt-out. Claude has no OMP `/useful-skills` management command or OMP profile settings UI.
+Claude exposes 18 namespaced skills (for example, `/useful-skills:us-workflow`) and seven native agents: `planner`, `scout`, `frontend`, `backend`, `general-purpose`, `reviewer`, and `security-reviewer`. All declare `model: inherit`; per-role models come from a Claude-owned config file instead (see [Claude Code model roles](#claude-code-model-roles)). Permissions and stronger host rules remain authoritative. Plugin `userConfig` has seven default-`true` booleans: `workflow`, `research`, `plan`, `review`, `security_review`, `backend_memory`, and `graphify_memory`. Configure them in Claude Code's `/plugin` configure flow or at install time with repeatable `--config key=false` flags (for example, `--config workflow=false`). Disabling `workflow` suppresses automatic stages without changing the other saved values. A **direct** `/useful-skills:us-ignore-workflow` invocation bypasses package-mandatory stages for one request only; quoted or copied text is not an opt-out. Claude has no OMP `/useful-skills` management command or OMP profile settings UI.
 
 The Claude plugin adds a **separate** local stdio MCP server with five tools: `memory_status`, `memory_search`, `memory_save`, `graph_build`, and `graph_query`. Facts are project-scoped private files under Claude plugin data, searched by literal text; they are **not** OMP's native Mnemopi facts and are not shared with them. Graphify is the shared code-relationship implementation, with lazy managed setup on explicit graph actions rather than at startup. Do not save credentials, personal data, transcripts, or tool dumps; secret detection is only a backstop. A Bash pre-tool guard denies recognized dangerous commands, and successful tool responses can be redacted by `PostToolUse`; failed third-party tool responses (`PostToolUseFailure`) cannot receive equivalent redaction. These protections are not a sandbox or a substitute for Claude's permissions, user approval, or publication controls.
 
@@ -225,6 +225,28 @@ Loading a skill or defining a role does not execute that role's model. With work
 
 After installation/restart the package advertises native agents and defaults to enabled repository masters and profile stage preferences unless saved otherwise. If a required agent is absent, routing cannot resolve, or stronger host policy prohibits dispatch, report the exact limitation rather than silently replacing it with parent work or claiming its model ran. Missing runtime metadata is not proof of a routing failure; report only observed metadata. Eligible focused inline repair remains allowed. A permitted fallback reports actual routing, not successful requested-role execution. See [Native model routing](skills/us-workflow/SKILL.md#native-model-routing); reading it does not launch the workflow.
 
+
+### Claude Code model roles
+
+Claude Code does not read OMP's `config.yml`. Its role models live in a Claude-owned file, `~/.claude/useful-skills/models.yml` (under `$CLAUDE_CONFIG_DIR` when set). The plugin's `SessionStart` hook creates it with these defaults the first time Claude Code starts after installation:
+
+```yaml
+modelRoles:
+  research: claude-opus-5-5:high
+  frontend: claude-sonnet-5-5:high
+  backend: claude-opus-5-5:high
+  implementation: claude-sonnet-5-5:high
+  review: claude-sonnet-5-5:medium
+  security: claude-opus-5-5:high
+  plan: claude-opus-5-5:high
+  default: claude-opus-5-5:medium
+```
+
+A selector is `<model>[:<effort>]`: a Claude model ID or alias (`opus`, `sonnet`, `haiku`, `fable`, `inherit`) and an optional effort (`low`, `medium`, `high`, `xhigh`, `max`). An OMP-style `anthropic/` prefix is accepted, so the same values work in both hosts. A missing role uses `default`. `default` does not change the main session model; choose that with Claude's `/model`.
+
+Claude Code cannot apply plugin options to plugin agent frontmatter, and the `Agent` tool accepts only model aliases without effort. So on each session start the hook generates user-level agents `us-planner`, `us-scout`, `us-frontend`, `us-backend`, `us-general-purpose`, `us-reviewer`, and `us-security-reviewer` in `~/.claude/agents/useful-skills-*.md`. Each one copies the bundled agent's instructions and tools and sets the configured `model` and `effort`. The hook tells the session to dispatch them in place of the `useful-skills:*` agents. Role mapping matches OMP: `scout` ← `research`, `planner` ← `plan`, `general-purpose` ← `implementation`, `reviewer` ← `review`, `security-reviewer` ← `security`.
+
+Claude Code loads agents at startup, so edits to `models.yml` take effect in the **next** session; the first session after installation still uses the inherited-model plugin agents. An invalid file is reported and leaves existing generated agents unchanged. A file at one of those paths that Useful Skills did not generate is never overwritten; that role falls back to its plugin agent. Uninstalling the plugin does not remove the generated files; delete `~/.claude/agents/useful-skills-*.md` and `~/.claude/useful-skills/` yourself.
 
 Some hosts require parent-only planning or prohibit delegating a single work package. Those higher-priority policies still block the corresponding stage; this package cannot override them. Report the conflict; do not treat installation, restart, or a host-configuration change as a bypass.
 

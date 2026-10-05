@@ -3,11 +3,13 @@ import { fileURLToPath } from "node:url";
 import { effectiveWorkflow } from "../workflow-policy.js";
 import { dangerousCommandReason, redactText } from "../resources.js";
 import { fastLaneContext, workflowContext } from "./context.js";
+import { claudeConfigDir, modelRoutingContext, syncRoleAgents } from "./models.js";
 import { readClaudeSettings } from "./settings.js";
 
 const IGNORE_SKILL = "useful-skills:us-ignore-workflow";
 const MAX_INPUT_BYTES = 8 * 1024 * 1024;
 const INVALID_INPUT = "Useful Skills hook received invalid event input.";
+const MODELS_UNAVAILABLE = "Useful Skills could not read or write its Claude model-role configuration. Dispatch the `useful-skills:<agent>` subagents named by the skills; they inherit the session model.";
 
 function additionalContext(event, text) {
   return { hookSpecificOutput: { hookEventName: event, additionalContext: text } };
@@ -64,6 +66,10 @@ export function handleHook(input, environment = process.env) {
   }
 
   switch (input.hook_event_name) {
+    case "SessionStart": {
+      // Role agents are generated outside the plugin because plugin agent frontmatter cannot read user options.
+      return additionalContext("SessionStart", modelRoutingContext(syncRoleAgents({ configDir: claudeConfigDir(environment) })));
+    }
     case "UserPromptSubmit": {
       const policy = effectiveWorkflow(readClaudeSettings(environment));
       return additionalContext("UserPromptSubmit", workflowContext(policy));
@@ -115,7 +121,7 @@ async function readInput() {
 
 async function main() {
   const expected = process.argv[2];
-  if (!["UserPromptSubmit", "UserPromptExpansion", "PreToolUse", "PostToolUse"].includes(expected)) {
+  if (!["SessionStart", "UserPromptSubmit", "UserPromptExpansion", "PreToolUse", "PostToolUse"].includes(expected)) {
     process.exitCode = 2;
     return;
   }
@@ -136,6 +142,8 @@ async function main() {
   } catch {
     if (expected === "PreToolUse") {
       process.stdout.write(`${JSON.stringify(deny(INVALID_INPUT))}\n`);
+    } else if (expected === "SessionStart") {
+      process.stdout.write(`${JSON.stringify(additionalContext(expected, MODELS_UNAVAILABLE))}\n`);
     } else if (expected === "UserPromptSubmit") {
       process.stdout.write(`${JSON.stringify(additionalContext(expected, workflowContext({ workflow: { effective: "unknown" } })))}\n`);
     } else {
