@@ -9,6 +9,19 @@
   "license": "GPL-3.0-only",
   "homepage": "https://github.com/MSpiechowicz/harness-useful-skills",
   "repository": "https://github.com/MSpiechowicz/harness-useful-skills",
+  "documentationUrl": "https://github.com/MSpiechowicz/harness-useful-skills/blob/main/plugins/claude/README.md",
+  "privacyPolicyUrl": "https://github.com/MSpiechowicz/harness-useful-skills/blob/main/plugins/claude/README.md#what-this-plugin-runs-and-sends",
+  "supportUrl": "https://github.com/MSpiechowicz/harness-useful-skills/issues",
+  "keywords": [
+    "workflow",
+    "code-review",
+    "security-review",
+    "planning",
+    "subagents",
+    "memory",
+    "knowledge-graph",
+    "skills"
+  ],
   "agents": [
     "./claude/agents/planner.md",
     "./claude/agents/scout.md",

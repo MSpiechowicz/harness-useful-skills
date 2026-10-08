@@ -15,7 +15,6 @@ if (process.argv.length > 3 || (process.argv[2] && !check)) {
   throw new Error('Usage: node scripts/build-claude-plugin.js [--check]');
 }
 
-const REPOSITORY = 'https://github.com/MSpiechowicz/harness-useful-skills';
 const PRESERVED = new Set(['README.md']);
 
 // Every file shipped to Claude. Skills are the only walked folders; nothing else is matched by pattern.
@@ -153,18 +152,14 @@ function skillNames() {
   return listed;
 }
 
-/** The root manifest plus directory-submission fields, keeping the root field order. */
+/** The root manifest plus the bundle's explicit skill list, keeping the root field order. */
 function manifest(skills) {
   const generated = {};
   for (const [key, value] of Object.entries(readJson('.claude-plugin/plugin.json'))) {
     generated[key] = value;
-    if (key === 'license') {
-      generated.homepage = REPOSITORY;
-      generated.repository = REPOSITORY;
-    }
     if (key === 'agents') generated.skills = skills.map(name => `./claude/skills/${name}/`);
   }
-  if (!generated.homepage || !generated.skills) throw new Error('Root plugin manifest needs license and agents fields');
+  if (!generated.homepage || !generated.skills) throw new Error('Root plugin manifest needs homepage and agents fields');
   return generated;
 }
 
