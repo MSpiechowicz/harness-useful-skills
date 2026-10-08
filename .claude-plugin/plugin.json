@@ -15,57 +15,53 @@
     "./claude/agents/reviewer.md",
     "./claude/agents/security-reviewer.md"
   ],
-  "hooks": "./claude/hooks.json",
   "mcpServers": {
     "useful_skills": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/claude/mcp-server.js"],
-      "env": {
-        "CLAUDE_PLUGIN_DATA": "${CLAUDE_PLUGIN_DATA}"
-      }
+      "args": ["${CLAUDE_PLUGIN_ROOT}/claude/mcp-server.js"]
     }
   },
   "userConfig": {
     "workflow": {
       "type": "boolean",
       "title": "Development workflow",
-      "description": "Enable skill-led development workflow stages.",
+      "description": "Enable skill-led development workflow stages. A saved /useful-skills setting overrides this.",
       "default": true
     },
     "research": {
       "type": "boolean",
       "title": "Research stage",
-      "description": "Research relevant source and behavior before implementation.",
+      "description": "Research relevant source and behavior before implementation. A saved /useful-skills setting overrides this.",
       "default": true
     },
     "plan": {
       "type": "boolean",
       "title": "Plan stage",
-      "description": "Prepare a plan and request approval before implementation.",
+      "description": "Prepare a plan and request approval before implementation. A saved /useful-skills setting overrides this.",
       "default": true
     },
     "review": {
       "type": "boolean",
       "title": "Correctness review stage",
-      "description": "Review authorized changes for correctness.",
+      "description": "Review authorized changes for correctness. A saved /useful-skills setting overrides this.",
       "default": true
     },
     "security_review": {
       "type": "boolean",
       "title": "Security review stage",
-      "description": "Review authorized changes for security issues.",
+      "description": "Review authorized changes for security issues. A saved /useful-skills setting overrides this.",
       "default": true
     },
     "backend_memory": {
       "type": "boolean",
       "title": "Backend memory stage",
-      "description": "Use local memory during development workflows.",
+      "description": "Use local memory during development workflows. A saved /useful-skills setting overrides this.",
       "default": true
     },
     "graphify_memory": {
       "type": "boolean",
       "title": "Graph memory stage",
-      "description": "Use project knowledge graph during development workflows.",
+      "description": "Use project knowledge graph during development workflows. A saved /useful-skills setting overrides this.",
       "default": true
     }
   }

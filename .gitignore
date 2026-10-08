@@ -4,3 +4,5 @@ node_modules/
 .omp/
 
 tasks/
+.claude-plugin/types/
+/tsconfig.json

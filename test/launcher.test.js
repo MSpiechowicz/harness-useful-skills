@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, rm, symlink } from "node:fs/promises";
 import { promisify } from "node:util";
 import os from "node:os";
 import path from "node:path";
@@ -11,9 +11,9 @@ import { formatResources, parseCatalogArguments } from "../resources.js";
 const exec = promisify(execFile);
 const launcher = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../useful-skills");
 
-async function cli(args, options = {}) {
+async function cli(args, options = {}, entry = launcher) {
   try {
-    return { code: 0, ...await exec(process.execPath, [launcher, ...args], { timeout: 10_000, ...options }) };
+    return { code: 0, ...await exec(process.execPath, [entry, ...args], { timeout: 10_000, ...options }) };
   } catch (error) {
     return { code: error.code, stdout: error.stdout, stderr: error.stderr };
   }
@@ -55,4 +55,16 @@ test("launcher doctor and help stay passive, omit retired naming, and report arg
   assert.equal((await cli(["install", "--scope"])).code, 2);
   assert.equal((await cli(["update", "check", "--scope", "user"])).code, 2);
   assert.equal((await cli(["install", "--unknown"])).code, 2);
+});
+
+test("launcher runs when invoked through a symlinked bin path", async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "us-launcher-link-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const link = path.join(directory, "useful-skills");
+  await symlink(launcher, link);
+
+  const help = await cli(["--help"], {}, link);
+  assert.equal(help.code, 0);
+  assert.match(help.stdout, /Usage:/);
+  assert.equal((await cli(["unknown"], {}, link)).code, 2);
 });

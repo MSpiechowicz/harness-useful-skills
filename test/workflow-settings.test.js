@@ -180,3 +180,24 @@ test("oversized settings remain unknown and readable stage files survive reposit
   assert.equal((await stat(file)).mode & 0o777, 0o644);
   assert.equal((await stat(f.directory)).mode & 0o777, 0o700);
 });
+
+test("sources report whether each value came from a saved file, a missing file, or an error", async t => {
+  const f = await fixture(t);
+  assert.deepEqual((await readWorkflowSettings(f.options)).sources,
+    Object.fromEntries(keys.map(key => [key, "default"])));
+
+  await writeWorkflowSetting({ ...f.options, key: "workflow", enabled: true });
+  await writeWorkflowSetting({ ...f.options, key: "plan", enabled: false });
+  await writeFile(path.join(f.directory, "review.json"), "not json", { mode: 0o600 });
+  const saved = await readWorkflowSettings(f.options);
+  assert.deepEqual(saved.sources, { workflow: "file", research: "default", plan: "file", review: "error",
+    "security-review": "default", "backend-memory": "default", "graphify-memory": "default" });
+
+  const unscoped = await readWorkflowSettings({ agentDir: f.agentDir });
+  assert.equal(unscoped.sources.workflow, "error");
+  assert.equal(unscoped.sources.plan, "file");
+
+  await chmod(path.dirname(f.directory), 0o755);
+  const unsafe = await readWorkflowSettings(f.options);
+  assert.ok(keys.every(key => unsafe.sources[key] === "error"));
+});

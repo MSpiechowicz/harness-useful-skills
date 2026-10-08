@@ -66,7 +66,7 @@ claude plugin install useful-skills@useful-skills-local --scope user
 
 The Claude plugin ID remains `useful-skills@useful-skills-local` in either case. Install through the marketplace, **not** `claude --plugin-dir .`: that loads the repository-root OMP `skills/` instead of the marketplace's selected Claude skills. Restart Claude Code after installation. The OMP installation, commands, and profile behavior above remain unchanged.
 
-Claude exposes 18 namespaced skills (for example, `/useful-skills:us-workflow`) and seven native agents: `planner`, `scout`, `frontend`, `backend`, `general-purpose`, `reviewer`, and `security-reviewer`. All declare `model: inherit`; per-role models come from a Claude-owned config file instead (see [Claude Code model roles](#claude-code-model-roles)). Permissions and stronger host rules remain authoritative. Plugin `userConfig` has seven default-`true` booleans: `workflow`, `research`, `plan`, `review`, `security_review`, `backend_memory`, and `graphify_memory`. Configure them in Claude Code's `/plugin` configure flow or at install time with repeatable `--config key=false` flags (for example, `--config workflow=false`). Disabling `workflow` suppresses automatic stages without changing the other saved values. A **direct** `/useful-skills:us-ignore-workflow` invocation bypasses package-mandatory stages for one request only; quoted or copied text is not an opt-out. Claude has no OMP `/useful-skills` management command or OMP profile settings UI.
+Claude exposes 18 namespaced skills (for example, `/useful-skills:us-workflow`) and seven native agents: `planner`, `scout`, `frontend`, `backend`, `general-purpose`, `reviewer`, and `security-reviewer`. All declare `model: inherit`; per-role models come from a Claude-owned config file instead (see [Claude Code model roles](#claude-code-model-roles)). Permissions and stronger host rules remain authoritative. Plugin `userConfig` has seven default-`true` booleans: `workflow`, `research`, `plan`, `review`, `security_review`, `backend_memory`, and `graphify_memory`. Configure them in Claude Code's `/plugin` configure flow or at install time with repeatable `--config key=false` flags (for example, `--config workflow=false`). Disabling `workflow` suppresses automatic stages without changing the other saved values. A **direct** `/useful-skills:us-ignore-workflow` invocation bypasses package-mandatory stages for one request only; quoted or copied text is not an opt-out. With a recent Claude Code that supports mods, `/useful-skills` is also available: without arguments it opens a menu (**Settings**, **Status**, **Browse**, **Help**); with arguments it runs the commands in [Management and optional library](#management-and-optional-library). Saved settings mirror OMP's layout under the Claude config directory (`$CLAUDE_CONFIG_DIR` or `~/.claude`): the per-repository workflow master is `useful-skills/workflow-settings/repositories/<sha256(scopeRoot)>/workflow.json` (same repository scope rules as OMP) and the six profile-wide stage switches are `useful-skills/workflow-settings/<stage>.json`, all private. For each setting a saved file wins, then the `/plugin` option, then enabled; an unreadable or unsafe saved file makes that setting unknown with no fallback. `/plugin` options remain fallbacks, and the only control on Claude Code versions without mods.
 
 The Claude plugin adds a **separate** local stdio MCP server with five tools: `memory_status`, `memory_search`, `memory_save`, `graph_build`, and `graph_query`. Facts are project-scoped private files under Claude plugin data, searched by literal text; they are **not** OMP's native Mnemopi facts and are not shared with them. Graphify is the shared code-relationship implementation, with lazy managed setup on explicit graph actions rather than at startup. Do not save credentials, personal data, transcripts, or tool dumps; secret detection is only a backstop. A Bash pre-tool guard denies recognized dangerous commands, and successful tool responses can be redacted by `PostToolUse`; failed third-party tool responses (`PostToolUseFailure`) cannot receive equivalent redaction. These protections are not a sandbox or a substitute for Claude's permissions, user approval, or publication controls.
 
@@ -252,7 +252,7 @@ Some hosts require parent-only planning or prohibit delegating a single work pac
 
 ## Management and optional library
 
-These management commands run in OMP, not Claude Code:
+These management commands run in OMP. Claude Code supports them as `/useful-skills ...` (needs a Claude Code version with mods) with these differences: `update` prints `claude plugin update useful-skills@useful-skills-local` followed by `/reload-plugins` guidance instead of checking or installing, and `graph` points to the `graph_build`/`graph_query` MCP tools instead of running `graph test`. `status` shows saved and effective values with their source (`file`, `option`, `default`, or `error`); `status --json` is also available.
 
 ```text
 /useful-skills list [query]
@@ -403,8 +403,8 @@ The existing single-plugin release transaction is unchanged: CI checks precede t
 
 ```bash
 node scripts/render-claude-skills.js --check
-node --test
-node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80
+node --test 'test/**/*.test.js'
+node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 'test/**/*.test.js'
 python -m unittest discover -s test -p 'test_*.py'
 node --check extension.js
 ./useful-skills list

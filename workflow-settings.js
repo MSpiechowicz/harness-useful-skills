@@ -195,7 +195,7 @@ async function readSetting(directory, key) {
     }
   } catch (error) {
     if (error?.code === "ENOENT") {
-      return { value: true };
+      return { value: true, source: "default" };
     }
     if (error?.code) {
       throw new Error("Cannot inspect workflow setting safely.");
@@ -221,7 +221,7 @@ async function readSetting(directory, key) {
       throw new Error("Workflow setting must contain a JSON boolean.");
     }
 
-    return { value };
+    return { value, source: "file" };
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new Error("Workflow setting must contain a JSON boolean.");
@@ -241,13 +241,16 @@ export async function readWorkflowSettings({ agentDir, cwd } = {}) {
   const directory = settingDirectory(profile);
   const values = Object.fromEntries(KEYS.map(key => [key, true]));
   const errors = {};
-  const snapshot = { directory, scopeRoot: undefined, workflowFile: undefined, values, errors };
+  // Per key: "file" (read from an existing file), "default" (no file) or "error".
+  const sources = Object.fromEntries(KEYS.map(key => [key, "default"]));
+  const snapshot = { directory, scopeRoot: undefined, workflowFile: undefined, values, errors, sources };
   try {
     snapshot.scopeRoot = await scopeRoot(cwd);
     snapshot.workflowFile = path.join(repositoryDirectory(directory, snapshot.scopeRoot), "workflow.json");
   } catch (error) {
     values.workflow = undefined;
     errors.workflow = error.message;
+    sources.workflow = "error";
   }
 
   try {
@@ -258,27 +261,30 @@ export async function readWorkflowSettings({ agentDir, cwd } = {}) {
     for (const key of KEYS) {
       values[key] = undefined;
       errors[key] = error.message;
+      sources[key] = "error";
     }
     return snapshot;
   }
 
   for (const key of STAGES) {
     try {
-      values[key] = (await readSetting(directory, key)).value;
+      ({ value: values[key], source: sources[key] } = await readSetting(directory, key));
     } catch (error) {
       values[key] = undefined;
       errors[key] = error.message;
+      sources[key] = "error";
     }
   }
   if (snapshot.workflowFile) {
     try {
       const local = path.dirname(snapshot.workflowFile);
       if (await readAncestor(path.dirname(local)) && await readAncestor(local)) {
-        values.workflow = (await readSetting(local, "workflow")).value;
+        ({ value: values.workflow, source: sources.workflow } = await readSetting(local, "workflow"));
       }
     } catch (error) {
       values.workflow = undefined;
       errors.workflow = error.message;
+      sources.workflow = "error";
     }
   }
 

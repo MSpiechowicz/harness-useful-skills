@@ -1,10 +1,11 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { effectiveWorkflow } from "../workflow-policy.js";
 import { dangerousCommandReason, redactText } from "../resources.js";
 import { fastLaneContext, workflowContext } from "./context.js";
 import { claudeConfigDir, modelRoutingContext, syncRoleAgents } from "./models.js";
-import { readClaudeSettings } from "./settings.js";
+import { readClaudeSettings, readClaudeWorkflow } from "./settings.js";
 
 const IGNORE_SKILL = "useful-skills:us-ignore-workflow";
 const MAX_INPUT_BYTES = 8 * 1024 * 1024;
@@ -26,7 +27,7 @@ function deny(reason) {
 }
 
 /** Only the host's command-expansion metadata can attest direct skill invocation. */
-function directIgnoreInvocation(input) {
+export function directIgnoreInvocation(input) {
   return input.expansion_type === "slash_command"
     && input.command_source === "plugin"
     && input.command_name === IGNORE_SKILL;
@@ -59,8 +60,11 @@ function redactValue(value) {
   return value;
 }
 
-/** A hook response, or undefined to leave normal Claude processing unchanged. */
-export function handleHook(input, environment = process.env) {
+/**
+ * A hook response, or undefined to leave normal Claude processing unchanged.
+ * `settings` is a pre-read workflow snapshot; without it prompt hooks use plugin options only.
+ */
+export function handleHook(input, environment = process.env, { settings } = {}) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     return undefined;
   }
@@ -71,14 +75,14 @@ export function handleHook(input, environment = process.env) {
       return additionalContext("SessionStart", modelRoutingContext(syncRoleAgents({ configDir: claudeConfigDir(environment) })));
     }
     case "UserPromptSubmit": {
-      const policy = effectiveWorkflow(readClaudeSettings(environment));
+      const policy = effectiveWorkflow(settings ?? readClaudeSettings(environment));
       return additionalContext("UserPromptSubmit", workflowContext(policy));
     }
     case "UserPromptExpansion": {
       if (!directIgnoreInvocation(input)) {
         return undefined;
       }
-      const policy = effectiveWorkflow(readClaudeSettings(environment), { explicitOptOut: true });
+      const policy = effectiveWorkflow(settings ?? readClaudeSettings(environment), { explicitOptOut: true });
       const text = policy.workflow.effective === "disabled" ? fastLaneContext() : workflowContext(policy);
       return additionalContext("UserPromptExpansion", text);
     }
@@ -135,7 +139,14 @@ async function main() {
       process.stdout.write(`${JSON.stringify(deny(INVALID_INPUT))}\n`);
       return;
     }
-    const result = handleHook(input);
+
+    // Saved repository/profile settings are read only for hooks that report workflow state.
+    let settings;
+    if (expected === "UserPromptSubmit" || (expected === "UserPromptExpansion" && directIgnoreInvocation(input))) {
+      settings = await readClaudeWorkflow({ environment: process.env, cwd: input.cwd });
+    }
+
+    const result = handleHook(input, process.env, { settings });
     if (result) {
       process.stdout.write(`${JSON.stringify(result)}\n`);
     }
@@ -153,6 +164,20 @@ async function main() {
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+/** True when Node runs this file as the entry script, including through a symlinked install path. */
+function invokedDirectly() {
+  if (!process.argv[1]) {
+    return false;
+  }
+
+  const self = fileURLToPath(import.meta.url);
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(self);
+  } catch {
+    return process.argv[1] === self;
+  }
+}
+
+if (invokedDirectly()) {
   await main();
 }
