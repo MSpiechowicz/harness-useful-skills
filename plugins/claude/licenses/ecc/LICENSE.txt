@@ -1,6 +1,6 @@
 Everything Claude Code (ECC) resources
 
-This repository vendors selected resource files from:
+Owned skills in this repository incorporate prompt practices adapted from:
 https://github.com/affaan-m/ECC
 
 Upstream version: 2.2.2
@@ -8,9 +8,10 @@ Upstream commit: 934195f955cf0da847d59fcd6f68856bce112d8b
 License source verified at:
 https://raw.githubusercontent.com/affaan-m/ECC/934195f955cf0da847d59fcd6f68856bce112d8b/LICENSE
 
-The vendored ECC resources are adapted for Oh My Pi. The OMP extension,
-launcher, updater, and local Useful Skills remain governed by this repository's
-GPL-3.0-only license. No ECC adapter for another harness is included.
+The adapted ECC prompt practices are covered by the MIT license below. The
+OMP extension, Claude plugin, launcher, updater, and local Useful Skills remain
+governed by this repository's GPL-3.0-only license. No ECC resource files are
+vendored.
 
 MIT License
 

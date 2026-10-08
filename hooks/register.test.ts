@@ -120,10 +120,10 @@ describe('useful-skills interactive menu', () => {
 
     expect(result.text).toBe('doctor output')
     expect(asked[0]!.options).toEqual(['Settings', 'Status', 'Browse', 'Help'])
-    expect(asked[1]!.options).toEqual(['List', 'Libraries', 'Doctor…', 'Back'])
+    expect(asked[1]!.options).toEqual(['List', 'Doctor…', 'Back'])
     expect(asked[2]!.options).toEqual(['Settings', 'Status', 'Browse', 'Help'])
     expect(asked[4]!.options).toEqual(['Set up memory', 'Check only', 'Back'])
-    expect(asked[5]!.options).toEqual(['List', 'Libraries', 'Doctor…', 'Back'])
+    expect(asked[5]!.options).toEqual(['List', 'Doctor…', 'Back'])
     expect(calls.at(-1)!.argv.slice(2)).toEqual(['doctor'])
   })
 

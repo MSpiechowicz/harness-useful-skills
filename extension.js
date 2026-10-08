@@ -44,13 +44,12 @@ const HELP = [
   "/useful-skills stage <research|plan|review|security-review|backend-memory|graphify-memory> enabled|disabled — set an independent automatic stage for this profile.",
   "/useful-skills status — read repository master and profile stage settings, paths, and errors.",
   "/skill:us-ignore-workflow — use the fast lane for one explicit request without changing saved settings.",
-  "/useful-skills library list [skills|commands|agents|rules] [query] — opt-in ECC references.",
   "/useful-skills doctor — inspect resources and memory availability without setup.",
   "/useful-skills graph test — explicitly build this workspace graph and run a diagnostic query.",
   "/useful-skills update check|install — check or install marketplace updates.",
   "Memory: us_memory handles agent actions; native /memory is unchanged.",
   "Graphify setup is lazy on explicit build/query or graph test. No startup workflow dependency.",
-  "Terminal: ./useful-skills list | doctor | library list [query] | update check|install",
+  "Terminal: ./useful-skills list | doctor | update check|install",
 ].join("\n");
 
 export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) {
@@ -182,11 +181,11 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
   }
 
   async function doctor(ctx) {
-    const [core, library, memory] = await Promise.all([
-      resourceInventory(), resourceInventory({ source: "library" }),
+    const [core, memory] = await Promise.all([
+      resourceInventory(),
       memoryAction({ action: "status" }, { cwd: ctx.cwd, agentDir: pi.pi.getAgentDir(), memory: ctx.memory }),
     ]);
-    notify(ctx, formatDoctor({ core, library, safety: safetyEnabled(), memory }));
+    notify(ctx, formatDoctor({ core, safety: safetyEnabled(), memory }));
   }
 
   async function workbench(args, ctx) {
@@ -229,7 +228,7 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
           if (menu === "root") {
             const choice = await ctx.ui.select(
               "Useful Skills",
-              ["List", "Libraries", "Doctor", "Status", workflowChoice, "Profile Workflow Stages", "Update", "Help"],
+              ["List", "Doctor", "Status", workflowChoice, "Profile Workflow Stages", "Update", "Help"],
               { helpText: "Esc Close" },
             );
             if (!choice) {
@@ -243,7 +242,7 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
             } else if (choice === "Update") {
               menu = "update";
             } else {
-              command = { List: "list", Libraries: "library list", Doctor: "doctor", Status: "status", Help: "help" }[choice];
+              command = { List: "list", Doctor: "doctor", Status: "status", Help: "help" }[choice];
             }
           } else if (menu === "stages") {
             const { choice, left } = await selectChild("Profile Workflow Stages", stageChoices);
@@ -330,15 +329,15 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
       if (tokens[0] === "update" && tokens.length === 2 && ["check", "install"].includes(tokens[1])) {
         return await update(tokens[1], ctx);
       }
-      const { kind, query, source } = parseCatalogArguments(tokens);
-      notify(ctx, formatResources(kind, await listResources(kind, { query, source }), query, source));
+      const { kind, query } = parseCatalogArguments(tokens);
+      notify(ctx, formatResources(kind, await listResources(kind, { query }), query));
     } catch (error) {
       notify(ctx, `${error.message}\n${HELP}`, "warning");
     }
   }
 
   pi.registerCommand("useful-skills", {
-    description: "Browse skills, references, health, graph diagnostics, and updates",
+    description: "Browse skills, health, graph diagnostics, and updates",
     handler: workbench,
   });
 

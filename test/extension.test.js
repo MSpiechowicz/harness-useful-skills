@@ -130,7 +130,7 @@ test("memory approval tiers keep observation readable and mutations gated", asyn
   assert.equal(approval(undefined), "exec");
 });
 
-test("catalog accepts whitespace queries, reference URIs, and no obsolete aliases", async t => {
+test("catalog accepts whitespace queries and no obsolete aliases", async t => {
   const f = await fixture(t);
   const handler = f.commands.get("useful-skills").handler;
   await handler("  list   us-workflow  ", f.ctx);
@@ -138,8 +138,7 @@ test("catalog accepts whitespace queries, reference URIs, and no obsolete aliase
   await handler("list us-ignore-workflow", f.ctx);
   assert.match(f.messages.at(-1).message, /\/skill:us-ignore-workflow/);
   await handler("library\tlist skills tdd-workflow", f.ctx);
-  assert.match(f.messages.at(-1).message, /skill:\/\/us-library\/references\/ecc\/skills\/tdd-workflow\/SKILL.md/);
-  assert.doesNotMatch(f.messages.at(-1).message, /\/skill:tdd-workflow/);
+  assert.match(f.messages.at(-1).message, /Expected list/);
   await handler("memory save nope", f.ctx);
   assert.match(f.messages.at(-1).message, /Expected list/);
   assert.deepEqual(await readdir(f.root), []);

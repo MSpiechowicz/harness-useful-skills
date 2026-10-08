@@ -4,7 +4,7 @@ import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 
 const COMMAND_TIMEOUT_MS = 60_000
 const DOCTOR_TIMEOUT_MS = 600_000
-const MAX_TOKENS = 8
+const MAX_ARGUMENTS = 8
 
 const NODE_REQUIRED = 'Useful Skills needs Node.js 22+ on PATH to run /useful-skills.'
 const FAILED = 'Useful Skills could not complete /useful-skills.'
@@ -15,10 +15,10 @@ const WRITE_REFUSED = 'Workflow settings can only be changed from your own promp
 const DOCTOR_PREPARING = 'Useful Skills doctor: preparing memory; first setup can take several minutes'
 const DOCTOR_TIMED_OUT = 'Useful Skills doctor did not finish within 10 minutes; setup may be partial — run it again.'
 const USAGE = [
-  'Usage: /useful-skills [status|workflow|stage|list|library|doctor|help]',
+  'Usage: /useful-skills [status|workflow|stage|list|doctor|help]',
   'Run /useful-skills help for the full list.',
 ].join('\n')
-const TOO_MANY_ARGUMENTS = [`Too many arguments (at most ${MAX_TOKENS}).`, USAGE].join('\n')
+const TOO_MANY_ARGUMENTS = [`Too many arguments (at most ${MAX_ARGUMENTS}).`, USAGE].join('\n')
 
 // `doctor` alone prepares memory (writes); `doctor --check` only reports.
 const DOCTOR_SETUP: readonly string[] = ['doctor']
@@ -39,7 +39,7 @@ const OPTION_ENV: Readonly<Record<string, string>> = {
 const WRITE_ORIGINS: ReadonlySet<string> = new Set(['composer', 'sdk'])
 
 // Every other subcommand can change saved settings; `doctor` from these origins only checks.
-const READ_ONLY: ReadonlySet<string> = new Set(['status', 'help', 'list', 'library', 'doctor', 'update', 'graph'])
+const READ_ONLY: ReadonlySet<string> = new Set(['status', 'help', 'list', 'doctor', 'update', 'graph'])
 
 type Stage = { key: string; label: string }
 
@@ -247,7 +247,6 @@ function buildMenu(saved: Record<string, string>): Menu {
     header: 'Browse',
     choices: [
       { label: 'List', command: ['list'] },
-      { label: 'Libraries', command: ['library', 'list'] },
       { label: 'Doctor…', menu: doctor },
       { label: 'Back', back: true },
     ],
@@ -308,7 +307,7 @@ export const register: Register = (on, options) => {
     await $.command.register({
       name: 'useful-skills',
       description: 'Workflow settings, status, skills, and health for Useful Skills',
-      argumentHint: '[status|workflow|stage|list|library|doctor|help]',
+      argumentHint: '[status|workflow|stage|list|doctor|help]',
     })
 
     return started
@@ -329,7 +328,7 @@ export const register: Register = (on, options) => {
     try {
       const tokens = e.args.trim().split(/\s+/).filter(Boolean)
 
-      if (tokens.length > MAX_TOKENS) {
+      if (tokens.length > MAX_ARGUMENTS) {
         return { text: TOO_MANY_ARGUMENTS }
       }
 

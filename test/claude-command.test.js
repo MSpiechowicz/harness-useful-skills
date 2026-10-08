@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { cp, mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, symlink } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -189,7 +189,7 @@ test("arguments are bounded and unknown commands show help with a failure", asyn
     ["update"],
     ["update", "now"],
     ["library"],
-    ["library", "agents"],
+    ["library", "list"],
   ]) {
     const { text, exitCode } = await f.run(argv);
     assert.notEqual(exitCode, 0, JSON.stringify(argv));
@@ -197,9 +197,12 @@ test("arguments are bounded and unknown commands show help with a failure", asyn
     assert.doesNotMatch(text, /\n\s+at /);
   }
 
-  for (const argv of [["library"], ["library", "agents"], ["status", "--yaml"]]) {
+  for (const argv of [["library"], ["library", "list"], ["status", "--yaml"]]) {
     assert.equal((await f.run(argv)).exitCode, 2, JSON.stringify(argv));
   }
+
+  const library = await f.run(["library", "list", "agents", "architect"]);
+  assert.match(library.text, /^Unknown \/useful-skills command\.\n/);
 
   for (const argv of [[], ["help"], [""]]) {
     const { text, exitCode } = await f.run(argv);
@@ -207,10 +210,11 @@ test("arguments are bounded and unknown commands show help with a failure", asyn
     assert.match(text, /^Useful Skills for Claude Code\n/);
     assert.match(text, /\/useful-skills:us-ignore-workflow/);
     assert.match(text, /memory_status/);
+    assert.doesNotMatch(text, /library/i);
   }
 });
 
-test("list shows Claude skill invocations; library list shows installed reference paths", async t => {
+test("list shows Claude skill invocations", async t => {
   const f = await fixture(t);
 
   const list = await f.run(["list", "memory"]);
@@ -220,13 +224,6 @@ test("list shows Claude skill invocations; library list shows installed referenc
 
   const split = await f.run(["list memory"]);
   assert.equal(split.text, list.text);
-
-  const library = await f.run(["library", "list", "agents", "architect"]);
-  assert.equal(library.exitCode, 0);
-  assert.doesNotMatch(library.text, /skill:\/\//);
-  const reference = /\n {4}(\/\S+\.md)(\n|$)/.exec(library.text)?.[1];
-  assert.ok(reference);
-  assert.ok((await stat(reference)).isFile());
 
   const none = await f.run(["list", "no-such-skill-anywhere"]);
   assert.deepEqual(none, { text: "No skills matching \"no-such-skill-anywhere\".", exitCode: 0 });
@@ -333,23 +330,4 @@ test("the CLI runs when invoked through a symlinked install path", async t => {
   assert.match(ok.stdout, /^Useful Skills repository workflow and Claude profile stage settings:\n/);
   assert.match(ok.stdout, /\nWorkflow: saved enabled, effective enabled, source default\n/);
   assert.equal(ok.stderr, "");
-});
-
-test("library commands report an installation without the reference archive", async t => {
-  const f = await fixture(t);
-  const source = path.dirname(path.dirname(COMMAND));
-  const excluded = new Set([".git", "test", path.join("skills", "us-library", "references", "ecc")]);
-  const installed = path.join(f.root, "directory-install");
-  await cp(source, installed, { recursive: true, filter: file => !excluded.has(path.relative(source, file)) });
-  const options = { cwd: f.repo, env: { ...process.env, ...f.environment() } };
-  const command = path.join(installed, "claude", "command.js");
-
-  for (const argv of [["library", "list"], ["library", "list", "agents", "architect"]]) {
-    const missing = await execute(process.execPath, [command, ...argv], options);
-    assert.equal(missing.stdout, "Reference library is not included in this installation.\n");
-    assert.equal(missing.stderr, "");
-  }
-
-  const core = await execute(process.execPath, [command, "list"], options);
-  assert.match(core.stdout, /^Useful Skills core skills \(\d+\):\n/);
 });

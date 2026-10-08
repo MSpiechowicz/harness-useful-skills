@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
-import { realpath, stat } from "node:fs/promises";
+import { realpath } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { formatDoctor } from "../doctor.js";
@@ -13,9 +13,8 @@ import { claudeConfigDir } from "./models.js";
 import { readClaudeWorkflow } from "./settings.js";
 
 const CLAUDE_ROOT = path.join(PACKAGE_ROOT, "claude");
-const LIBRARY_ROOT = path.join(PACKAGE_ROOT, "skills", "us-library", "references", "ecc");
-const MAX_TOKENS = 8;
-const MAX_TOKEN_LENGTH = 256;
+const MAX_ARGUMENTS = 8;
+const MAX_ARGUMENT_LENGTH = 256;
 const DOCTOR_BUDGET_MS = 540_000;
 const MODES = Object.freeze(["enabled", "disabled"]);
 const STAGE_ALIASES = Object.freeze({
@@ -42,14 +41,12 @@ const HELP = [
   `/useful-skills ${STAGE_USAGE} — set an independent automatic stage for this Claude profile.`,
   "/useful-skills status [--json] — read repository workflow and profile stage settings, their sources, paths, and errors.",
   "/useful-skills:us-ignore-workflow — use the fast lane for one explicit request without changing saved settings.",
-  "/useful-skills library list [skills|commands|agents|rules] [query] — opt-in ECC references.",
   "/useful-skills doctor [--check] — set up this project's memory (private facts store, pinned Graphify dependencies, graph) and report status; --check only reports status and writes nothing.",
   "/useful-skills update check|install — show how Claude Code updates this plugin.",
   "Memory: use the `memory_status`, `graph_build`, and `graph_query` MCP tools.",
   "A saved setting overrides the plugin option of the same name; without either, the setting is enabled.",
 ].join("\n");
 const UPDATE_GUIDANCE = "Claude Code updates the plugin itself: use `/plugin` (Installed tab) or run `claude plugin update useful-skills@<marketplace>`, then `/reload-plugins`.";
-const LIBRARY_MISSING = "Reference library is not included in this installation.";
 const GRAPH_GUIDANCE = "Graph diagnostics in Claude Code use the `graph_build` and `graph_query` MCP tools: ask Claude to build this workspace's graph, then query it. `memory_status` reports graph state without building.";
 
 function result(text, exitCode = 0) {
@@ -236,9 +233,8 @@ async function doctor(tokens, { environment, cwd, packageRoot, doctorServices, d
   const mode = check ? "check" : "setup";
   const projectDir = environment.CLAUDE_PROJECT_DIR;
   const projectRoot = projectDir && path.isAbsolute(projectDir) ? projectDir : cwd;
-  const [core, library, snapshot] = await Promise.all([
+  const [core, snapshot] = await Promise.all([
     resourceInventory({ root: CLAUDE_ROOT }),
-    resourceInventory({ source: "library" }),
     readClaudeWorkflow({ environment, cwd: projectRoot }),
   ]);
   const settings = doctorSettings(snapshot);
@@ -247,7 +243,7 @@ async function doctor(tokens, { environment, cwd, packageRoot, doctorServices, d
   const { host, reason } = await doctorHost({ environment, workspace: projectRoot, packageRoot });
   if (!host) {
     const unavailable = printable(redactText(reason));
-    return result(formatDoctor({ core, library, safety: true, setup: { mode, settings, steps: [], ok: false, unavailable } }), 1);
+    return result(formatDoctor({ core, safety: true, setup: { mode, settings, steps: [], ok: false, unavailable } }), 1);
   }
 
   const controller = new AbortController();
@@ -265,17 +261,8 @@ async function doctor(tokens, { environment, cwd, packageRoot, doctorServices, d
     ...(detail ? { detail: doctorDetail(detail, host.agentDir) } : {}),
   }));
   const memory = doctorMemory(outcome.memory, host.agentDir);
-  const report = formatDoctor({ core, library, safety: true, memory, setup: { mode, settings, steps, ok: outcome.ok, timedOut: outcome.timedOut } });
+  const report = formatDoctor({ core, safety: true, memory, setup: { mode, settings, steps, ok: outcome.ok, timedOut: outcome.timedOut } });
   return result(report, outcome.ok ? 0 : 1);
-}
-
-/** Directory installs may ship without the ECC reference archive. */
-async function libraryInstalled() {
-  try {
-    return (await stat(LIBRARY_ROOT)).isDirectory();
-  } catch {
-    return false;
-  }
 }
 
 async function catalog(tokens) {
@@ -286,34 +273,29 @@ async function catalog(tokens) {
     return usage(errorMessage(error));
   }
 
-  const { kind, query, source } = parsed;
-  const library = source === "library";
-  if (library && !(await libraryInstalled())) {
-    return result(LIBRARY_MISSING);
-  }
+  const { kind, query } = parsed;
+  const resources = await listResources(kind, { root: CLAUDE_ROOT, query });
 
-  const resources = await listResources(kind, library ? { query, source } : { root: CLAUDE_ROOT, query });
-
-  // Claude namespaces plugin skills, and has no skill:// resolver for library references.
+  // Claude namespaces plugin skills.
   const items = resources.map(resource => ({
     ...resource,
-    usage: library ? path.join(PACKAGE_ROOT, resource.path) : resource.usage.replace(/^\/skill:/, "/useful-skills:"),
+    usage: resource.usage.replace(/^\/skill:/, "/useful-skills:"),
   }));
-  return result(formatResources(kind, items, query, source));
+  return result(formatResources(kind, items, query));
 }
 
 /** Split host arguments like OMP's text input, or return undefined for an oversized or malformed command. */
 function commandTokens(argv) {
-  if (!Array.isArray(argv) || argv.length > MAX_TOKENS) {
+  if (!Array.isArray(argv) || argv.length > MAX_ARGUMENTS) {
     return undefined;
   }
 
-  if (!argv.every(token => typeof token === "string" && token.length <= MAX_TOKEN_LENGTH)) {
+  if (!argv.every(token => typeof token === "string" && token.length <= MAX_ARGUMENT_LENGTH)) {
     return undefined;
   }
 
   const tokens = argv.flatMap(token => token.trim().split(/\s+/)).filter(Boolean);
-  return tokens.length <= MAX_TOKENS ? tokens : undefined;
+  return tokens.length <= MAX_ARGUMENTS ? tokens : undefined;
 }
 
 /** Run one `/useful-skills` subcommand for Claude Code; never throws. */
@@ -326,7 +308,7 @@ export async function runCommand(argv, {
 } = {}) {
   const tokens = commandTokens(argv);
   if (!tokens) {
-    return usage(`Expected at most ${MAX_TOKENS} arguments of at most ${MAX_TOKEN_LENGTH} characters each.`);
+    return usage(`Expected at most ${MAX_ARGUMENTS} arguments of at most ${MAX_ARGUMENT_LENGTH} characters each.`);
   }
 
   const context = { environment, cwd };
@@ -344,7 +326,6 @@ export async function runCommand(argv, {
       case "doctor":
         return await doctor(tokens, { ...context, packageRoot, doctorServices, doctorBudgetMs });
       case "list":
-      case "library":
         return await catalog(tokens);
       case "update":
         if (tokens.length === 2 && ["check", "install"].includes(tokens[1])) {

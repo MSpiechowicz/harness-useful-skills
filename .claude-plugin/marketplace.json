@@ -14,7 +14,6 @@
         "./claude/skills/us-implement/",
         "./claude/skills/us-plan/",
         "./claude/skills/us-workflow/",
-        "./claude/skills/us-library/",
         "./claude/skills/us-ship-backlog-item/",
         "./claude/skills/us-improve-codebase-architecture/",
         "./claude/skills/us-improve-code-coverage/",

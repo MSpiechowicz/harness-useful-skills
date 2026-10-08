@@ -19,23 +19,24 @@ async function cli(args, options = {}, entry = launcher) {
   }
 }
 
-test("launcher discovers owned skills and reference URIs through the shared catalog", async () => {
+test("launcher discovers owned skills through the shared catalog and rejects library", async () => {
   const owned = await cli(["list", "us-workflow"]);
   assert.equal(owned.code, 0);
   assert.match(owned.stdout, /\/skill:us-workflow/);
-  const library = await cli(["library", "list", "commands", "pr"]);
-  assert.equal(library.code, 0);
-  assert.match(library.stdout, /skill:\/\/us-library\/references\/ecc\/commands\/pr.md/);
+  const library = await cli(["library", "list"]);
+  assert.equal(library.code, 2);
+  assert.match(library.stderr, /^useful-skills: Expected install, list, doctor, update check, update install, or help\.\nUsage:/);
+  assert.doesNotMatch(library.stderr, /library/);
 });
 
 test("launcher spaced-query parsing matches extension string parsing", () => {
-  assert.deepEqual(parseCatalogArguments("  library\t list  skills spaced query  "), parseCatalogArguments(["library", "list", "skills", "spaced", "query"]));
-  assert.deepEqual(parseCatalogArguments("list spaced query"), { source: "core", kind: "skills", query: "spaced query" });
-  assert.deepEqual(parseCatalogArguments("list"), { source: "core", kind: "skills", query: "" });
+  assert.deepEqual(parseCatalogArguments("  list\t spaced  query  "), parseCatalogArguments(["list", "spaced", "query"]));
+  assert.deepEqual(parseCatalogArguments("list spaced query"), { kind: "skills", query: "spaced query" });
+  assert.deepEqual(parseCatalogArguments("list"), { kind: "skills", query: "" });
   assert.throws(() => parseCatalogArguments(["list", 7]), /arguments/);
   assert.throws(() => parseCatalogArguments(undefined), /arguments/);
-  assert.deepEqual(parseCatalogArguments("list commands"), { source: "core", kind: "skills", query: "commands" });
-  assert.throws(() => parseCatalogArguments("library"), /Expected list/);
+  assert.deepEqual(parseCatalogArguments("list commands"), { kind: "skills", query: "commands" });
+  assert.throws(() => parseCatalogArguments("library list"), /Expected list/);
   assert.match(formatResources("skills", [], "absent"), /No skills matching "absent"/);
 });
 

@@ -181,12 +181,11 @@ function closingLine(setup) {
  * Without `setup` the report is passive (OMP and terminal); with `setup` ({ steps, settings, mode,
  * ok, timedOut?, unavailable? }) it adds the Claude setup outcome and saved workflow settings.
  */
-export function formatDoctor({ core, library, safety, memory, setup } = {}) {
+export function formatDoctor({ core, safety, memory, setup } = {}) {
   return [
     "Useful Skills doctor",
     "Resources",
     inventory("Core", core),
-    inventory("Reference library", library),
     `Safety: ${safety === true ? "Enabled" : "Disabled"}`,
     ...(setup ? setupSection(setup) : []),
     ...memorySection(memory, setup),

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -14,7 +14,7 @@ async function fixture(t) {
     await writeFile(path.join(dir, "SKILL.md"), `---\nname: ${name}\ndescription: ${description}\n---\nInstructions.\n`);
   };
   await skill("skills/us-example", "us-example", "Handle spaced query input");
-  await skill("skills/us-library/references/ecc/skills/legacy", "legacy", "Optional reference");
+  await skill("skills/us-example/references/nested", "nested", "Nested reference");
   return { root, skill };
 }
 
@@ -28,14 +28,8 @@ test("core discovery stays shallow and new valid skills need no registry", async
   assert.deepEqual(await resourceInventory({ root }), { skills: 2, commands: 0, agents: 0, rules: 0 });
 });
 
-test("library is opt-in and references resolve without exposing legacy invocations", async (t) => {
+test("unknown resource kinds are rejected", async (t) => {
   const { root } = await fixture(t);
-  const [reference] = await listResources("skills", { root, source: "library" });
-  assert.equal(reference.name, "legacy");
-  assert.equal(reference.uri, "skill://us-library/references/ecc/skills/legacy/SKILL.md");
-  assert.equal(reference.usage, reference.uri);
-  assert.match(await readFile(path.join(root, reference.path), "utf8"), /Optional reference/);
-  await assert.rejects(listResources("skills", { root, source: "../outside" }), /source/i);
   await assert.rejects(listResources("../outside", { root }), /kind/i);
 });
 

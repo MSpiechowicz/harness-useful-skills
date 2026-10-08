@@ -17,7 +17,6 @@ if (process.argv.length > 3 || (process.argv[2] && !check)) {
 
 const REPOSITORY = 'https://github.com/MSpiechowicz/harness-useful-skills';
 const PRESERVED = new Set(['README.md']);
-const EXCLUDED_SKILL = 'us-library';
 
 // Every file shipped to Claude. Skills are the only walked folders; nothing else is matched by pattern.
 const FILES = [
@@ -88,10 +87,10 @@ function json(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-/** True when `path` is a plain repository-relative POSIX path: no empty, '.', or '..' segment, no backslash or NUL, already normalized. */
+/** True when `path` is a plain repository-relative POSIX path: no empty, '.', '..', or '.git' (any case) segment, no backslash or NUL, already normalized. */
 function isPlainRelativePath(path) {
   if (path.includes('\\') || path.includes('\0')) return false;
-  if (path.split('/').some(segment => segment === '' || segment === '.' || segment === '..')) return false;
+  if (path.split('/').some(segment => segment === '' || segment === '.' || segment === '..' || segment.toLowerCase() === '.git')) return false;
   return posix.normalize(path) === path;
 }
 
@@ -118,7 +117,12 @@ function replaceFile(destination, content) {
     writeFileSync(temporary, content, { flag: 'wx' });
     renameSync(temporary, destination);
   } catch (error) {
-    rmSync(temporary, { force: true });
+    try {
+      rmSync(temporary, { force: true });
+    } catch {
+      // Keep the original failure; a leftover temporary file is less important than why the write failed.
+    }
+
     throw error;
   }
 }
@@ -139,11 +143,9 @@ function trackedSkillFiles() {
 /** The skill folders in marketplace order, verified against what is actually on disk. */
 function skillNames() {
   const catalog = readJson('.claude-plugin/marketplace.json');
-  const listed = catalog.plugins[0].skills
-    .map(path => /^\.\/claude\/skills\/(us-[a-z-]+)\/$/.exec(path)?.[1])
-    .filter(name => name !== EXCLUDED_SKILL);
+  const listed = catalog.plugins[0].skills.map(path => /^\.\/claude\/skills\/(us-[a-z-]+)\/$/.exec(path)?.[1]);
   const onDisk = readdirSync(join(root, 'claude', 'skills'), { withFileTypes: true })
-    .filter(entry => entry.isDirectory() && entry.name.startsWith('us-') && entry.name !== EXCLUDED_SKILL)
+    .filter(entry => entry.isDirectory() && entry.name.startsWith('us-'))
     .map(entry => entry.name);
   if (listed.includes(undefined) || [...listed].sort().join() !== onDisk.sort().join()) {
     throw new Error('claude/skills folders do not match .claude-plugin/marketplace.json');

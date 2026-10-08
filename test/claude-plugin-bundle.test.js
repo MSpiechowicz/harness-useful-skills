@@ -65,7 +65,7 @@ test("the committed Claude plugin bundle matches its generator", async () => {
   assert.match(stdout, /Checked \d+ Claude plugin bundle files/);
 });
 
-test("the bundle excludes OMP, library, launcher, and test files", async () => {
+test("the bundle excludes OMP, launcher, and test files", async () => {
   const forbidden = (await bundleFiles()).filter(file => FORBIDDEN.some(pattern => pattern.test(file)));
   assert.deepEqual(forbidden, []);
 });
@@ -106,7 +106,7 @@ test("every relative import and URL in the bundled modules resolves inside the b
   }
 });
 
-test("the bundled command lists 17 skills and reports the missing reference library", async t => {
+test("the bundled command lists the 17 shipped skills", async t => {
   const { cwd, env } = await isolated(t);
   const command = path.join(BUNDLE, "claude", "command.js");
 
@@ -114,9 +114,6 @@ test("the bundled command lists 17 skills and reports the missing reference libr
   const names = [...skills.stdout.matchAll(/^\s+(us-[a-z-]+)/gm)].map(match => match[1]);
   assert.equal(names.length, 17);
   assert.ok(!names.includes("us-library"));
-
-  const library = await execute(process.execPath, [command, "library", "list"], { cwd, env });
-  assert.equal(library.stdout.trim(), "Reference library is not included in this installation.");
 });
 
 test("the bundled Bash guard denies a download piped into a shell", async t => {
@@ -251,6 +248,9 @@ test("tracked paths that escape the repository or the output root are refused be
     "claude/skills/us-plan/../../../../outside.txt",
     "claude/skills/us-plan/./notes.md",
     "claude/skills/us-plan/a\\b.md",
+    "claude/skills/us-plan//notes.md",
+    "claude/skills/us-plan/.git/config",
+    "claude/skills/us-plan/.GIT/config",
   ]) {
     const index = path.join(cwd, "crafted-index");
     await craftedIndex(git, index, [unsafe]);

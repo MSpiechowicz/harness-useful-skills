@@ -41,9 +41,6 @@ function adapt(file, source) {
   // The references remain relative to the installed plugin root, not the user's checkout.
   text = text.replace(/skill:\/\/(us-[a-z-]+)(\/[^`\s]*)?/g, (_, skill, suffix) => {
     if (!suffix) return `/useful-skills:${skill}`;
-    if (skill === 'us-library' && suffix.startsWith('/references/ecc/')) {
-      return `\${CLAUDE_PLUGIN_ROOT}/skills/${skill}${suffix}`;
-    }
     return `\${CLAUDE_PLUGIN_ROOT}/claude/skills/${skill}${suffix}`;
   });
   text = text.replaceAll('/skill:us-', '/useful-skills:us-');
@@ -107,11 +104,6 @@ function adapt(file, source) {
   if (name === 'us-check-security' && file.endsWith('SKILL.md')) {
     text = line(text, 'For an applicable enabled normal-workflow', 'For an applicable enabled normal-workflow or selected eligible focused security review, dispatch a fresh `useful-skills:security-reviewer` after required/selected correctness review, otherwise after changed-surface verification. Only if unavailable and host policy permits, use `useful-skills:general-purpose` with explicit read-only security instructions and report the fallback. Use Claude Code’s `Agent` tool. A report is evidence, not permission to edit; selected reviews remain fresh after affected changes.');
   }
-  if (name === 'us-library' && file.endsWith('SKILL.md')) {
-    text = line(text, '2. Read archive material', '2. Use Claude Code `Read` on an exact installed-plugin path rooted at `${CLAUDE_PLUGIN_ROOT}/skills/us-library/references/ecc/`, for example `${CLAUDE_PLUGIN_ROOT}/skills/us-library/references/ecc/skills/security-audit/SKILL.md`. This optional archive is packaged at the plugin root, not under the generated Claude skills. Never accept a path with `..` or invoke archived commands.');
-    text = text.replace('its exact skill URI', 'its exact installed-plugin path').replace('Cite the exact archived URI consulted', 'Cite the exact installed archived path consulted');
-    text = text.replace('native OMP tools', 'Claude Code native tools');
-  }
   if (name === 'us-ship-backlog-item' && file.endsWith('SKILL.md')) {
     text = text.replace('the enabled `us-workflow` stages', 'the enabled `/useful-skills:us-workflow` stages');
   }
@@ -149,8 +141,8 @@ for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
   }
 }
 output.set('us-check-code-quality/CODE_QUALITY.md', readFileSync(join(sourceRoot, 'us-check-code-quality', 'CODE_QUALITY.md'), 'utf8'));
-if (readdirSync(sourceRoot, { withFileTypes: true }).filter(entry => entry.isDirectory() && entry.name.startsWith('us-')).length !== 18) {
-  throw new Error('Expected exactly 18 canonical skills');
+if (readdirSync(sourceRoot, { withFileTypes: true }).filter(entry => entry.isDirectory() && entry.name.startsWith('us-')).length !== 17) {
+  throw new Error('Expected exactly 17 canonical skills');
 }
 
 function filesUnder(directory, prefix = '') {

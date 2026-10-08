@@ -3,12 +3,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const PACKAGE_ROOT = path.dirname(fileURLToPath(import.meta.url));
-export const ECC_UPSTREAM = Object.freeze({
-  repository: "affaan-m/ECC",
-  version: "2.2.2",
-  commit: "934195f955cf0da847d59fcd6f68856bce112d8b",
-  url: "https://github.com/affaan-m/ECC",
-});
 
 const DISABLED_VALUES = new Set(["0", "false", "off", "none", "disabled"]);
 const SECRET_PATTERNS = [
@@ -172,22 +166,17 @@ export async function resourceInventory(options = {}) {
   return Object.fromEntries(counts);
 }
 
-/** One shallow skill catalog; archived references never become active skills. */
-export async function listResources(kind, { root = PACKAGE_ROOT, query = "", source = "core" } = {}) {
+/** One shallow catalog of the package's core resources. */
+export async function listResources(kind, { root = PACKAGE_ROOT, query = "" } = {}) {
   if (!RESOURCE_KINDS.includes(kind)) {
     throw new TypeError("Resource kind must be skills, commands, agents, or rules.");
-  }
-
-  if (!["core", "library"].includes(source)) {
-    throw new TypeError("Resource source must be core or library.");
   }
 
   if (typeof query !== "string") {
     throw new TypeError("Resource query must be a string.");
   }
 
-  const base = source === "core" ? root : path.join(root, "skills/us-library/references/ecc");
-  const directory = source === "core" ? coreDirectory(root, kind) : path.join(base, kind);
+  const directory = coreDirectory(root, kind);
   const entries = await entriesOptional(directory);
   const files = kind === "rules"
     ? await walkMarkdown(directory)
@@ -202,14 +191,13 @@ export async function listResources(kind, { root = PACKAGE_ROOT, query = "", sou
     const baseName = kind === "skills" ? path.basename(path.dirname(file)) : path.basename(file, ".md");
     const name = frontmatterField(contents, "name") ?? baseName;
     const description = frontmatterField(contents, "description") ?? "";
-    if (kind === "skills" && source === "core" && (name !== baseName || !frontmatterField(contents, "name") || !description)) {
+    if (kind === "skills" && (name !== baseName || !frontmatterField(contents, "name") || !description)) {
       return undefined;
     }
 
     const relative = path.relative(root, file).split(path.sep).join("/");
-    const uri = source === "library" ? `skill://us-library/references/ecc/${path.relative(base, file).split(path.sep).join("/")}` : undefined;
-    const usage = uri ?? (kind === "skills" ? `/skill:${name}` : relative);
-    return { name, description, path: relative, usage, ...(uri ? { uri } : {}) };
+    const usage = kind === "skills" ? `/skill:${name}` : relative;
+    return { name, description, path: relative, usage };
   }));
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -224,22 +212,19 @@ export function parseCatalogArguments(input) {
     throw new TypeError("Expected catalog arguments.");
   }
 
-  const library = tokens[0] === "library";
-  const rest = library ? tokens.slice(1) : tokens;
-  if (rest[0] !== "list") {
-    throw new TypeError("Expected list [query] or library list [kind] [query].");
+  if (tokens[0] !== "list") {
+    throw new TypeError("Expected list [query].");
   }
 
-  const hasKind = library && RESOURCE_KINDS.includes(rest[1]);
-  return { source: library ? "library" : "core", kind: hasKind ? rest[1] : "skills", query: rest.slice(hasKind ? 2 : 1).join(" ").trim() };
+  return { kind: "skills", query: tokens.slice(1).join(" ").trim() };
 }
 
-export function formatResources(kind, resources, query = "", source = "core") {
+export function formatResources(kind, resources, query = "") {
   if (resources.length === 0) {
     return `No ${kind} match${query ? `ing ${JSON.stringify(query)}` : ""}.`;
   }
   return [
-    `Useful Skills ${source === "library" ? "reference library" : "core"} ${kind} (${resources.length}):`,
+    `Useful Skills core ${kind} (${resources.length}):`,
     ...resources.map(resource => `  ${resource.name}${resource.description ? ` — ${resource.description}` : ""}\n    ${resource.usage}`),
   ].join("\n");
 }
