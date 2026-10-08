@@ -18,9 +18,9 @@ async function fixture(t) {
   return { root, project, other, data };
 }
 
-function connect(t, project, data) {
+function connect(t, project, data, environment = {}) {
   const child = spawn(process.execPath, [server], {
-    env: { ...process.env, CLAUDE_PROJECT_DIR: project, CLAUDE_PLUGIN_DATA: data },
+    env: { ...process.env, CLAUDE_PROJECT_DIR: project, CLAUDE_PLUGIN_DATA: data, ...environment },
     stdio: ["pipe", "pipe", "pipe"],
   });
   let output = "";
@@ -144,6 +144,19 @@ test("protocol failures, secret refusal, invalid fields and unavailable graph re
   assert.equal(graph.isError, true);
   assert.match(graph.value.error, /No active graph/);
   assert.deepEqual(await readdir(data), []);
+  await client.close();
+});
+
+test("graph_build refuses a project that is the home directory before installing dependencies", async t => {
+  const { project, data } = await fixture(t);
+  const client = connect(t, project, data, { HOME: project });
+  await client.init();
+
+  const build = await client.call(2, "graph_build");
+  assert.equal(build.isError, true);
+  assert.match(build.value.error, /Graphify build refused: workspace includes a home directory or is the filesystem root/);
+  assert.deepEqual(await readdir(data), []);
+  assert.deepEqual(await readdir(project), []);
   await client.close();
 });
 

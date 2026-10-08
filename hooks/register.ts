@@ -3,6 +3,7 @@ import type { EngineInterface, PluginOptions, Register } from 'claude-code'
 // Claude Code function-hooks module: `/useful-skills`, backed by claude/command.js.
 
 const COMMAND_TIMEOUT_MS = 60_000
+const DOCTOR_TIMEOUT_MS = 600_000
 const MAX_TOKENS = 8
 
 const NODE_REQUIRED = 'Useful Skills needs Node.js 22+ on PATH to run /useful-skills.'
@@ -11,11 +12,17 @@ const CANCELLED = 'Cancelled; no settings changed.'
 const NO_CHANGE = 'No change.'
 const NO_OUTPUT = 'Useful Skills command produced no output; nothing was confirmed.'
 const WRITE_REFUSED = 'Workflow settings can only be changed from your own prompt.'
+const DOCTOR_PREPARING = 'Useful Skills doctor: preparing memory; first setup can take several minutes'
+const DOCTOR_TIMED_OUT = 'Useful Skills doctor did not finish within 10 minutes; setup may be partial — run it again.'
 const USAGE = [
-  `Too many arguments (at most ${MAX_TOKENS}).`,
   'Usage: /useful-skills [status|workflow|stage|list|library|doctor|help]',
   'Run /useful-skills help for the full list.',
 ].join('\n')
+const TOO_MANY_ARGUMENTS = [`Too many arguments (at most ${MAX_TOKENS}).`, USAGE].join('\n')
+
+// `doctor` alone prepares memory (writes); `doctor --check` only reports.
+const DOCTOR_SETUP: readonly string[] = ['doctor']
+const DOCTOR_CHECK: readonly string[] = ['doctor', '--check']
 
 // Boolean plugin options travel to the CLI as the env vars Claude gives hook processes.
 const OPTION_ENV: Readonly<Record<string, string>> = {
@@ -31,7 +38,7 @@ const OPTION_ENV: Readonly<Record<string, string>> = {
 // Only these origins are the person's own prompt; every other origin may only read.
 const WRITE_ORIGINS: ReadonlySet<string> = new Set(['composer', 'sdk'])
 
-// Every other subcommand can change saved settings.
+// Every other subcommand can change saved settings; `doctor` from these origins only checks.
 const READ_ONLY: ReadonlySet<string> = new Set(['status', 'help', 'list', 'library', 'doctor', 'update', 'graph'])
 
 type Stage = { key: string; label: string }
@@ -53,7 +60,11 @@ type Run = (tokens: readonly string[]) => Promise<string>
 type Choice = { label: string; menu?: Menu; command?: readonly string[]; back?: true }
 type Menu = { question: string; header: string; choices: readonly Choice[] }
 
+type CliResult = { exitCode: number; text: string }
+type CliRunOptions = { timeoutMs?: number; extraEnv?: Record<string, string> }
+
 class CliUnavailable extends Error {}
+class DoctorTimedOut extends Error {}
 
 function optionEnvironment(options: PluginOptions): Record<string, string> {
   const env: Record<string, string> = {}
@@ -74,13 +85,14 @@ async function runCli(
   $: EngineInterface,
   env: Record<string, string>,
   tokens: readonly string[],
-): Promise<{ exitCode: number; text: string }> {
+  options: CliRunOptions = {},
+): Promise<CliResult> {
   try {
     const cwd = await $.session.cwd()
     const result = await $.process.run(['node', `${$.plugin.root}/claude/command.js`, ...tokens], {
       cwd,
-      env,
-      timeoutMs: COMMAND_TIMEOUT_MS,
+      env: { ...env, ...options.extraEnv },
+      timeoutMs: options.timeoutMs ?? COMMAND_TIMEOUT_MS,
     })
     const text = result.stdout.trim() || result.stderr.trim()
 
@@ -88,6 +100,65 @@ async function runCli(
   } catch {
     throw new CliUnavailable()
   }
+}
+
+function sameTokens(tokens: readonly string[], expected: readonly string[]): boolean {
+  return tokens.length === expected.length && tokens.every((token, index) => token === expected[index])
+}
+
+/** A toast is only a hint: one that cannot be shown, now or later, never stops the command. */
+function showToast($: EngineInterface, text: string): void {
+  try {
+    const shown: unknown = $.ui.toast(text)
+
+    // Not awaited: a toast that fails later is dropped, never an unhandled rejection.
+    Promise.resolve(shown).catch(() => {})
+  } catch {
+    // No surface to show it on; the command still runs.
+  }
+}
+
+/** Full memory setup: may run for minutes, so it gets the longest timeout the host allows. */
+async function runDoctorSetup($: EngineInterface, env: Record<string, string>, extraEnv: Record<string, string>): Promise<CliResult> {
+  showToast($, DOCTOR_PREPARING)
+
+  const startedAt = await $.clock.now()
+  const hasTimedOut = async () => (await $.clock.now()) - startedAt >= DOCTOR_TIMEOUT_MS
+  let result: CliResult
+
+  try {
+    result = await runCli($, env, DOCTOR_SETUP, { timeoutMs: DOCTOR_TIMEOUT_MS, extraEnv })
+  } catch (error) {
+    if (await hasTimedOut()) {
+      throw new DoctorTimedOut()
+    }
+
+    throw error
+  }
+
+  // A host may report a run it killed at the limit as a silent failure (a signal reads as exit 1).
+  const isSilentFailure = result.exitCode !== 0 && !result.text
+
+  if (isSilentFailure && (await hasTimedOut())) {
+    throw new DoctorTimedOut()
+  }
+
+  return result
+}
+
+/** Runs one command; every `doctor` run is told the session's project root. */
+async function runTokens($: EngineInterface, env: Record<string, string>, tokens: readonly string[]): Promise<CliResult> {
+  if (tokens[0] !== 'doctor') {
+    return runCli($, env, tokens)
+  }
+
+  const extraEnv = { CLAUDE_PROJECT_DIR: await $.session.root() }
+
+  if (sameTokens(tokens, DOCTOR_SETUP)) {
+    return runDoctorSetup($, env, extraEnv)
+  }
+
+  return runCli($, env, tokens, { extraEnv })
 }
 
 /** Saved enabled/disabled values by key; empty when the CLI cannot report them. */
@@ -160,20 +231,31 @@ function buildMenu(saved: Record<string, string>): Menu {
     ],
   }
 
+  // Setup installs and writes; checking only reports. The person picks which, never by default.
+  const doctor: Menu = {
+    question: 'Doctor: set up memory (may install and write files) or only check it?',
+    header: 'Doctor',
+    choices: [
+      { label: 'Set up memory', command: DOCTOR_SETUP },
+      { label: 'Check only', command: DOCTOR_CHECK },
+      { label: 'Back', back: true },
+    ],
+  }
+
   const browse: Menu = {
     question: 'What would you like to browse?',
     header: 'Browse',
     choices: [
       { label: 'List', command: ['list'] },
       { label: 'Libraries', command: ['library', 'list'] },
-      { label: 'Doctor', command: ['doctor'] },
+      { label: 'Doctor…', menu: doctor },
       { label: 'Back', back: true },
     ],
   }
 
   return {
-    question: 'What would you like to do?',
-    header: 'Useful',
+    question: 'Useful Skills: what would you like to do?',
+    header: 'Menu',
     choices: [
       { label: 'Settings', menu: settings },
       { label: 'Status', command: ['status'] },
@@ -234,7 +316,7 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'useful-skills' }, async ($, e) => {
     const run: Run = async tokens => {
-      const { exitCode, text } = await runCli($, env, tokens)
+      const { exitCode, text } = await runTokens($, env, tokens)
 
       if (text) {
         return text
@@ -248,7 +330,7 @@ export const register: Register = (on, options) => {
       const tokens = e.args.trim().split(/\s+/).filter(Boolean)
 
       if (tokens.length > MAX_TOKENS) {
-        return { text: USAGE }
+        return { text: TOO_MANY_ARGUMENTS }
       }
 
       // Fail closed: a missing or unrecognized origin is read-only, with no menu.
@@ -257,6 +339,13 @@ export const register: Register = (on, options) => {
       if (typeof kind !== 'string' || !WRITE_ORIGINS.has(kind)) {
         if (tokens.length === 0) {
           return { text: await run(['help']) }
+        }
+
+        // Memory setup writes, so from here `doctor` only ever checks.
+        if (tokens[0] === 'doctor') {
+          const isCheckable = sameTokens(tokens, DOCTOR_SETUP) || sameTokens(tokens, DOCTOR_CHECK)
+
+          return { text: isCheckable ? await run(DOCTOR_CHECK) : USAGE }
         }
 
         if (!READ_ONLY.has(tokens[0]!)) {
@@ -272,7 +361,15 @@ export const register: Register = (on, options) => {
 
       return { text: await chooseAndRun($, run, saved) }
     } catch (error) {
-      return { text: error instanceof CliUnavailable ? NODE_REQUIRED : FAILED }
+      if (error instanceof DoctorTimedOut) {
+        return { text: DOCTOR_TIMED_OUT }
+      }
+
+      if (error instanceof CliUnavailable) {
+        return { text: NODE_REQUIRED }
+      }
+
+      return { text: FAILED }
     }
   })
 }

@@ -15,7 +15,15 @@ const JS_SOURCE_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".cjs", ".ts", ".ts
 
 const IMPORT_PROVENANCE_PARSER = fileURLToPath(new URL("./graph-import-provenance.py", import.meta.url));
 
-function stagedGraphParts(contents) {
+/** Refill `edges` in place, one push at a time: spreading a graph-sized array into a call overflows the stack. */
+export function replaceEdges(edges, items) {
+  edges.length = 0;
+  for (const item of items) {
+    edges.push(item);
+  }
+}
+
+export function stagedGraphParts(contents) {
   if (!isObject(contents) || !Array.isArray(contents.nodes)) {
     return undefined;
   }
@@ -479,13 +487,13 @@ export async function repairMissingExternalImportEdges({
 
   assertActive();
   if (additions.size) {
-    parts.edges.push(...additions.values());
+    replaceEdges(parts.edges, [...parts.edges, ...additions.values()]);
   }
 
   if (removedNodeIds.size) {
     contents.nodes = contents.nodes.filter((node) => !removedNodeIds.has(node.id));
     const retainedEdges = parts.edges.filter((edge) => !removedEdges.has(edge));
-    parts.edges.splice(0, parts.edges.length, ...retainedEdges);
+    replaceEdges(parts.edges, retainedEdges);
   }
 
   return true;

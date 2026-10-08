@@ -32,13 +32,23 @@ export async function seed(f, contents = validGraph) {
   return { directory, graph, snapshot, generation };
 }
 
+/** A mount table listing only a plain `/` by default, so build tests do not depend on the host's mounts. */
 export function service(overrides = {}) {
+  const { scope = {}, ...rest } = overrides;
+
   return createGraphify({
     dependencyStatus: async () => ({ ready: true, state: "ready" }),
     ensureDependencies: async () => ({ python: "/managed/python", version: "0.9.65" }),
     runProcess: async () => { throw new Error("Unexpected process invocation"); },
-    ...overrides,
+    ...rest,
+    scope: { ...scope, system: { readMountInfo: async () => mountLine("/"), ...scope.system } },
   });
+}
+
+/** One mountinfo line for `mountPoint` with kernel octal escaping of spaces, tabs, newlines, and backslashes. */
+export function mountLine(mountPoint, fstype = "ext4") {
+  const escaped = mountPoint.replace(/[ \t\n\\]/g, (character) => `\\${character.charCodeAt(0).toString(8).padStart(3, "0")}`);
+  return `90 1 0:50 / ${escaped} rw,relatime shared:9 - ${fstype} /dev/test rw\n`;
 }
 
 export async function extract(args, contents) {

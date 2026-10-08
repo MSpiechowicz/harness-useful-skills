@@ -235,12 +235,17 @@ test("list shows Claude skill invocations; library list shows installed referenc
 test("doctor, update, and graph commands give Claude guidance", async t => {
   const f = await fixture(t);
 
-  const doctor = await f.run(["doctor"]);
-  assert.equal(doctor.exitCode, 0);
-  assert.match(doctor.text, /Core: [1-9]\d* skills, 0 commands, [1-9]\d* agents, 0 rules/);
-  assert.match(doctor.text, /Safety: Enabled/);
-  assert.match(doctor.text, /`memory_status` MCP tool/);
-  assert.doesNotMatch(doctor.text, /in OMP/);
+  // This checkout is not installed in the fixture's Claude plugin cache, so memory cannot be located.
+  for (const argv of [["doctor"], ["doctor", "--check"]]) {
+    const doctor = await f.run(argv);
+    assert.equal(doctor.exitCode, 1);
+    assert.match(doctor.text, /Core: [1-9]\d* skills, 0 commands, [1-9]\d* agents, 0 rules/);
+    assert.match(doctor.text, /Safety: Enabled/);
+    assert.match(doctor.text, /\nMemory: not checked — /);
+    assert.match(doctor.text, /\nSettings\n {2}Workflow: enabled \(default\)\n/);
+    assert.doesNotMatch(doctor.text, /in OMP|Read-only/);
+  }
+  assert.deepEqual(await storedFiles(f.configDir), []);
 
   for (const action of ["check", "install"]) {
     assert.deepEqual(await f.run(["update", action]), {

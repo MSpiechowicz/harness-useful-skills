@@ -101,6 +101,23 @@ export function createLocalFacts({ cwd, agentDir }) {
       return { backend: "claude-local-facts", active: true, writable: "unknown", searchable: true };
     },
 
+    /** Report whether the private facts directory exists, without creating anything. */
+    async inspect() {
+      const paths = await pathsForAction();
+      return { exists: Boolean(await factsDirectory(paths)) };
+    },
+
+    /** Create the private facts directory only when it is missing. */
+    async ensure() {
+      const paths = await pathsForAction();
+      if (await factsDirectory(paths)) {
+        return { created: false };
+      }
+
+      await factsDirectory(paths, true);
+      return { created: true };
+    },
+
     async search(query, { limit = 8 } = {}) {
       const paths = await pathsForAction();
       const directory = await factsDirectory(paths);

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, readdir, rm, symlink, truncate, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, symlink, truncate, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
 import { workspaceMemoryPaths } from "../graphify.js";
-import { fixture, seed, service, validGraph } from "./helpers/graph-fixture.js";
+import { extract, fixture, mountLine, seed, service, validGraph } from "./helpers/graph-fixture.js";
 
 const pointerCases = [
   ["malformed JSON", "{", /pointer.*invalid/i],
@@ -231,4 +231,126 @@ test("workspace path must be a directory, not a regular source file", async (t) 
     /workspace.*directory/i,
   );
   assert.deepEqual(await readdir(f.agentDir), []);
+});
+
+/** A build service counting dependency setup and extraction, with an injectable scope and extraction. */
+function countedService(scope, runProcess = (args) => extract(args, validGraph)) {
+  const calls = { setup: 0, spawn: 0 };
+  const graphify = service({
+    scope,
+    ensureDependencies: async () => {
+      calls.setup += 1;
+      return { python: "/managed/python", version: "0.9.65" };
+    },
+    runProcess: async (_file, args) => {
+      calls.spawn += 1;
+      return runProcess(args);
+    },
+  });
+  return { calls, graphify };
+}
+
+/** An overlay mount at `mountPoint` whose lower layer is the filesystem root, which contains every home. */
+function homeOverlay(mountPoint) {
+  return mountLine(mountPoint, "overlay").replace(/ rw\n$/, " rw,lowerdir=/,upperdir=/srv/u,workdir=/srv/w\n");
+}
+
+test("a workspace that is a home directory, contains a mount, or sits on a home-backed mount is refused before storage, setup, or extraction", async (t) => {
+  const f = await fixture(t);
+  const cases = [
+    [{ home: f.workspace }, /Graphify build refused: workspace includes a home directory or is the filesystem root\./],
+    [{ system: { readMountInfo: async () => mountLine(path.join(f.paths.workspace, "data")) } }, /refused: workspace contains a nested mount at .*\/workspace\/data\./],
+    [{ system: { readMountInfo: async () => homeOverlay(f.paths.workspace) } }, /refused: workspace is on an overlay mount at .*\/workspace whose layers include a home directory\./],
+    [{ system: { readMountInfo: async () => homeOverlay(path.dirname(f.paths.workspace)) } }, /refused: workspace is on an overlay mount at .* whose layers include a home directory\./],
+    [{ system: { readMountInfo: async () => undefined, platform: "linux" } }, /refused: mount table cannot be checked: \/proc\/self\/mountinfo is missing\./],
+    [{ system: { readMountInfo: async () => "not a mount table" } }, /refused: mount table cannot be checked/],
+    [{ system: { readMountInfo: async () => "" } }, /refused: mount table does not list the workspace's mount \(for example a masked \/proc or a chroot\)\./],
+    [{ system: { readMountInfo: async () => homeOverlay("/") + mountLine(f.paths.workspace) } }, /refused: workspace is on an overlay mount at \/ whose layers include a home directory\./],
+  ];
+
+  for (const [scope, expected] of cases) {
+    const { calls, graphify } = countedService(scope);
+    const result = await graphify.buildGraph(f.options);
+    assert.equal(result.ok, false);
+    assert.match(result.error, expected);
+    assert.deepEqual(calls, { setup: 0, spawn: 0 });
+    assert.deepEqual(await readdir(f.agentDir), []);
+  }
+});
+
+test("a workspace whose identity changes between pinning and extraction is refused before spawn", async (t) => {
+  const f = await fixture(t);
+  let swapped = false;
+  let spawned = 0;
+  const swappingStat = async (file, options) => {
+    const details = await stat(file, options);
+    return swapped && file === f.paths.workspace ? { dev: details.dev, ino: details.ino + 1n } : details;
+  };
+  const graphify = service({
+    scope: { system: { stat: swappingStat } },
+    ensureDependencies: async () => {
+      swapped = true;
+      return { python: "/managed/python", version: "0.9.65" };
+    },
+    runProcess: async () => {
+      spawned += 1;
+      throw new Error("Unexpected extraction");
+    },
+  });
+
+  const result = await graphify.buildGraph(f.options);
+  assert.equal(result.ok, false);
+  assert.match(result.error, /Workspace directory changed during the graph build/);
+  assert.equal(spawned, 0);
+});
+
+test("a workspace swapped during extraction is refused and the prior generation is kept", async (t) => {
+  const f = await fixture(t);
+  await seed(f);
+  const before = await readFile(f.paths.current, "utf8");
+  const { calls, graphify } = countedService({}, async (args) => {
+    const result = await extract(args, validGraph);
+    await rename(f.workspace, `${f.workspace}-old`);
+    await mkdir(f.workspace);
+    await writeFile(path.join(f.workspace, "main.py"), "def main(): pass\n");
+    return result;
+  });
+
+  const result = await graphify.buildGraph(f.options);
+  assert.equal(result.ok, false);
+  assert.match(result.error, /Workspace directory changed during the graph build/);
+  assert.equal(calls.spawn, 1);
+  assert.equal(await readFile(f.paths.current, "utf8"), before);
+});
+
+test("sources on another device or behind a bind-mounted home are refused and the prior generation is kept", async (t) => {
+  const f = await fixture(t);
+  await seed(f);
+  const before = await readFile(f.paths.current, "utf8");
+  const home = path.join(f.root, "home");
+  await mkdir(home);
+  await mkdir(path.join(f.workspace, "sub"));
+  await writeFile(path.join(f.workspace, "sub", "mod.py"), "x = 1\n");
+  const contents = { nodes: [...validGraph.nodes, { id: "mod", source_file: "sub/mod.py" }], edges: [] };
+
+  const source = path.join(f.paths.workspace, "main.py");
+  const otherDevice = async (file, options) => {
+    const details = await stat(file, options);
+    return file === source ? { dev: details.dev + 1n, ino: details.ino } : details;
+  };
+  const sub = path.join(f.paths.workspace, "sub");
+  const homeMount = (file, options) => stat(file === sub ? home : file, options);
+
+  const cases = [
+    [{ system: { stat: otherDevice } }, /main\.py lies on a different device than the workspace .*btrfs subvolume/],
+    [{ home, system: { stat: homeMount } }, /sub\/mod\.py passes through a mount of a protected home directory at sub\./],
+  ];
+  for (const [scope, expected] of cases) {
+    const { calls, graphify } = countedService(scope, (args) => extract(args, contents));
+    const result = await graphify.buildGraph(f.options);
+    assert.equal(result.ok, false);
+    assert.match(result.error, expected);
+    assert.equal(calls.spawn, 1);
+    assert.equal(await readFile(f.paths.current, "utf8"), before);
+  }
 });
