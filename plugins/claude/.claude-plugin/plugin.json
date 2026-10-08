@@ -1,7 +1,7 @@
 {
   "name": "useful-skills",
   "displayName": "Useful Skills",
-  "version": "0.2.34",
+  "version": "0.2.35",
   "description": "Claude Code engineering workflows, safety reviews, and local memory tools",
   "author": {
     "name": "MSpiechowicz"
