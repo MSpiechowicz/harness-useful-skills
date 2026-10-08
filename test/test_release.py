@@ -11,6 +11,7 @@ from release import bump_version, plan_release
 
 PLUGIN = "harness-useful-skills"
 CATALOG = ".omp-plugin/marketplace.json"
+CLAUDE_MANIFESTS = (".claude-plugin/plugin.json", "plugins/claude/.claude-plugin/plugin.json")
 
 
 def git(path, *args):
@@ -57,6 +58,12 @@ class ReleaseTransactionTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
+        for path in CLAUDE_MANIFESTS:
+            (self.checkout / path).parent.mkdir(parents=True, exist_ok=True)
+            (self.checkout / path).write_text(
+                '{\n  "name": "useful-skills",\n  "version": "1.0.0",\n  "license": "GPL-3.0-only"\n}\n',
+                encoding="utf-8",
+            )
         self.commit(self.checkout, "Initial source")
         git(self.checkout, "push", "origin", "main")
         self.source = git(self.checkout, "rev-parse", "HEAD")
@@ -95,6 +102,11 @@ class ReleaseTransactionTests(unittest.TestCase):
         self.assertEqual(catalog["plugins"][0]["source"]["repo"], "MSpiechowicz/harness-useful-skills")
         self.assertEqual(catalog["plugins"][0]["version"], "1.0.1")
         self.assertEqual(catalog["plugins"][0]["source"]["ref"], "v1.0.1")
+        for path in CLAUDE_MANIFESTS:
+            self.assertEqual(
+                git(self.origin, "show", f"{commit}:{path}"),
+                '{\n  "name": "useful-skills",\n  "version": "1.0.1",\n  "license": "GPL-3.0-only"\n}',
+            )
 
         retry = plan_release(self.fresh_checkout("retry"), self.source, push=True)
         self.assertTrue(retry["reused"])
@@ -165,6 +177,23 @@ class ReleaseTransactionTests(unittest.TestCase):
 
         self.assertEqual(git(self.origin, "rev-parse", "refs/heads/main"), source)
         self.assertEqual(git(self.origin, "tag", "--list"), "")
+
+    def test_mismatched_claude_manifest_version_fails_before_creating_refs(self):
+        for path in CLAUDE_MANIFESTS:
+            manifest = self.checkout / path
+            manifest.write_text(manifest.read_text(encoding="utf-8").replace("1.0.0", "0.9.0"), encoding="utf-8")
+            self.commit(self.checkout, f"Break {path}")
+            git(self.checkout, "push", "origin", "main")
+            source = git(self.checkout, "rev-parse", "HEAD")
+
+            with self.assertRaisesRegex(ValueError, "version must match package.json"):
+                plan_release(self.checkout, source, push=True)
+
+            self.assertEqual(git(self.origin, "rev-parse", "refs/heads/main"), source)
+            self.assertEqual(git(self.origin, "tag", "--list"), "")
+            manifest.write_text(manifest.read_text(encoding="utf-8").replace("0.9.0", "1.0.0"), encoding="utf-8")
+            self.commit(self.checkout, f"Repair {path}")
+            git(self.checkout, "push", "origin", "main")
 
     def test_bump_resets_lower_components_and_rejects_unstable_versions(self):
         self.assertEqual(bump_version("3.9.8", "minor"), "3.10.0")

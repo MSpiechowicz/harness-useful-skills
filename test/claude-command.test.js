@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, symlink } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -249,7 +249,7 @@ test("doctor, update, and graph commands give Claude guidance", async t => {
 
   for (const action of ["check", "install"]) {
     assert.deepEqual(await f.run(["update", action]), {
-      text: "Claude Code updates the plugin itself: run `claude plugin update useful-skills@useful-skills-local`, then `/reload-plugins`.",
+      text: "Claude Code updates the plugin itself: use `/plugin` (Installed tab) or run `claude plugin update useful-skills@<marketplace>`, then `/reload-plugins`.",
       exitCode: 0,
     });
   }
@@ -333,4 +333,23 @@ test("the CLI runs when invoked through a symlinked install path", async t => {
   assert.match(ok.stdout, /^Useful Skills repository workflow and Claude profile stage settings:\n/);
   assert.match(ok.stdout, /\nWorkflow: saved enabled, effective enabled, source default\n/);
   assert.equal(ok.stderr, "");
+});
+
+test("library commands report an installation without the reference archive", async t => {
+  const f = await fixture(t);
+  const source = path.dirname(path.dirname(COMMAND));
+  const excluded = new Set([".git", "test", path.join("skills", "us-library", "references", "ecc")]);
+  const installed = path.join(f.root, "directory-install");
+  await cp(source, installed, { recursive: true, filter: file => !excluded.has(path.relative(source, file)) });
+  const options = { cwd: f.repo, env: { ...process.env, ...f.environment() } };
+  const command = path.join(installed, "claude", "command.js");
+
+  for (const argv of [["library", "list"], ["library", "list", "agents", "architect"]]) {
+    const missing = await execute(process.execPath, [command, ...argv], options);
+    assert.equal(missing.stdout, "Reference library is not included in this installation.\n");
+    assert.equal(missing.stderr, "");
+  }
+
+  const core = await execute(process.execPath, [command, "list"], options);
+  assert.match(core.stdout, /^Useful Skills core skills \(\d+\):\n/);
 });

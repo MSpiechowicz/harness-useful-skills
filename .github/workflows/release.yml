@@ -40,8 +40,10 @@ jobs:
           python-version: '3.10'
       - name: Check generated Claude skills
         run: node scripts/render-claude-skills.js --check
+      - name: Check generated Claude plugin bundle
+        run: node scripts/build-claude-plugin.js --check
       - name: Run Node tests with coverage gate
-        run: node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 'test/**/*.test.js'
+        run: node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-exclude='plugins/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 'test/**/*.test.js'
       - name: Run Python release tests
         run: python -m unittest discover -s test -p 'test_*.py'
       - name: Check extension syntax

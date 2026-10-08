@@ -72,6 +72,8 @@ The Claude plugin adds a **separate** local stdio MCP server with five tools: `m
 
 In Claude Code, `/useful-skills doctor` also prepares memory for the session's project (see [Management and optional library](#management-and-optional-library)); it never writes the workflow or stage settings files.
 
+To submit Claude Code to the Claude plugin directory, `node scripts/build-claude-plugin.js` generates a Claude-only plugin bundle at `plugins/claude/`; the self-hosted marketplace install above is unchanged. `plugins/claude/` is generated: run the script after editing Claude runtime files or skills (CI runs it with `--check`). Only `plugins/claude/README.md` is hand-written, and generated output is outside the 500-line cap.
+
 OMP's updater and release process do **not** update the Claude installation automatically. There is no Codex runtime adapter yet.
 
 ## Skill-led development
@@ -431,14 +433,15 @@ The linked PR uses `Closes #N` when it fully resolves the issue and targets the 
 
 Historic installations cannot migrate through `update install`; follow [Remove or migrate an OMP installation](#remove-or-migrate-an-omp-installation) to remove them and install the current ID manually. Updating this source tree or publishing a release does not change anyone's installed plugins or registered marketplace. For a source checkout, changing its Git remote to the new repository URL is optional and user-managed. The OMP updater does **not** update Claude installations.
 
-The existing single-plugin release transaction is unchanged: CI checks precede the atomic package/marketplace version commit and branch/tag push by `release.py`. No publication is performed merely by implementing a plan. Python 3.10+ is needed for release-development checks, not normal plugin installation.
+The existing single-plugin release transaction is unchanged apart from its version files: CI checks precede the atomic package/marketplace/Claude-manifest version commit and branch/tag push by `release.py`. The release bumps `package.json`, the marketplace entry, `.claude-plugin/plugin.json`, and `plugins/claude/.claude-plugin/plugin.json`, and fails before creating any ref if a Claude manifest version differs from `package.json`. No publication is performed merely by implementing a plan. Python 3.10+ is needed for release-development checks, not normal plugin installation.
 
 ## Development and verification
 
 ```bash
 node scripts/render-claude-skills.js --check
+node scripts/build-claude-plugin.js --check
 node --test 'test/**/*.test.js'
-node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 'test/**/*.test.js'
+node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-exclude='plugins/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 'test/**/*.test.js'
 python -m unittest discover -s test -p 'test_*.py'
 node --check extension.js
 ./useful-skills list

@@ -13,6 +13,6 @@
   },
   "omp": {
     "extensions": ["./extension.js"],
-    "agents": ["./agents"]
+    "agents": ["./omp/agents"]
   }
 }

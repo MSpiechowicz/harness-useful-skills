@@ -1,0 +1,92 @@
+{
+  "name": "useful-skills",
+  "displayName": "Useful Skills",
+  "version": "0.2.32",
+  "description": "Claude Code engineering workflows, safety reviews, and local memory tools",
+  "author": {
+    "name": "MSpiechowicz"
+  },
+  "license": "GPL-3.0-only",
+  "homepage": "https://github.com/MSpiechowicz/harness-useful-skills",
+  "repository": "https://github.com/MSpiechowicz/harness-useful-skills",
+  "agents": [
+    "./claude/agents/planner.md",
+    "./claude/agents/scout.md",
+    "./claude/agents/frontend.md",
+    "./claude/agents/backend.md",
+    "./claude/agents/general-purpose.md",
+    "./claude/agents/reviewer.md",
+    "./claude/agents/security-reviewer.md"
+  ],
+  "skills": [
+    "./claude/skills/us-ignore-workflow/",
+    "./claude/skills/us-implement/",
+    "./claude/skills/us-plan/",
+    "./claude/skills/us-workflow/",
+    "./claude/skills/us-ship-backlog-item/",
+    "./claude/skills/us-improve-codebase-architecture/",
+    "./claude/skills/us-improve-code-coverage/",
+    "./claude/skills/us-memory/",
+    "./claude/skills/us-approve-work/",
+    "./claude/skills/us-open-pr/",
+    "./claude/skills/us-concise/",
+    "./claude/skills/us-review/",
+    "./claude/skills/us-research/",
+    "./claude/skills/us-grill-me/",
+    "./claude/skills/us-check-code-quality/",
+    "./claude/skills/us-check-performance/",
+    "./claude/skills/us-check-security/"
+  ],
+  "mcpServers": {
+    "useful_skills": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/claude/mcp-server.js"
+      ]
+    }
+  },
+  "userConfig": {
+    "workflow": {
+      "type": "boolean",
+      "title": "Development workflow",
+      "description": "Enable skill-led development workflow stages. A saved /useful-skills setting overrides this.",
+      "default": true
+    },
+    "research": {
+      "type": "boolean",
+      "title": "Research stage",
+      "description": "Research relevant source and behavior before implementation. A saved /useful-skills setting overrides this.",
+      "default": true
+    },
+    "plan": {
+      "type": "boolean",
+      "title": "Plan stage",
+      "description": "Prepare a plan and request approval before implementation. A saved /useful-skills setting overrides this.",
+      "default": true
+    },
+    "review": {
+      "type": "boolean",
+      "title": "Correctness review stage",
+      "description": "Review authorized changes for correctness. A saved /useful-skills setting overrides this.",
+      "default": true
+    },
+    "security_review": {
+      "type": "boolean",
+      "title": "Security review stage",
+      "description": "Review authorized changes for security issues. A saved /useful-skills setting overrides this.",
+      "default": true
+    },
+    "backend_memory": {
+      "type": "boolean",
+      "title": "Backend memory stage",
+      "description": "Use local memory during development workflows. A saved /useful-skills setting overrides this.",
+      "default": true
+    },
+    "graphify_memory": {
+      "type": "boolean",
+      "title": "Graph memory stage",
+      "description": "Use project knowledge graph during development workflows. A saved /useful-skills setting overrides this.",
+      "default": true
+    }
+  }
+}

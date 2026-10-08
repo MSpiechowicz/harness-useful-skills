@@ -14,6 +14,9 @@ import sys
 
 VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
 CATALOG = ".omp-plugin/marketplace.json"
+CLAUDE_MANIFEST = ".claude-plugin/plugin.json"
+CLAUDE_BUNDLE_MANIFEST = "plugins/claude/.claude-plugin/plugin.json"
+CLAUDE_MANIFESTS = (CLAUDE_MANIFEST, CLAUDE_BUNDLE_MANIFEST)
 PLUGIN = "harness-useful-skills"
 
 
@@ -64,12 +67,33 @@ def catalog_for(repo, source, current_version, version):
     return catalog
 
 
+def check_claude_manifests(repo, source, current_version):
+    """Require every Claude manifest in the tested source to carry the current version."""
+    for path in CLAUDE_MANIFESTS:
+        if json.loads(git(repo, "show", f"{source}:{path}")).get("version") != current_version:
+            raise ValueError(f"{path} version must match package.json")
+
+
+def bump_manifest(text, current_version, version, path):
+    """Replace the sole ``version`` field in *text* without reformatting the JSON."""
+    updated, count = re.subn(
+        r'("version"\s*:\s*")' + re.escape(current_version) + r'(")',
+        lambda match: match[1] + version + match[2],
+        text,
+    )
+    if count != 1:
+        raise ValueError(f"{path} must contain exactly one version field")
+
+    return updated
+
+
 def is_matching_release(repo, source, metadata, catalog, version, message, commit):
     """Whether an existing tag is the exact transaction this invocation resumes."""
     try:
         parents = git(repo, "show", "-s", "--format=%P", commit)
         released = json.loads(git(repo, "show", f"{commit}:package.json"))
         released_catalog = json.loads(git(repo, "show", f"{commit}:{CATALOG}"))
+        released_manifests = [json.loads(git(repo, "show", f"{commit}:{path}")) for path in CLAUDE_MANIFESTS]
     except (KeyError, json.JSONDecodeError, subprocess.SubprocessError):
         return False
 
@@ -77,9 +101,10 @@ def is_matching_release(repo, source, metadata, catalog, version, message, commi
     return (
         parents == source
         and git(repo, "show", "-s", "--format=%B", commit) == message
-        and changed == [CATALOG, "package.json"]
+        and changed == sorted([CATALOG, "package.json", *CLAUDE_MANIFESTS])
         and released == dict(metadata, version=version)
         and released_catalog == catalog
+        and all(manifest.get("version") == version for manifest in released_manifests)
     )
 
 
@@ -112,6 +137,7 @@ def plan_release(repo, source, bump="patch", push=False):
     metadata = json.loads(git(repo, "show", f"{source}:package.json"))
     version = bump_version(metadata["version"], bump)
     catalog = catalog_for(repo, source, metadata["version"], version)
+    check_claude_manifests(repo, source, metadata["version"])
     tag = f"v{version}"
     message = f"chore(release): {tag}\n\nRelease-Source: {source}\nRelease-Bump: {bump}"
 
@@ -144,19 +170,16 @@ def plan_release(repo, source, bump="patch", push=False):
     if not push:
         return result
 
-    package = repo / "package.json"
-    package_text = package.read_text(encoding="utf-8")
-    updated, count = re.subn(
-        r'("version"\s*:\s*")' + re.escape(metadata["version"]) + r'(")',
-        lambda match: match[1] + version + match[2],
-        package_text,
-    )
-    if count != 1:
-        raise ValueError("package.json must contain exactly one version field")
-    package.write_text(updated, encoding="utf-8")
+    paths = ("package.json", *CLAUDE_MANIFESTS)
+    bumped = {
+        path: bump_manifest((repo / path).read_text(encoding="utf-8"), metadata["version"], version, path)
+        for path in paths
+    }
+    for path, text in bumped.items():
+        (repo / path).write_text(text, encoding="utf-8")
 
     (repo / CATALOG).write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
-    git(repo, "add", "--", "package.json", CATALOG)
+    git(repo, "add", "--", "package.json", CATALOG, *CLAUDE_MANIFESTS)
 
     git(
         repo,
