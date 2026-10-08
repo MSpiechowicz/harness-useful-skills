@@ -24,7 +24,7 @@ const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
 const MODEL = /^(inherit|opus|sonnet|haiku|fable|claude-[a-z0-9][a-z0-9.-]{0,80})$/;
 
 export const DEFAULT_ROLES = Object.freeze({
-  research: "claude-opus-5-5:high",
+  research: "claude-haiku-5-5:high",
   frontend: "claude-sonnet-5-5:high",
   backend: "claude-opus-5-5:high",
   implementation: "claude-sonnet-5-5:high",

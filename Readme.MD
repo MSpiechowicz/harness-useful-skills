@@ -232,7 +232,7 @@ Claude Code does not read OMP's `config.yml`. Its role models live in a Claude-o
 
 ```yaml
 modelRoles:
-  research: claude-opus-5-5:high
+  research: claude-haiku-5-5:high
   frontend: claude-sonnet-5-5:high
   backend: claude-opus-5-5:high
   implementation: claude-sonnet-5-5:high
