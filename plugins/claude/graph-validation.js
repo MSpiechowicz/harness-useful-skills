@@ -186,6 +186,41 @@ export function isExternalImportReference(node, nodesById, relations) {
   return true;
 }
 
+function isGeneratedPath(lower) {
+  return lower.some((part) => GENERATED_DIRECTORIES.has(part)) || GENERATED_FILE.test(lower.at(-1));
+}
+
+/** A bare package specifier such as `svelte/motion` or `@scope/name`: no scheme, path, dot segment or dotfile. */
+export function isBarePackageSpecifier(specifier) {
+  return typeof specifier === "string"
+    && !specifier.includes(":")
+    && isExternalImportSpecifier(specifier)
+    && specifier.split("/").every((part) => !part.startsWith("."));
+}
+
+function isCredentialPath(lower) {
+  return lower.slice(0, -1).some((part) => CREDENTIAL_DIRECTORIES.has(part)) || CREDENTIAL_FILE.test(lower.at(-1));
+}
+
+/**
+ * Whether a source file inside the workspace is generated output and nothing worse: a build folder, or a
+ * `.generated.` or minified file, that is not also credential-shaped.
+ */
+export function isGeneratedOutput(sourceFile, workspace) {
+  if (typeof sourceFile !== "string" || !sourceFile) {
+    return false;
+  }
+
+  const sourcePath = path.resolve(workspace, sourceFile);
+
+  if (!isPathWithin(workspace, sourcePath)) {
+    return false;
+  }
+
+  const lower = path.relative(workspace, sourcePath).split(path.sep).map((part) => part.toLowerCase());
+  return isGeneratedPath(lower) && !isCredentialPath(lower);
+}
+
 export function sourcePolicyError(sourceFile, workspace, displaySourceFile = sourceFile) {
   if (typeof sourceFile !== "string" || !sourceFile) {
     return "Graph node source_file must be a non-empty string.";
@@ -200,11 +235,11 @@ export function sourcePolicyError(sourceFile, workspace, displaySourceFile = sou
   const relative = path.relative(workspace, sourcePath).split(path.sep);
   const lower = relative.map((part) => part.toLowerCase());
 
-  if (lower.some((part) => GENERATED_DIRECTORIES.has(part)) || GENERATED_FILE.test(lower.at(-1))) {
+  if (isGeneratedPath(lower)) {
     return `Graph node source file is in generated output: ${displaySourceFile}`;
   }
 
-  if (lower.slice(0, -1).some((part) => CREDENTIAL_DIRECTORIES.has(part)) || CREDENTIAL_FILE.test(lower.at(-1))) {
+  if (isCredentialPath(lower)) {
     return `Graph node source file is credential-shaped: ${displaySourceFile}`;
   }
 

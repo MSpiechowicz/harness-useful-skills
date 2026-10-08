@@ -8,7 +8,7 @@ import { errorMessage, truncateUtf8 } from "./graph-safety.js";
 import { activeSnapshot, checkExistingManagedPath, existingDirectory, MAX_GRAPH_BYTES, prepareRuntime, prepareStorage, PRIVATE_MODE, stagedGraphContents, writeAtomic } from "./graph-storage.js";
 import { graphValidationError, importRelations, isExternalImportReference, isSourceLessReference, validateExternalImportSource, validateSource } from "./graph-validation.js";
 import { inspectDynamicImportWitnesses, repairMissingExternalImportEdges } from "./graph-import-provenance.js";
-import { dropUnresolvablePlaceholderImports } from "./graph-placeholder-imports.js";
+import { dropGeneratedImportTargets, dropSveltePackageImports, dropUnresolvablePlaceholderImports } from "./graph-placeholder-imports.js";
 import { assertWorkspaceUnchanged, pinWorkspace, scopeSystem, sourceScopeError, workspaceMountBlocker, workspaceScopeBlocker } from "./graph-scope.js";
 import { isPathWithin } from "./path-boundary.js";
 import { runProcess } from "./process.js";
@@ -208,6 +208,8 @@ export function createGraphify(overrides = {}) {
       }
 
       const placeholderImports = dropUnresolvablePlaceholderImports(stagedGraph.contents);
+      const generatedImports = dropGeneratedImportTargets(stagedGraph.contents, paths.workspace);
+      const svelteImports = dropSveltePackageImports(stagedGraph.contents, paths.workspace);
 
       const repairedStagedImports = await repairMissingExternalImportEdges({
         contents: stagedGraph.contents,
@@ -230,7 +232,7 @@ export function createGraphify(overrides = {}) {
         throw new Error(graphError);
       }
 
-      const rewrittenStagedGraph = placeholderImports.dropped || repairedStagedImports;
+      const rewrittenStagedGraph = placeholderImports.dropped || generatedImports.dropped || svelteImports.dropped || repairedStagedImports;
       const graphText = rewrittenStagedGraph ? JSON.stringify(stagedGraph.contents) : stagedGraph.text;
       if (Buffer.byteLength(graphText) > MAX_GRAPH_BYTES) {
         throw new Error("Staged graph exceeds the 512 MiB safety limit.");
