@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdir, mkdtemp, realpath, rm, symlink } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { handleHook } from "../claude/hooks.js";
+import { fastLaneContext } from "../claude/context.js";
 import { readClaudeSettings } from "../claude/settings.js";
 import { effectiveWorkflow } from "../workflow-policy.js";
+import { writeWorkflowSetting } from "../workflow-settings.js";
 
 const script = fileURLToPath(new URL("../claude/hooks.js", import.meta.url));
 const normal = { CLAUDE_PLUGIN_OPTION_WORKFLOW: "true", OMP_ECC_SAFETY: "true" };
@@ -14,8 +19,19 @@ function context(event, environment = normal) {
   return handleHook(event, environment)?.hookSpecificOutput?.additionalContext;
 }
 
-function run(event, payload, environment = normal) {
-  return spawnSync(process.execPath, [script, event], {
+/** An isolated Claude config dir and Git checkout so spawned hooks never read the real ~/.claude. */
+async function workspace(t) {
+  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "us-claude-hooks-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const configDir = path.join(root, "claude");
+  const cwd = path.join(root, "repo");
+  await mkdir(configDir);
+  await mkdir(path.join(cwd, ".git"), { recursive: true });
+  return { configDir, cwd, environment: { ...normal, CLAUDE_CONFIG_DIR: configDir } };
+}
+
+function run(event, payload, environment = normal, entry = script) {
+  return spawnSync(process.execPath, [entry, event], {
     input: typeof payload === "string" ? payload : JSON.stringify(payload),
     encoding: "utf8",
     env: { ...process.env, ...environment },
@@ -155,11 +171,13 @@ test("PostToolUse redacts supported text-bearing result fields without changing 
   assert.equal(handleHook({ hook_event_name: "PostToolUseFailure", tool_response: response }), undefined);
 });
 
-test("executable consumes JSON stdin and emits only valid decision JSON with sanitized failures", () => {
-  const prompt = run("UserPromptSubmit", { hook_event_name: "UserPromptSubmit", prompt: "hello" });
+test("executable consumes JSON stdin and emits only valid decision JSON with sanitized failures", async t => {
+  const isolated = await workspace(t);
+  const prompt = run("UserPromptSubmit", { hook_event_name: "UserPromptSubmit", prompt: "hello", cwd: isolated.cwd }, isolated.environment);
   assert.equal(prompt.status, 0);
   assert.equal(prompt.stderr, "");
   assert.equal(JSON.parse(prompt.stdout).hookSpecificOutput.hookEventName, "UserPromptSubmit");
+  assert.match(JSON.parse(prompt.stdout).hookSpecificOutput.additionalContext, /development workflow is enabled/);
 
   const denied = run("PreToolUse", {
     hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "rm -rf /" },
@@ -185,4 +203,29 @@ test("executable consumes JSON stdin and emits only valid decision JSON with san
   assert.doesNotMatch(result.stdout + result.stderr, /synthetic-example-value-12345/);
   assert.equal(JSON.parse(result.stdout).hookSpecificOutput.updatedToolOutput.stdout, "password=[REDACTED]");
   assert.equal(JSON.parse(result.stdout).hookSpecificOutput.updatedToolOutput.interrupted, false);
+});
+
+test("spawned prompt hook honors the repository workflow switch saved under the Claude config dir", async t => {
+  const isolated = await workspace(t);
+  await writeWorkflowSetting({ agentDir: isolated.configDir, cwd: isolated.cwd, key: "workflow", enabled: false });
+
+  const prompt = run("UserPromptSubmit", { hook_event_name: "UserPromptSubmit", prompt: "hello", cwd: isolated.cwd }, isolated.environment);
+  assert.equal(prompt.status, 0);
+  assert.equal(JSON.parse(prompt.stdout).hookSpecificOutput.additionalContext, fastLaneContext());
+
+  const unscoped = run("UserPromptSubmit", { hook_event_name: "UserPromptSubmit", prompt: "hello" }, isolated.environment);
+  assert.match(JSON.parse(unscoped.stdout).hookSpecificOutput.additionalContext, /setting is invalid or unreadable/);
+});
+
+test("executable still guards Bash when invoked through a symlinked install path", async t => {
+  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "us-claude-hooks-link-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const link = path.join(root, "linked-package");
+  await symlink(path.dirname(path.dirname(script)), link, "dir");
+
+  const denied = run("PreToolUse", {
+    hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "rm -rf /" },
+  }, normal, path.join(link, "claude", "hooks.js"));
+  assert.equal(denied.status, 0);
+  assert.equal(JSON.parse(denied.stdout).hookSpecificOutput.permissionDecision, "deny");
 });

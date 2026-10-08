@@ -41,7 +41,7 @@ jobs:
       - name: Check generated Claude skills
         run: node scripts/render-claude-skills.js --check
       - name: Run Node tests with coverage gate
-        run: node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80
+        run: node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 test/
       - name: Run Python release tests
         run: python -m unittest discover -s test -p 'test_*.py'
       - name: Check extension syntax

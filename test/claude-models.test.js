@@ -1,15 +1,20 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { handleHook } from "../claude/hooks.js";
 import { modelRoutingContext, modelsConfigPath, parseModelsConfig, syncRoleAgents } from "../claude/models.js";
+import { readClaudeWorkflow } from "../claude/settings.js";
 
 async function configDir(t) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "claude-models-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   return directory;
+}
+
+async function permissions(file) {
+  return (await stat(file)).mode & 0o777;
 }
 
 function agentPath(directory, agent) {
@@ -101,4 +106,42 @@ test("SessionStart hook syncs role agents and tells the parent which agent to di
   assert.match(context, /useful-skills:security-reviewer: dispatch `us-security-reviewer` \(claude-opus-5-5, effort high\)/);
   assert.match(context, /load after Claude Code restarts/);
   assert.match(context, /do not pass a `model` in the Agent call/);
+});
+
+test("a fresh config dir gets a private useful-skills directory", async t => {
+  const directory = await configDir(t);
+  syncRoleAgents({ configDir: directory });
+
+  assert.equal(await permissions(path.join(directory, "useful-skills")), 0o700);
+});
+
+test("an existing shared useful-skills directory is made private so workflow settings stay readable", async t => {
+  const directory = await configDir(t);
+  const shared = path.join(directory, "useful-skills");
+  await mkdir(shared);
+  await chmod(shared, 0o755);
+  await writeFile(modelsConfigPath(directory), "modelRoles:\n  default: sonnet\n");
+
+  const repository = await configDir(t);
+  await mkdir(path.join(repository, ".git"));
+  const before = await readClaudeWorkflow({ environment: { CLAUDE_CONFIG_DIR: directory }, cwd: repository });
+  assert.equal(before.sources.workflow, "error");
+
+  const result = syncRoleAgents({ configDir: directory });
+  assert.equal(result.created, false);
+  assert.equal(await permissions(shared), 0o700);
+
+  const workflow = await readClaudeWorkflow({ environment: { CLAUDE_CONFIG_DIR: directory }, cwd: repository });
+  assert.deepEqual(workflow.errors, {});
+  assert.ok(Object.values(workflow.sources).every(source => source === "default"));
+});
+
+test("a symlinked useful-skills directory is not followed or made private", async t => {
+  const directory = await configDir(t);
+  const target = await configDir(t);
+  await chmod(target, 0o755);
+  await symlink(target, path.join(directory, "useful-skills"));
+
+  syncRoleAgents({ configDir: directory });
+  assert.equal(await permissions(target), 0o755);
 });
