@@ -403,8 +403,8 @@ The existing single-plugin release transaction is unchanged: CI checks precede t
 
 ```bash
 node scripts/render-claude-skills.js --check
-node --test
-node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80
+node --test 'test/**/*.test.js'
+node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 'test/**/*.test.js'
 python -m unittest discover -s test -p 'test_*.py'
 node --check extension.js
 ./useful-skills list
