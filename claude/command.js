@@ -7,12 +7,15 @@ import { formatDoctor } from "../doctor.js";
 import { formatResources, listResources, PACKAGE_ROOT, parseCatalogArguments, redactText, resourceInventory } from "../resources.js";
 import { effectiveWorkflow } from "../workflow-policy.js";
 import { STAGES, writeWorkflowSetting } from "../workflow-settings.js";
+import { runClaudeDoctor } from "./doctor-setup.js";
+import { claudePluginDataDir, resolveHostContext } from "./host-context.js";
 import { claudeConfigDir } from "./models.js";
 import { readClaudeWorkflow } from "./settings.js";
 
 const CLAUDE_ROOT = path.join(PACKAGE_ROOT, "claude");
 const MAX_TOKENS = 8;
 const MAX_TOKEN_LENGTH = 256;
+const DOCTOR_BUDGET_MS = 540_000;
 const MODES = Object.freeze(["enabled", "disabled"]);
 const STAGE_ALIASES = Object.freeze({
   security_review: "security-review",
@@ -39,14 +42,13 @@ const HELP = [
   "/useful-skills status [--json] — read repository workflow and profile stage settings, their sources, paths, and errors.",
   "/useful-skills:us-ignore-workflow — use the fast lane for one explicit request without changing saved settings.",
   "/useful-skills library list [skills|commands|agents|rules] [query] — opt-in ECC references.",
-  "/useful-skills doctor — inspect resources without setup.",
+  "/useful-skills doctor [--check] — set up this project's memory (private facts store, pinned Graphify dependencies, graph) and report status; --check only reports status and writes nothing.",
   "/useful-skills update check|install — show how Claude Code updates this plugin.",
   "Memory: use the `memory_status`, `graph_build`, and `graph_query` MCP tools.",
   "A saved setting overrides the plugin option of the same name; without either, the setting is enabled.",
 ].join("\n");
 const UPDATE_GUIDANCE = "Claude Code updates the plugin itself: run `claude plugin update useful-skills@useful-skills-local`, then `/reload-plugins`.";
 const GRAPH_GUIDANCE = "Graph diagnostics in Claude Code use the `graph_build` and `graph_query` MCP tools: ask Claude to build this workspace's graph, then query it. `memory_status` reports graph state without building.";
-const MEMORY_GUIDANCE = "Memory is not inspected by this command; in Claude Code, check it with the `memory_status` MCP tool.";
 
 function result(text, exitCode = 0) {
   return { text, exitCode };
@@ -167,15 +169,102 @@ async function setting(tokens, context) {
   return result(`Useful Skills ${key} ${mode} for ${scope}.`);
 }
 
-async function doctor() {
-  const [core, library] = await Promise.all([
+function doctorSettings(snapshot) {
+  const policy = effectiveWorkflow(snapshot);
+  const setting = (label, key, saved) => ({
+    label,
+    saved,
+    source: snapshot.sources[key],
+    ...(snapshot.errors[key] ? { error: printable(redactText(snapshot.errors[key])) } : {}),
+  });
+
+  return [
+    setting("Workflow", "workflow", policy.workflow.saved),
+    ...STAGES.map(stage => setting(STAGE_LABELS[stage], stage, policy.stages[stage].saved)),
+  ];
+}
+
+/** Resolve the project and Claude plugin data roots, or return a printable reason they cannot be trusted. */
+async function doctorHost({ environment, workspace, packageRoot }) {
+  const located = await claudePluginDataDir({ environment, packageRoot });
+  if (located.reason) {
+    return { reason: located.reason };
+  }
+
+  try {
+    return { host: await resolveHostContext({ workspace, data: located.dataDir }) };
+  } catch (error) {
+    // System errors embed raw paths; keep only the validation messages.
+    return { reason: error?.code ? "Claude project root or plugin data directory cannot be resolved." : errorMessage(error) };
+  }
+}
+
+/** Escape and redact a step detail, hiding the plugin data directory path. */
+function doctorDetail(detail, dataDir) {
+  if (!detail) {
+    return undefined;
+  }
+
+  return printable(redactText(String(detail).split(dataDir).join("<plugin data>")));
+}
+
+/** Apply `doctorDetail` to every string in a memory status so its rendered errors are masked like step details. */
+function doctorMemory(value, dataDir) {
+  if (typeof value === "string") {
+    return doctorDetail(value, dataDir);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(item => doctorMemory(item, dataDir));
+  }
+
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, doctorMemory(item, dataDir)]));
+  }
+
+  return value;
+}
+
+async function doctor(tokens, { environment, cwd, packageRoot, doctorServices, doctorBudgetMs }) {
+  const check = tokens[1] === "--check";
+  if (tokens.length > 2 || (tokens.length === 2 && !check)) {
+    return usage("Expected /useful-skills doctor [--check].");
+  }
+
+  const mode = check ? "check" : "setup";
+  const projectDir = environment.CLAUDE_PROJECT_DIR;
+  const projectRoot = projectDir && path.isAbsolute(projectDir) ? projectDir : cwd;
+  const [core, library, snapshot] = await Promise.all([
     resourceInventory({ root: CLAUDE_ROOT }),
     resourceInventory({ source: "library" }),
+    readClaudeWorkflow({ environment, cwd: projectRoot }),
   ]);
+  const settings = doctorSettings(snapshot);
 
-  // Claude hooks always apply the command guard; memory is inspected through the MCP server.
-  const report = formatDoctor({ core, library, safety: true, memory: {} });
-  return result(`${report}\n${MEMORY_GUIDANCE}`);
+  // Claude hooks always apply the command guard.
+  const { host, reason } = await doctorHost({ environment, workspace: projectRoot, packageRoot });
+  if (!host) {
+    const unavailable = printable(redactText(reason));
+    return result(formatDoctor({ core, library, safety: true, setup: { mode, settings, steps: [], ok: false, unavailable } }), 1);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), doctorBudgetMs);
+  let outcome;
+  try {
+    outcome = await runClaudeDoctor({ ...host, check, signal: controller.signal, services: doctorServices });
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const steps = outcome.steps.map(({ label, outcome: stepOutcome, detail }) => ({
+    label,
+    outcome: stepOutcome,
+    ...(detail ? { detail: doctorDetail(detail, host.agentDir) } : {}),
+  }));
+  const memory = doctorMemory(outcome.memory, host.agentDir);
+  const report = formatDoctor({ core, library, safety: true, memory, setup: { mode, settings, steps, ok: outcome.ok, timedOut: outcome.timedOut } });
+  return result(report, outcome.ok ? 0 : 1);
 }
 
 async function catalog(tokens) {
@@ -213,7 +302,13 @@ function commandTokens(argv) {
 }
 
 /** Run one `/useful-skills` subcommand for Claude Code; never throws. */
-export async function runCommand(argv, { environment = process.env, cwd = process.cwd() } = {}) {
+export async function runCommand(argv, {
+  environment = process.env,
+  cwd = process.cwd(),
+  packageRoot = PACKAGE_ROOT,
+  doctorServices,
+  doctorBudgetMs = DOCTOR_BUDGET_MS,
+} = {}) {
   const tokens = commandTokens(argv);
   if (!tokens) {
     return usage(`Expected at most ${MAX_TOKENS} arguments of at most ${MAX_TOKEN_LENGTH} characters each.`);
@@ -232,7 +327,7 @@ export async function runCommand(argv, { environment = process.env, cwd = proces
       case "stage":
         return await setting(tokens, context);
       case "doctor":
-        return tokens.length === 1 ? await doctor() : usage("Expected /useful-skills doctor.");
+        return await doctor(tokens, { ...context, packageRoot, doctorServices, doctorBudgetMs });
       case "list":
       case "library":
         return await catalog(tokens);

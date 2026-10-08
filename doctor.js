@@ -121,20 +121,76 @@ function dependencyStatus(memory) {
   return reason ? `Error — ${reason}` : "Unavailable";
 }
 
-/** Format passive resource and profile status without exposing implementation paths or raw observations. */
-export function formatDoctor({ core, library, safety, memory } = {}) {
+function memorySection(memory, setup) {
+  if (setup?.unavailable !== undefined) {
+    return [`Memory: not checked — ${diagnostic(setup.unavailable) ?? "unknown reason"}`];
+  }
+
+  return [
+    "Memory",
+    `  Native: ${nativeStatus(memory)}`,
+    `  Graph: ${graphStatus(memory)}`,
+    `  Dependencies: ${dependencyStatus(memory)}`,
+    ...(memory?.error && !memory.native && !memory.graph ? [`  Status: Error — ${diagnostic(memory.error)}`] : []),
+    ...(!record(memory) && !setup ? ["Run /useful-skills doctor in OMP for current profile memory status."] : []),
+  ];
+}
+
+function setupSection(setup) {
+  const steps = Array.isArray(setup.steps) ? setup.steps : [];
+  if (!steps.length) {
+    return [];
+  }
+
+  return ["Setup", ...steps.map(({ label, outcome, detail }) => {
+    const reason = diagnostic(detail);
+    return `  ${diagnostic(label)}: ${diagnostic(outcome)}${reason ? ` — ${reason}` : ""}`;
+  })];
+}
+
+function settingsSection(setup) {
+  const settings = Array.isArray(setup.settings) ? setup.settings : [];
+  return ["Settings", ...settings.map(({ label, saved, source, error }) => {
+    const reason = diagnostic(error);
+    return `  ${diagnostic(label)}: ${diagnostic(saved)} (${diagnostic(source)})${reason ? ` — ${reason}` : ""}`;
+  })];
+}
+
+function closingLine(setup) {
+  if (!setup) {
+    return "Read-only: no setup, installation, or build.";
+  }
+
+  if (setup.mode === "check") {
+    return "Status only: no setup was performed.";
+  }
+
+  if (setup.ok === true) {
+    return "Setup: complete";
+  }
+
+  if (setup.timedOut === true) {
+    return "Setup: partial — run /useful-skills doctor again to continue";
+  }
+
+  return "Setup: incomplete — run /useful-skills doctor again after fixing the error";
+}
+
+/**
+ * Format resource and memory status without exposing implementation paths or raw observations.
+ * Without `setup` the report is passive (OMP and terminal); with `setup` ({ steps, settings, mode,
+ * ok, timedOut?, unavailable? }) it adds the Claude setup outcome and saved workflow settings.
+ */
+export function formatDoctor({ core, library, safety, memory, setup } = {}) {
   return [
     "Useful Skills doctor",
     "Resources",
     inventory("Core", core),
     inventory("Reference library", library),
     `Safety: ${safety === true ? "Enabled" : "Disabled"}`,
-    "Memory",
-    `  Native: ${nativeStatus(memory)}`,
-    `  Graph: ${graphStatus(memory)}`,
-    `  Dependencies: ${dependencyStatus(memory)}`,
-    ...(memory?.error && !memory.native && !memory.graph ? [`  Status: Error — ${diagnostic(memory.error)}`] : []),
-    ...(!record(memory) ? ["Run /useful-skills doctor in OMP for current profile memory status."] : []),
-    "Read-only: no setup, installation, or build.",
+    ...(setup ? setupSection(setup) : []),
+    ...memorySection(memory, setup),
+    ...(setup ? settingsSection(setup) : []),
+    closingLine(setup),
   ].join("\n");
 }

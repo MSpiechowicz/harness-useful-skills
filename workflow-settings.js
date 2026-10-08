@@ -43,7 +43,7 @@ async function inspectGitDirectory(directory) {
   }
 }
 
-async function scopeRoot(cwd) {
+async function canonicalWorkspace(cwd) {
   if (typeof cwd !== "string" || !cwd) {
     throw new Error("An active workspace directory is required.");
   }
@@ -56,7 +56,11 @@ async function scopeRoot(cwd) {
   } catch {
     throw new Error("Cannot resolve active workspace directory.");
   }
+  return canonical;
+}
 
+/** Return the nearest enclosing checkout with a safe `.git` marker, or undefined outside Git. */
+async function enclosingCheckout(canonical) {
   for (let directory = canonical; ; directory = path.dirname(directory)) {
     const marker = path.join(directory, ".git");
     let details;
@@ -97,9 +101,19 @@ async function scopeRoot(cwd) {
       return directory;
     }
     if (directory === path.dirname(directory)) {
-      return canonical;
+      return undefined;
     }
   }
+}
+
+/** The canonical checkout root containing `cwd`, or undefined when `cwd` is outside a Git work tree. */
+export async function gitWorkTreeRoot(cwd) {
+  return enclosingCheckout(await canonicalWorkspace(cwd));
+}
+
+async function scopeRoot(cwd) {
+  const canonical = await canonicalWorkspace(cwd);
+  return (await enclosingCheckout(canonical)) ?? canonical;
 }
 
 function repositoryDirectory(directory, root) {

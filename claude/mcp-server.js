@@ -1,8 +1,5 @@
-import { lstat, realpath } from "node:fs/promises";
-import path from "node:path";
-
 import { executeMemory } from "../memory.js";
-import { createLocalFacts } from "./local-facts.js";
+import { resolveHostContext } from "./host-context.js";
 
 const PROTOCOL_VERSION = "2025-06-18";
 const MAX_MESSAGE_BYTES = 128 * 1024;
@@ -32,25 +29,6 @@ function emit(message) {
 
 function failure(id, code, message) {
   emit({ id, error: { code, message } });
-}
-
-async function resolveHostContext() {
-  const workspace = process.env.CLAUDE_PROJECT_DIR;
-  const data = process.env.CLAUDE_PLUGIN_DATA;
-  if (!workspace || !data || !path.isAbsolute(workspace) || !path.isAbsolute(data)) {
-    throw new Error("Claude project root and persistent plugin data root are required.");
-  }
-
-  const [cwd, resolvedData] = await Promise.all([realpath(workspace), realpath(data)]);
-  if (path.resolve(data) !== resolvedData) {
-    throw new Error("Claude plugin data root must not contain symbolic links.");
-  }
-  const [workspaceEntry, dataEntry] = await Promise.all([lstat(cwd), lstat(resolvedData)]);
-  if (!workspaceEntry.isDirectory() || !dataEntry.isDirectory()) {
-    throw new Error("Claude project and plugin data roots must be directories.");
-  }
-
-  return { cwd, agentDir: resolvedData, memory: createLocalFacts({ cwd, agentDir: resolvedData }) };
 }
 
 const active = new Map();
@@ -134,7 +112,9 @@ async function handle(message) {
   const controller = new AbortController();
   active.set(key, controller);
   try {
-    if (!context) context = await resolveHostContext();
+    if (!context) {
+      context = await resolveHostContext({ workspace: process.env.CLAUDE_PROJECT_DIR, data: process.env.CLAUDE_PLUGIN_DATA });
+    }
     const args = { ...(params.arguments ?? {}), action: actions.get(params.name) };
     const result = controller.signal.aborted
       ? { ok: false, error: "Request cancelled." }

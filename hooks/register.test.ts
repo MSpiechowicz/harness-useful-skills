@@ -1,76 +1,7 @@
-import type { On, PromptOrigin } from 'claude-code'
-import type { Engine } from 'claude-code/testing'
+import type { PromptOrigin } from 'claude-code'
 import { describe, expect, test } from 'claude-code/testing'
 
-type Call = { argv: readonly string[]; env?: Record<string, string>; timeoutMs?: number }
-type CliReply = { exitCode?: number; stdout?: string; stderr?: string }
-
-const STATUS_JSON = JSON.stringify({
-  workflow: { saved: 'enabled', effective: 'enabled', source: 'file' },
-  stages: {
-    research: { saved: 'enabled', effective: 'enabled', source: 'default' },
-    plan: { saved: 'disabled', effective: 'disabled', source: 'file' },
-  },
-})
-
-/** Stands in for the OS beneath the plugin: records each CLI call and answers from `reply`. */
-function fakeCli(on: On, reply: (tokens: readonly string[]) => CliReply | 'unavailable') {
-  const calls: Call[] = []
-
-  on('session.cwd', () => ({ value: '/work/repo' }))
-
-  on('process.run', (_$, e) => {
-    calls.push({ argv: e.argv, env: e.init?.env, timeoutMs: e.init?.timeoutMs })
-
-    const answer = reply(e.argv.slice(2))
-
-    if (answer === 'unavailable') {
-      return { deny: 'spawn node ENOENT /secret/path' }
-    }
-
-    return {
-      value: {
-        exitCode: answer.exitCode ?? 0,
-        stdout: answer.stdout ?? '',
-        stderr: answer.stderr ?? '',
-        isStdoutTruncated: false,
-        isStderrTruncated: false,
-      },
-    }
-  })
-
-  return calls
-}
-
-/** Answers each AskUserQuestion with the next scripted label, or rejects when `answers` runs out. */
-function fakeUser(on: On, answers: readonly (string | 'dismiss')[]) {
-  const asked: { question: string; options: string[] }[] = []
-  let next = 0
-
-  on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => {
-    const [question] = e.questions
-    asked.push({ question: question!.question, options: question!.options.map(option => option.label) })
-
-    const answer = answers[next++]
-
-    if (answer === undefined || answer === 'dismiss') {
-      return { deny: 'dismissed' }
-    }
-
-    return { result: { questions: e.questions, answers: { [question!.question]: answer } } }
-  })
-
-  return asked
-}
-
-async function runCommand($: Engine, args: string, origin: PromptOrigin = { kind: 'composer' }) {
-  return $.command.run({
-    command: 'useful-skills',
-    args,
-    origin,
-    presentation: { isFullscreen: false, columns: 80 },
-  })
-}
+import { fakeCli, fakeClock, fakeToasts, fakeUser, runCommand, STATUS_JSON } from './register-test-helpers'
 
 describe('useful-skills command with arguments', () => {
   test('passes the arguments to the CLI in the session cwd and returns its output', async ($, on) => {
@@ -181,15 +112,18 @@ describe('useful-skills interactive menu', () => {
   })
 
   test('Back returns to the parent menu', async ($, on) => {
+    fakeClock(on)
     const calls = fakeCli(on, tokens => ({ stdout: tokens[0] === 'status' ? STATUS_JSON : 'doctor output' }))
-    const asked = fakeUser(on, ['Browse', 'Back', 'Browse', 'Doctor'])
+    const asked = fakeUser(on, ['Browse', 'Back', 'Browse', 'Doctor…', 'Back', 'Doctor…', 'Set up memory'])
 
     const result = await runCommand($, '')
 
     expect(result.text).toBe('doctor output')
     expect(asked[0]!.options).toEqual(['Settings', 'Status', 'Browse', 'Help'])
-    expect(asked[1]!.options).toEqual(['List', 'Libraries', 'Doctor', 'Back'])
+    expect(asked[1]!.options).toEqual(['List', 'Libraries', 'Doctor…', 'Back'])
     expect(asked[2]!.options).toEqual(['Settings', 'Status', 'Browse', 'Help'])
+    expect(asked[4]!.options).toEqual(['Set up memory', 'Check only', 'Back'])
+    expect(asked[5]!.options).toEqual(['List', 'Libraries', 'Doctor…', 'Back'])
     expect(calls.at(-1)!.argv.slice(2)).toEqual(['doctor'])
   })
 
@@ -294,6 +228,31 @@ describe('useful-skills command by prompt origin', () => {
         expect(asked).toHaveLength(0)
         expect(calls.map(call => call.argv.slice(2))).toEqual([['help']])
       })
+
+      test('only checks memory for doctor, without a toast', async ($, on) => {
+        const calls = fakeCli(on, () => ({ stdout: 'memory: ok' }))
+        const toasts = fakeToasts(on)
+
+        const setup = await runCommand($, 'doctor', origin)
+        const check = await runCommand($, 'doctor --check', origin)
+
+        expect(setup.text).toBe('memory: ok')
+        expect(check.text).toBe('memory: ok')
+        expect(toasts).toHaveLength(0)
+        expect(calls.map(call => call.argv.slice(2))).toEqual([
+          ['doctor', '--check'],
+          ['doctor', '--check'],
+        ])
+      })
+
+      test('answers other doctor arguments with usage and does not run the CLI', async ($, on) => {
+        const calls = fakeCli(on, () => ({ stdout: 'ran' }))
+
+        const result = await runCommand($, 'doctor foo', origin)
+
+        expect(result.text).toContain('Usage: /useful-skills')
+        expect(calls).toHaveLength(0)
+      })
     })
   }
 
@@ -315,6 +274,27 @@ describe('useful-skills command by prompt origin', () => {
 
     expect(asked).toHaveLength(0)
     expect(calls.map(call => call.argv.slice(2))).toEqual([['status'], ['help'], ['status'], ['help']])
+  })
+
+  test('only checks memory for doctor from a missing or unknown origin', async ($, on) => {
+    const calls = fakeCli(on, () => ({ stdout: 'memory: ok' }))
+    const toasts = fakeToasts(on)
+    const missing = null as unknown as PromptOrigin
+    const unknown = { kind: 'something-new' } as unknown as PromptOrigin
+
+    for (const origin of [missing, unknown]) {
+      const setup = await runCommand($, 'doctor', origin)
+      const other = await runCommand($, 'doctor foo', origin)
+
+      expect(setup.text).toBe('memory: ok')
+      expect(other.text).toContain('Usage: /useful-skills')
+    }
+
+    expect(toasts).toHaveLength(0)
+    expect(calls.map(call => call.argv.slice(2))).toEqual([
+      ['doctor', '--check'],
+      ['doctor', '--check'],
+    ])
   })
 
   const writeOrigins: readonly PromptOrigin[] = [{ kind: 'composer' }, { kind: 'sdk' }]

@@ -8,6 +8,8 @@ import { errorMessage, truncateUtf8 } from "./graph-safety.js";
 import { activeSnapshot, checkExistingManagedPath, existingDirectory, MAX_GRAPH_BYTES, prepareRuntime, prepareStorage, PRIVATE_MODE, stagedGraphContents, writeAtomic } from "./graph-storage.js";
 import { graphValidationError, importRelations, isExternalImportReference, isSourceLessReference, validateExternalImportSource, validateSource } from "./graph-validation.js";
 import { inspectDynamicImportWitnesses, repairMissingExternalImportEdges } from "./graph-import-provenance.js";
+import { dropUnresolvablePlaceholderImports } from "./graph-placeholder-imports.js";
+import { assertWorkspaceUnchanged, pinWorkspace, scopeSystem, sourceScopeError, workspaceMountBlocker, workspaceScopeBlocker } from "./graph-scope.js";
 import { isPathWithin } from "./path-boundary.js";
 import { runProcess } from "./process.js";
 
@@ -40,6 +42,38 @@ function assertBuildActive(deadline) {
   }
 
   throw new Error("Graphify build was cancelled.");
+}
+
+/** Refuse home-covering, root, or mount-crossing workspaces before any storage, setup, or extraction. */
+async function pinBuildScope(workspace, scope) {
+  const scopeReason = await workspaceScopeBlocker([workspace], scope);
+  if (scopeReason) {
+    throw new Error(`Graphify build refused: ${scopeReason}.`);
+  }
+
+  const mountReason = await workspaceMountBlocker(workspace, scope);
+  if (mountReason) {
+    throw new Error(`Graphify build refused: ${mountReason}.`);
+  }
+
+  return pinWorkspace(workspace, scope);
+}
+
+/** Device and bind-mount checks for one graph source; missing optional sources have nothing to read. */
+async function sourceScopeCheck(sourceFile, pin, scope, { missingAllowed = false } = {}) {
+  let resolved;
+
+  try {
+    resolved = await realpath(path.resolve(pin.realpath, sourceFile));
+  } catch (error) {
+    if (missingAllowed && (error?.code === "ENOENT" || error?.code === "ENOTDIR")) {
+      return undefined;
+    }
+
+    return `Cannot verify graph node source file ${sourceFile}: ${errorMessage(error)}`;
+  }
+
+  return sourceScopeError(resolved, pin, scope);
 }
 
 export async function workspaceMemoryPaths({ cwd, agentDir }) {
@@ -96,6 +130,7 @@ export function createGraphify(overrides = {}) {
     runProcess: overrides.runProcess ?? runProcess,
     inspectDynamicImportWitnesses: overrides.inspectDynamicImportWitnesses ?? inspectDynamicImportWitnesses,
   });
+  const scope = Object.freeze({ home: overrides.scope?.home, system: scopeSystem(overrides.scope?.system) });
 
   async function graphStatusFor({ cwd, agentDir }) {
     const paths = await workspaceMemoryPaths({ cwd, agentDir });
@@ -132,6 +167,8 @@ export function createGraphify(overrides = {}) {
         throw new Error("Graphify build was cancelled.");
       }
 
+      const pin = await pinBuildScope(paths.workspace, scope);
+
       await prepareStorage(paths);
       const dependencies = await runtime.ensureDependencies({ agentDir, signal });
       deadline = createBuildDeadline(signal);
@@ -143,6 +180,9 @@ export function createGraphify(overrides = {}) {
       const generation = randomUUID();
       staging = path.join(paths.generations, `.staging-${generation}`);
       await mkdir(staging, { mode: PRIVATE_MODE });
+      await assertWorkspaceUnchanged(pin, scope);
+      assertBuildActive(deadline);
+
       const result = await runtime.runProcess(
         dependencies.python,
         ["-I", "-m", "graphify", "extract", paths.workspace, "--code-only", "--no-dedup", "--max-workers", "2", "--out", staging],
@@ -158,6 +198,7 @@ export function createGraphify(overrides = {}) {
         throw error;
       });
       assertBuildActive(deadline);
+      await assertWorkspaceUnchanged(pin, scope);
 
       const stagedGraph = await stagedGraphContents(path.join(staging, "graphify-out", "graph.json"));
       assertBuildActive(deadline);
@@ -165,6 +206,8 @@ export function createGraphify(overrides = {}) {
       if (!stagedGraph.available) {
         throw new Error(stagedGraph.error ?? "Graphify did not produce a graph.");
       }
+
+      const placeholderImports = dropUnresolvablePlaceholderImports(stagedGraph.contents);
 
       const repairedStagedImports = await repairMissingExternalImportEdges({
         contents: stagedGraph.contents,
@@ -187,7 +230,8 @@ export function createGraphify(overrides = {}) {
         throw new Error(graphError);
       }
 
-      const graphText = repairedStagedImports ? JSON.stringify(stagedGraph.contents) : stagedGraph.text;
+      const rewrittenStagedGraph = placeholderImports.dropped || repairedStagedImports;
+      const graphText = rewrittenStagedGraph ? JSON.stringify(stagedGraph.contents) : stagedGraph.text;
       if (Buffer.byteLength(graphText) > MAX_GRAPH_BYTES) {
         throw new Error("Staged graph exceeds the 512 MiB safety limit.");
       }
@@ -212,7 +256,8 @@ export function createGraphify(overrides = {}) {
 
       for (const sourceFile of sourceFiles) {
         assertBuildActive(deadline);
-        const sourceError = await validateSource(sourceFile, paths.workspace);
+        const sourceError = await validateSource(sourceFile, paths.workspace)
+          ?? await sourceScopeCheck(sourceFile, pin, scope);
         assertBuildActive(deadline);
 
         if (sourceError) {
@@ -222,7 +267,8 @@ export function createGraphify(overrides = {}) {
 
       for (const sourceFile of externalSources) {
         assertBuildActive(deadline);
-        const sourceError = await validateExternalImportSource(sourceFile, paths.workspace);
+        const sourceError = await validateExternalImportSource(sourceFile, paths.workspace)
+          ?? await sourceScopeCheck(sourceFile, pin, scope, { missingAllowed: true });
         assertBuildActive(deadline);
 
         if (sourceError) {
