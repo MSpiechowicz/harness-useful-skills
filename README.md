@@ -11,7 +11,7 @@
 
 Owned `us-*` skills for development, focused audits, delivery, and project memory. Oh My Pi (OMP) and Claude Code discover their descriptions; the model follows the relevant instructions using native tools and workers.
 
-[![Harness Skills tour: one request through research, plan approval, workers, reviews, verification and a pull request](docs/video/harness-skills-tour-poster.jpg)](docs/video/harness-skills-tour-github.mp4?raw=true)
+https://github.com/user-attachments/assets/3925f7dc-d21c-4317-b8c1-1a612a14789d
 
 <sub>A 72-second tour with sound: one request from research and plan approval through workers and fresh reviews to a verified pull request, then the short path for small fixes, read-only audits, memory and installation. The terminals are illustrations. [Download the full-quality 4K video](docs/video/harness-skills-tour.mp4?raw=true) (27 MB).</sub>
 
