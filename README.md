@@ -1,8 +1,19 @@
-# Useful Skills for Oh My Pi
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/lockup-dark.svg">
+    <img src="docs/brand/lockup-light.svg" alt="harness skills" width="430">
+  </picture>
+</p>
+
+# Harness Skills for Oh My Pi and Claude Code
 
 **From a natural-language request to reviewed, verified work.**
 
-Owned `us-*` skills for development, focused audits, delivery, and project memory. OMP discovers their descriptions; the model follows the relevant instructions using native tools and workers.
+Owned `us-*` skills for development, focused audits, delivery, and project memory. Oh My Pi (OMP) and Claude Code discover their descriptions; the model follows the relevant instructions using native tools and workers.
+
+[![Harness Skills tour: one request through research, plan approval, workers, reviews, verification and a pull request](docs/video/harness-skills-tour-poster.jpg)](docs/video/harness-skills-tour-github.mp4?raw=true)
+
+<sub>A 72-second tour with sound: one request from research and plan approval through workers and fresh reviews to a verified pull request, then the short path for small fixes, read-only audits, memory and installation. The terminals are illustrations. [Download the full-quality 4K video](docs/video/harness-skills-tour.mp4?raw=true) (27 MB).</sub>
 
 | Develop | Inspect | Deliver | Remember |
 | --- | --- | --- | --- |
@@ -183,7 +194,7 @@ No Jev integration is included and no task context is sent. Any future integrati
 
 ## Native model configuration
 
-Useful Skills bundles native `planner`, `frontend`, and `backend` agents; it does not add a model router or workflow executor. Ordinary startup needs no role mapping, global host override, prompt file, or extra flag for its narrow session-local policy. The repository master and profile stage preferences determine eligibility; pre-composition triage determines applicability. Existing OMP mappings remain authoritative. Optional distinct mappings use native roles in the active profile, project configuration, overlays, or runtime options; Useful Skills never changes them.
+Harness Skills bundles native `planner`, `frontend`, and `backend` agents; it does not add a model router or workflow executor. Ordinary startup needs no role mapping, global host override, prompt file, or extra flag for its narrow session-local policy. The repository master and profile stage preferences determine eligibility; pre-composition triage determines applicability. Existing OMP mappings remain authoritative. Optional distinct mappings use native roles in the active profile, project configuration, overlays, or runtime options; Harness Skills never changes them.
 
 Open `/model`, then the **Roles** view, to optionally assign and persist role mappings. This example uses only OpenAI Codex selectors; availability depends on your OMP model catalog and credentials, not on this table.
 
@@ -249,7 +260,7 @@ A selector is `<model>[:<effort>]`: a Claude model ID or alias (`opus`, `sonnet`
 
 Claude Code cannot apply plugin options to plugin agent frontmatter, and the `Agent` tool accepts only model aliases without effort. So on each session start the hook generates user-level agents `us-planner`, `us-scout`, `us-frontend`, `us-backend`, `us-general-purpose`, `us-reviewer`, and `us-security-reviewer` in `~/.claude/agents/useful-skills-*.md`. Each one copies the bundled agent's instructions and tools and sets the configured `model` and `effort`. The hook tells the session to dispatch them in place of the `useful-skills:*` agents. Role mapping matches OMP: `scout` ← `research`, `planner` ← `plan`, `general-purpose` ← `implementation`, `reviewer` ← `review`, `security-reviewer` ← `security`.
 
-Claude Code loads agents at startup, so edits to `models.yml` take effect in the **next** session; the first session after installation still uses the inherited-model plugin agents. An invalid file is reported and leaves existing generated agents unchanged. A file at one of those paths that Useful Skills did not generate is never overwritten; that role falls back to its plugin agent. Uninstalling the plugin does not remove the generated files; delete `~/.claude/agents/useful-skills-*.md` and `~/.claude/useful-skills/` yourself.
+Claude Code loads agents at startup, so edits to `models.yml` take effect in the **next** session; the first session after installation still uses the inherited-model plugin agents. An invalid file is reported and leaves existing generated agents unchanged. A file at one of those paths that Harness Skills did not generate is never overwritten; that role falls back to its plugin agent. Uninstalling the plugin does not remove the generated files; delete `~/.claude/agents/useful-skills-*.md` and `~/.claude/useful-skills/` yourself.
 
 Some hosts require parent-only planning or prohibit delegating a single work package. Those higher-priority policies still block the corresponding stage; this package cannot override them. Report the conflict; do not treat installation, restart, or a host-configuration change as a bypass.
 
@@ -308,7 +319,7 @@ Graphify setup is lazy: an explicit `us_memory` build/query action or `/useful-s
 
 ### Recommended setup: local memory alongside Graphify
 
-Use **Mnemopi** for durable facts, decisions, and lessons. It stores memories in local SQLite databases and supports the native save/search operations used by Useful Skills. Graphify remains responsible for code relationships; the two backends complement each other and use separate storage.
+Use **Mnemopi** for durable facts, decisions, and lessons. It stores memories in local SQLite databases and supports the native save/search operations used by Harness Skills. Graphify remains responsible for code relationships; the two backends complement each other and use separate storage.
 
 For a lightweight, project-isolated setup, copy these commands into your terminal:
 
@@ -320,7 +331,7 @@ omp config set mnemopi.noEmbeddings true
 omp config set mnemopi.llmMode none
 ```
 
-This enables explicit memory saves and full-text search without automatically retaining conversation turns, loading embedding models, or making memory-related LLM calls. Full-text search matches words rather than providing embedding-based semantic similarity. These settings configure OMP's native backend; Useful Skills does not change them automatically.
+This enables explicit memory saves and full-text search without automatically retaining conversation turns, loading embedding models, or making memory-related LLM calls. Full-text search matches words rather than providing embedding-based semantic similarity. These settings configure OMP's native backend; Harness Skills does not change them automatically.
 
 If you use a named profile, apply every command to that profile—for example, `omp --profile work config set memory.backend mnemopi`. Restart OMP after configuring it. Then run this **inside OMP**, not in your shell:
 
@@ -362,7 +373,7 @@ Managed Graphify targets **Linux x64 (glibc)** and **macOS Darwin ARM64**. Other
 
 The managed uv archive must match its pinned SHA-256 checksum, and `uv --version` must identify the pinned version and exact platform target. Upstream release commit/date metadata is accepted; a different version or target is not.
 
-Managed setup uses OS-provided tools with no manual setup beyond updating Useful Skills: Linux uses `tar`, `flock`, and `timeout`; macOS uses system `tar` and `/usr/bin/lockf` in inherited-descriptor mode. The bundled Node watchdog bounds Darwin installer subprocesses independently if their coordinator disappears. Setup uses an OS-owned advisory lock shared with active installer processes, so retries cannot overwrite a surviving installer's files after coordinator exit. No Homebrew, separate Python, uv, or other host configuration is required.
+Managed setup uses OS-provided tools with no manual setup beyond updating Harness Skills: Linux uses `tar`, `flock`, and `timeout`; macOS uses system `tar` and `/usr/bin/lockf` in inherited-descriptor mode. The bundled Node watchdog bounds Darwin installer subprocesses independently if their coordinator disappears. Setup uses an OS-owned advisory lock shared with active installer processes, so retries cannot overwrite a surviving installer's files after coordinator exit. No Homebrew, separate Python, uv, or other host configuration is required.
 
 Memory lives outside the checkout:
 
@@ -425,7 +436,7 @@ The linked PR uses `Closes #N` when it fully resolves the issue and targets the 
 
 ## Updates and releases
 
-`update check` is quiet/read-only at interactive startup; explicit failures are reported. `update install` immediately announces that Useful Skills is updating through OMP's native plugin manager, then reports the result. It retains native active-install ownership, scope/profile, and stable-version checks. Only an active, unambiguous `harness-useful-skills@harness-useful-skills` marketplace installation is eligible for upgrade. After a newer release is published, use **Update → Install** and restart OMP to load it.
+`update check` is quiet/read-only at interactive startup; explicit failures are reported. `update install` immediately announces that it is updating through OMP's native plugin manager, then reports the result. It retains native active-install ownership, scope/profile, and stable-version checks. Only an active, unambiguous `harness-useful-skills@harness-useful-skills` marketplace installation is eligible for upgrade. After a newer release is published, use **Update → Install** and restart OMP to load it.
 
 Historic installations cannot migrate through `update install`; follow [Remove or migrate an OMP installation](#remove-or-migrate-an-omp-installation) to remove them and install the current ID manually. Updating this source tree or publishing a release does not change anyone's installed plugins or registered marketplace. For a source checkout, changing its Git remote to the new repository URL is optional and user-managed. The OMP updater does **not** update Claude installations.
 
