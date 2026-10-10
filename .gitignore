@@ -6,3 +6,6 @@ node_modules/
 tasks/
 .claude-plugin/types/
 /tsconfig.json
+
+# HyperFrames project of the README video (the rendered MP4 lives in docs/video)
+videos/
