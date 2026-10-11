@@ -13,7 +13,7 @@ Owned `us-*` skills for development, focused audits, delivery, and project memor
 
 https://github.com/user-attachments/assets/86bc6cf3-b61e-4ade-9ebd-5e48b27fac38
 
-<sub>A 72-second tour with sound: one request from research and plan approval through workers and fresh reviews to a verified pull request, then the short path for small fixes, read-only audits, memory and installation. The terminals are illustrations. [Download the full-quality 4K video](docs/video/harness-skills-tour.mp4?raw=true) (27 MB).</sub>
+<sub>A 72-second tour with sound: one request from research and plan approval through workers and fresh reviews to a verified pull request, then the short path for small fixes, read-only audits, memory and installation. The terminals are illustrations. [Download the full-quality 4K video](https://raw.githubusercontent.com/MSpiechowicz/harness-useful-skills/main/docs/video/harness-skills-tour.mp4) (27 MB).</sub>
 
 | Develop | Inspect | Deliver | Remember |
 | --- | --- | --- | --- |
