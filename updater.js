@@ -18,7 +18,10 @@ const LIST_TIMEOUT_MS = 8_000;
 const MARKETPLACE_TIMEOUT_MS = 55_000;
 const UPGRADE_TIMEOUT_MS = 75_000;
 const FETCH_TIMEOUT_MS = 5_000;
+const TOKEN_TIMEOUT_MS = 5_000;
 const MAX_RELEASE_BYTES = 1024 * 1024;
+// GitHub tokens (ghp_, gho_, github_pat_, ...) are word characters; anything else never reaches a header.
+const TOKEN_SHAPE = /^[A-Za-z0-9_]{1,255}$/;
 
 export class UpdateError extends Error {
   constructor(message) {
@@ -70,19 +73,78 @@ async function packageVersion(root) {
   }
 }
 
-/** Read the latest published stable GitHub release without following redirects. */
-export async function latestRelease(fetcher = fetch) {
-  let response;
+/** A well-formed token, or null. */
+function usableToken(value) {
+  const token = typeof value === "string" ? value.trim() : "";
+  return TOKEN_SHAPE.test(token) ? token : null;
+}
+
+async function ghAuthToken() {
   try {
-    response = await fetcher(RELEASE_API, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-        "User-Agent": "harness-useful-skills-updater",
-      },
-      redirect: "error",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    const { stdout } = await execFileAsync("gh", ["auth", "token", "--hostname", "github.com"], {
+      timeout: TOKEN_TIMEOUT_MS,
+      maxBuffer: 4096,
+      windowsHide: true,
+      env: { ...process.env, GH_PROMPT_DISABLED: "1", NO_COLOR: "1" },
     });
+    return String(stdout);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The GitHub token used to lift the anonymous rate limit (60 requests an hour per IP):
+ * GH_TOKEN, then GITHUB_TOKEN, then the GitHub CLI login. Null when none is available.
+ */
+export async function githubToken(env = process.env, cliToken = ghAuthToken) {
+  return usableToken(env.GH_TOKEN) ?? usableToken(env.GITHUB_TOKEN) ?? usableToken(await cliToken());
+}
+
+function releaseRequest(fetcher, token) {
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "harness-useful-skills-updater",
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  // The token only ever goes to the fixed RELEASE_API origin: redirects are refused.
+  return fetcher(RELEASE_API, { headers, redirect: "error", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
+
+function rateLimitMessage(response, authenticated) {
+  const limited = response.status === 429
+    || (response.status === 403 && (response.headers.get("x-ratelimit-remaining") === "0" || response.headers.has("retry-after")));
+  if (!limited) {
+    return null;
+  }
+
+  const reset = Number(response.headers.get("x-ratelimit-reset"));
+  const retryAfter = Number(response.headers.get("retry-after"));
+  const at = Number.isFinite(reset) && reset > 0
+    ? new Date(reset * 1000)
+    : Number.isFinite(retryAfter) && retryAfter > 0 ? new Date(Date.now() + retryAfter * 1000) : null;
+  const when = at ? ` Try again after ${at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.` : " Try again later.";
+  const hint = authenticated ? "" : " Sign in with `gh auth login` or set GITHUB_TOKEN to raise the limit.";
+  return `GitHub API rate limit reached.${when}${hint}`;
+}
+
+/**
+ * Read the latest published stable GitHub release without following redirects. With a token the
+ * request is authenticated; a rejected token (401) falls back to one anonymous request.
+ */
+export async function latestRelease(fetcher = fetch, token = null) {
+  let response;
+  let authenticated = Boolean(token);
+  try {
+    response = await releaseRequest(fetcher, token);
+    if (response.status === 401 && authenticated) {
+      authenticated = false;
+      response = await releaseRequest(fetcher, null);
+    }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new UpdateError(`Cannot retrieve the public GitHub release: ${detail}`);
@@ -93,7 +155,7 @@ export async function latestRelease(fetcher = fetch) {
   }
 
   if (!response.ok) {
-    throw new UpdateError(`GitHub release request failed (HTTP ${response.status}).`);
+    throw new UpdateError(rateLimitMessage(response, authenticated) ?? `GitHub release request failed (HTTP ${response.status}).`);
   }
 
   let body;
@@ -158,7 +220,18 @@ function normalizedOptions(options = {}) {
     throw new UpdateError("Update fetcher must be a function.");
   }
 
-  return { root, cwd, profile, runner: options.runner ?? execRunner, fetcher: options.fetcher ?? fetch };
+  if (options.token !== undefined && typeof options.token !== "function") {
+    throw new UpdateError("Update token source must be a function.");
+  }
+
+  return {
+    root,
+    cwd,
+    profile,
+    runner: options.runner ?? execRunner,
+    fetcher: options.fetcher ?? fetch,
+    token: options.token ?? (() => githubToken()),
+  };
 }
 
 async function native(state, args, timeoutMs) {
@@ -258,7 +331,7 @@ export async function checkUpdate(options = {}) {
   const state = normalizedOptions(options);
   const currentVersion = await packageVersion(state.root);
   const installation = await managedInstallation(state, state.root);
-  const release = await latestRelease(state.fetcher);
+  const release = await latestRelease(state.fetcher, usableToken(await state.token()));
   const report = reportFor(currentVersion, release, Boolean(installation));
   if (!installation) {
     report.message = "This useful-skills installation is not an unambiguous active OMP marketplace installation. Source checkouts are never overwritten.";
@@ -278,7 +351,7 @@ export async function installUpdate(options = {}) {
   }
 
   const currentVersion = await packageVersion(state.root);
-  const release = await latestRelease(state.fetcher);
+  const release = await latestRelease(state.fetcher, usableToken(await state.token()));
   const report = reportFor(currentVersion, release, true);
   if (!release || !report.updateAvailable) {
     return { ...report, updated: false, message: "No newer stable release is available." };

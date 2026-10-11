@@ -8,7 +8,9 @@ import {
   PLUGIN_ID,
   RELEASE_BASE,
   UpdateError,
+  RELEASE_API,
   checkUpdate,
+  githubToken,
   installUpdate,
   isNewerVersion,
   latestRelease,
@@ -65,6 +67,71 @@ test("rejects unstable or malformed latest-release metadata", async () => {
     await latestRelease(stableRelease()),
     { version: "1.0.1", tag: "v1.0.1", url: `${RELEASE_BASE}v1.0.1` },
   );
+});
+
+test("resolves a GitHub token from the environment, then the GitHub CLI", async () => {
+  const cli = async () => "gho_fromcli\n";
+  assert.equal(await githubToken({ GH_TOKEN: "ghp_first", GITHUB_TOKEN: "ghp_second" }, cli), "ghp_first");
+  assert.equal(await githubToken({ GITHUB_TOKEN: "ghp_second" }, cli), "ghp_second");
+  assert.equal(await githubToken({}, cli), "gho_fromcli");
+  assert.equal(await githubToken({ GITHUB_TOKEN: "bad token\r\nX-Injected: 1" }, async () => null), null);
+  assert.equal(await githubToken({}, async () => null), null);
+});
+
+test("sends the token only to the release API and never follows redirects", async () => {
+  const requests = [];
+  await latestRelease(async (url, init) => {
+    requests.push({ url, init });
+    return stableRelease()();
+  }, "ghp_secret");
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, RELEASE_API);
+  assert.equal(requests[0].init.redirect, "error");
+  assert.equal(requests[0].init.headers.Authorization, "Bearer ghp_secret");
+
+  const anonymous = [];
+  await latestRelease(async (url, init) => {
+    anonymous.push(init.headers);
+    return stableRelease()();
+  });
+  assert.equal("Authorization" in anonymous[0], false);
+});
+
+test("retries anonymously once when GitHub rejects the token", async () => {
+  const auth = [];
+  const release = await latestRelease(async (_url, init) => {
+    auth.push(init.headers.Authorization ?? null);
+    return auth.length === 1 ? new Response("{}", { status: 401 }) : stableRelease()();
+  }, "ghp_expired");
+  assert.deepEqual(auth, ["Bearer ghp_expired", null]);
+  assert.equal(release.version, "1.0.1");
+});
+
+test("explains a rate-limited release lookup", async () => {
+  const limited = async () => new Response("{}", {
+    status: 403,
+    headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(Math.floor(Date.now() / 1000) + 600) },
+  });
+  await assert.rejects(latestRelease(limited), /rate limit reached\. Try again after .+gh auth login/);
+  await assert.rejects(latestRelease(limited, "ghp_valid"), (error) => /rate limit reached/.test(error.message) && !/gh auth login/.test(error.message));
+  await assert.rejects(latestRelease(async () => new Response("{}", { status: 403 })), /HTTP 403/);
+});
+
+test("authenticates the update check with the resolved token", async (t) => {
+  const { home, installed } = await fixture(t);
+  const auth = [];
+  const report = await checkUpdate({
+    root: installed,
+    cwd: home,
+    token: async () => "gho_login",
+    fetcher: async (_url, init) => {
+      auth.push(init.headers.Authorization);
+      return stableRelease()();
+    },
+    runner: async () => JSON.stringify(listing(installed)),
+  });
+  assert.deepEqual(auth, ["Bearer gho_login"]);
+  assert.equal(report.updateAvailable, true);
 });
 
 test("refuses an unsafe source checkout before fetching or mutating native OMP", async (t) => {
