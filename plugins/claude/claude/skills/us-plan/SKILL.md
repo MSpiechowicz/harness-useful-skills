@@ -1,17 +1,17 @@
 ---
 name: us-plan
-description: Use after clarification and source inspection when planning applies in normal workflow, is selected for an eligible focused repair, or is explicitly requested. Draft an actionable plan and obtain approval before implementing that proposed plan.
+description: Drafts one actionable implementation plan with acceptance criteria, file-level work packages, and verification, then asks for explicit approval before any edits. Use when the user says "plan this", "make a plan first", or "how would you implement X", or when the plan stage applies in the development workflow or is selected for a focused repair.
 ---
 
 # Plan a proposed change
 
-Load `/useful-skills:us-concise`. Apply lane selection in `/useful-skills:us-workflow` before composing stages, even on direct loading. Use applicable research and settled decisions from `/useful-skills:us-grill-me`; inspect source to close concrete gaps. A plan is a human-readable handoff, not a workflow database. An enabled plan switch alone does not require a new planner or approval for an eligible focused correction: current bounded authorization or prior in-scope approval suffices, subject to independent requirements. With no applicable automatic plan stage, a bounded user request may authorize implementation. An explicit plan request remains independent.
+Load `/useful-skills:us-write-concisely`. Apply lane selection in `/useful-skills:us-run-workflow` before composing stages, even on direct loading. Load `/useful-skills:us-grill-me` when any user-owned choice is open and plan only on settled decisions; inspect source to close concrete gaps. A plan is a human-readable handoff, not a workflow database. An enabled plan switch alone does not require a new planner or approval for an eligible focused correction: current bounded authorization or prior in-scope approval suffices, subject to independent requirements. With no applicable automatic plan stage, a bounded user request may authorize implementation. An explicit plan request remains independent.
 
-When planning is applicable and enabled in normal composition, selected and eligible for focused work, or explicitly requested, read **Native model routing** in `/useful-skills:us-workflow` without starting the full workflow. The parent inspects source, owns scope and integration, and dispatches `useful-skills:planner` with Claude Code’s `Agent` tool for a bounded read-only draft. Enabled `plan` alone does not force focused planning or re-approval. Plugin agents use `model: inherit`; when Useful Skills session context lists a configured `/useful-skills:us-planner` role agent, dispatch it instead with the same brief. Host permissions remain authoritative. A missing or prohibited required agent is a limitation, not permission to substitute another stage.
+When planning is applicable and enabled in normal composition, selected and eligible for focused work, or explicitly requested, read **Native model routing** in `/useful-skills:us-run-workflow` without starting the full workflow. The parent inspects source, owns scope and integration, and dispatches `useful-skills:planner` with Claude Code’s `Agent` tool for a bounded read-only draft. Enabled `plan` alone does not force focused planning or re-approval. Plugin agents use `model: inherit`; when Useful Skills session context lists a configured `/useful-skills:us-planner` role agent, dispatch it instead with the same brief. Host permissions remain authoritative. A missing or prohibited required agent is a limitation, not permission to substitute another stage.
 
 ## Inputs
 
-Require the requested outcome, available source/research brief, repository conventions, current constraints, and unresolved risks. If an essential consequence remains unknown, return to source inspection or `/useful-skills:us-grill-me`, or mark the smallest experiment needed; do not hide an assumption.
+Require the requested outcome, available source/research brief, repository conventions, current constraints, and unresolved risks. If a user-owned choice remains, load `/useful-skills:us-grill-me` and ask; if a fact is unknown, return to source inspection; if it needs a prototype or measurement, mark the smallest experiment. Do not hide an assumption.
 
 ## Dispatch and integrate one actionable plan
 

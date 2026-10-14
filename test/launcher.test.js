@@ -20,9 +20,9 @@ async function cli(args, options = {}, entry = launcher) {
 }
 
 test("launcher discovers owned skills through the shared catalog and rejects library", async () => {
-  const owned = await cli(["list", "us-workflow"]);
+  const owned = await cli(["list", "us-run-workflow"]);
   assert.equal(owned.code, 0);
-  assert.match(owned.stdout, /\/skill:us-workflow/);
+  assert.match(owned.stdout, /\/skill:us-run-workflow/);
   const library = await cli(["library", "list"]);
   assert.equal(library.code, 2);
   assert.match(library.stderr, /^useful-skills: Expected install, list, doctor, update check, update install, or help\.\nUsage:/);

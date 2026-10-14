@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cp, link, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { chmod, cp, link, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -309,4 +309,71 @@ test("a write-mode build repairs stale output, prunes extras and empty folders, 
   assert.equal(await readFile(path.join(bundle, "README.md"), "utf8"), "# readme\n");
   const checked = run("--check");
   assert.equal(checked.status, 0, checked.stderr);
+});
+
+test("a write-mode build keeps the hand-written evals tree, including empty folders, but not a symlink named evals", async t => {
+  const { repository, cwd, run } = await repositoryCopy(t);
+  const bundle = path.join(repository, "plugins", "claude");
+  const evals = path.join(bundle, "evals");
+  await mkdir(path.join(evals, "case-a"), { recursive: true });
+  await mkdir(path.join(evals, "empty"));
+  await writeFile(path.join(evals, "case-a", "prompt.md"), "# case\n");
+  await writeFile(path.join(bundle, "README.md"), "# readme\n");
+
+  const built = run();
+  assert.equal(built.status, 0, built.stderr);
+  assert.equal(await readFile(path.join(evals, "case-a", "prompt.md"), "utf8"), "# case\n");
+  assert.equal((await stat(path.join(evals, "empty"))).isDirectory(), true);
+  const checked = run("--check");
+  assert.equal(checked.status, 0, checked.stderr);
+
+  await rm(evals, { recursive: true });
+  await symlink(cwd, evals);
+  const refused = run("--check");
+  assert.notEqual(refused.status, 0, refused.stdout);
+  assert.match(refused.stderr, /extra: evals/);
+  assert.equal(run().status, 0);
+  assert.ok(!(await exists(evals)));
+});
+
+test("only real directories and non-executable files stay in the evals tree; links and executables are reported and removed", async t => {
+  const { repository, cwd, run } = await repositoryCopy(t);
+  const bundle = path.join(repository, "plugins", "claude");
+  const evals = path.join(bundle, "evals");
+  const outsideFile = path.join(cwd, "outside.md");
+  const outsideDirectory = path.join(cwd, "outside-directory");
+  await mkdir(path.join(evals, "case-a"), { recursive: true });
+  await mkdir(outsideDirectory);
+  await writeFile(path.join(evals, "case-a", "prompt.md"), "# case\n");
+  await writeFile(path.join(bundle, "README.md"), "# readme\n");
+  await writeFile(outsideFile, "outside\n");
+  await writeFile(path.join(outsideDirectory, "inner.md"), "inner\n");
+  await symlink(outsideFile, path.join(evals, "leak.md"));
+  await symlink(outsideDirectory, path.join(evals, "case-a", "leak-directory"));
+  await writeFile(path.join(evals, "run.sh"), "#!/bin/sh\n");
+  await chmod(path.join(evals, "run.sh"), 0o755);
+
+  const refused = run("--check");
+  assert.notEqual(refused.status, 0, refused.stdout);
+  for (const entry of ["evals/leak.md", "evals/case-a/leak-directory", "evals/run.sh"]) {
+    assert.match(refused.stderr, new RegExp(`extra: ${entry}\\n`));
+  }
+  assert.doesNotMatch(refused.stderr, /prompt\.md/);
+
+  const built = run();
+  assert.equal(built.status, 0, built.stderr);
+  for (const gone of ["leak.md", path.join("case-a", "leak-directory"), "run.sh"]) assert.ok(!(await exists(path.join(evals, gone))), gone);
+  assert.equal(await readFile(path.join(evals, "case-a", "prompt.md"), "utf8"), "# case\n");
+  assert.equal(await readFile(outsideFile, "utf8"), "outside\n");
+  assert.equal(await readFile(path.join(outsideDirectory, "inner.md"), "utf8"), "inner\n");
+  const checked = run("--check");
+  assert.equal(checked.status, 0, checked.stderr);
+});
+
+test("the Claude us-ignore-workflow skill cannot be selected by the model, in the source and the bundle", async () => {
+  for (const base of [ROOT, path.join(ROOT, "plugins", "claude")]) {
+    const text = await readFile(path.join(base, "claude", "skills", "us-ignore-workflow", "SKILL.md"), "utf8");
+    const [, frontmatter] = text.split(/^---\r?\n/m);
+    assert.match(frontmatter, /^disable-model-invocation: true$/m, base);
+  }
 });

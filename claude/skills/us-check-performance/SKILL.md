@@ -1,11 +1,11 @@
 ---
 name: us-check-performance
-description: Audit a repository or changed feature for performance bottlenecks when the user explicitly requests performance analysis, measurement, or optimization evidence. Measure representative behavior before recommending changes; do not rewrite code speculatively.
+description: Measures representative performance and finds bottlenecks with a baseline before recommending any change; never rewrites code speculatively. Use only when the user explicitly asks to "audit performance", "profile this", "find what is slow", "why is this slow", or "benchmark X".
 ---
 
 # Performance audit
 
-Load `/useful-skills:us-concise` before preparing context or findings. This skill is read-only by default and does not authorize application changes, production load, profiler installation, or infrastructure changes.
+Load `/useful-skills:us-write-concisely` before preparing context or findings. This skill is read-only by default and does not authorize application changes, production load, profiler installation, or infrastructure changes.
 
 ## Establish a baseline
 
@@ -21,4 +21,4 @@ Trace actual entry points and callers before looking for generic optimizations. 
 
 For every finding, state the location/symbol, workload, measurement or profile evidence, likely cause, user-visible consequence, simplest behavior-preserving recommendation, tradeoffs, and reproducible validation scenario. Separate measured findings from hypotheses and state what would confirm the latter.
 
-Include a baseline table with the actual environment, workload, results, and limitations. Do not promise a speedup without a controlled before/after comparison. If implementation is later authorized, use `/useful-skills:us-workflow` and repeat the same measurement after functional verification. Leave a permanent benchmark only when requested or when it protects a demonstrated regression.
+Include a baseline table with the actual environment, workload, results, and limitations. Do not promise a speedup without a controlled before/after comparison. If implementation is later authorized, use `/useful-skills:us-run-workflow` and repeat the same measurement after functional verification. Leave a permanent benchmark only when requested or when it protects a demonstrated regression.

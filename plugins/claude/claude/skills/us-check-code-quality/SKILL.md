@@ -1,11 +1,11 @@
 ---
 name: us-check-code-quality
-description: Audit a repository for maintainability risks such as authored files over 500 lines, duplicated behavior, poor boundaries, coupling, and inappropriate object-oriented design. Use when the user explicitly requests a code-quality audit; do not refactor application code without separate authorization.
+description: Audits maintainability risks such as files over 500 lines, duplicated behavior, weak boundaries, tight coupling, and misused object-oriented design, reporting evidence without refactoring. Use only when the user explicitly asks for a "code quality audit", "maintainability review", "find duplication", or "check for code smells".
 ---
 
 # Code-quality audit
 
-Load `/useful-skills:us-concise` before preparing context or findings. Audit actual architecture and language conventions, not personal formatting preferences. This audit does not authorize application-code refactoring.
+Load `/useful-skills:us-write-concisely` before preparing context or findings. Audit actual architecture and language conventions, not personal formatting preferences. This audit does not authorize application-code refactoring.
 
 ## Inspect the repository
 
