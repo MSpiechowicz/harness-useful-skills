@@ -1,6 +1,6 @@
 {
   "name": "harness-useful-skills",
-  "version": "0.2.41",
+  "version": "0.3.0",
   "description": "Owned skill-led development workflows and OMP-native memory support",
   "type": "module",
   "private": true,
