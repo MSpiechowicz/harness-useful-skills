@@ -2,7 +2,7 @@
 
 Eval suite for `claude plugin eval` against the `useful-skills` plugin (`plugins/claude`). It measures two things:
 
-- **Trigger accuracy** (`trigger` tag): whether skill descriptions make Claude pick the right skill for a plain request (`us-review`, `us-open-pr`, `us-check-performance`, `us-check-security`, `us-write-concisely`) and avoid heavy workflow skills for a simple explanation.
+- **Trigger accuracy** (`trigger` tag): whether skill descriptions make Claude pick the right skill for a plain request (`us-review`, `us-open-pr`, `us-check-performance`, `us-check-security`, `us-write-concisely`, `us-delete-safely`) and avoid heavy workflow skills for a simple explanation.
 - **Grill-me behavior** (`grill-me` tag): whether `us-grill-me` asks about user-owned choices before guessing on an ambiguous request, and stays out of the way for a precise one.
 
 ## Run
