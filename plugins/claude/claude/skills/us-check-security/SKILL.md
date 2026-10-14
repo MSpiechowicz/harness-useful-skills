@@ -1,13 +1,13 @@
 ---
 name: us-check-security
-description: Perform a focused evidence-backed security audit when explicitly requested, or after implementation when security review applies in normal workflow or is selected and eligible for focused repair. Inspect read-only; do not implement fixes, publish findings, or probe production.
+description: Performs a read-only, evidence-backed security audit (trust boundaries, injection, authentication, secrets, unsafe input) without fixing code, publishing findings, or probing production. Use when the user explicitly asks for a "security audit", "security review", "check for vulnerabilities", or "is this secure", or after implementation when the security review stage applies or is selected for a focused repair.
 ---
 
 # Security review
 
-Load `/useful-skills:us-concise` before preparing context or findings. This skill audits the current checkout; it does not authorize changes, deployment, publication, or testing against production. Disabling automatic `security_review` suppresses only that workflow stage, not an explicit security audit or another independent requirement; never report a skipped stage as completed.
+Load `/useful-skills:us-write-concisely` before preparing context or findings. This skill audits the current checkout; it does not authorize changes, deployment, publication, or testing against production. Disabling automatic `security_review` suppresses only that workflow stage, not an explicit security audit or another independent requirement; never report a skipped stage as completed.
 
-Apply pre-composition lane selection in `/useful-skills:us-workflow`, including on direct loading. Enabled `security_review` alone does not require an automatic audit for a clear low-risk focused correction. Actual security-sensitive changes require normal applicable stages and any independent security obligations, never a size-based exemption. Disabled/unknown stages are not activated automatically. A selected focused audit remains independent and fresh after affected changes; it does not trigger unrelated full-workflow stages.
+Apply pre-composition lane selection in `/useful-skills:us-run-workflow`, including on direct loading. Enabled `security_review` alone does not require an automatic audit for a clear low-risk focused correction. Actual security-sensitive changes require normal applicable stages and any independent security obligations, never a size-based exemption. Disabled/unknown stages are not activated automatically. A selected focused audit remains independent and fresh after affected changes; it does not trigger unrelated full-workflow stages.
 
 ## Scope and evidence
 
@@ -18,7 +18,7 @@ Apply pre-composition lane selection in `/useful-skills:us-workflow`, including 
 
 ## Independent review
 
-Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `/useful-skills:us-workflow`; loading that guidance does not launch the workflow.
+Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `/useful-skills:us-run-workflow`; loading that guidance does not launch the workflow.
 
 For an applicable enabled normal-workflow or selected eligible focused security review, dispatch a fresh `useful-skills:security-reviewer` after required/selected correctness review, otherwise after changed-surface verification. Only if unavailable and host policy permits, use `useful-skills:general-purpose` with explicit read-only security instructions and report the fallback. Use Claude Code’s `Agent` tool. A report is evidence, not permission to edit; selected reviews remain fresh after affected changes.
 

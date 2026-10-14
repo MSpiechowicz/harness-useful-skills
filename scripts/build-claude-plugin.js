@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Builds plugins/claude: a Claude-only plugin bundle with the same relative layout as this repository.
-// plugins/claude/README.md is hand-written and is the only file the generator never touches.
+// plugins/claude/README.md and the plugins/claude/evals/ tree (cases for `claude plugin eval`) are hand-written;
+// the generator never touches them.
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -16,6 +17,13 @@ if (process.argv.length > 3 || (process.argv[2] && !check)) {
 }
 
 const PRESERVED = new Set(['README.md']);
+const PRESERVED_TREE = 'evals';
+
+/** True for anything below a real evals/ directory. A link or file named evals has no children here, so it is not preserved. */
+const inPreservedTree = path => path.startsWith(`${PRESERVED_TREE}/`);
+
+/** Only real directories and non-executable regular files are preserved below evals/; links and executables are extras. */
+const isPreserved = (path, type) => inPreservedTree(path) && (type === 'directory' || type === 'file');
 
 // Every file shipped to Claude. Skills are the only walked folders; nothing else is matched by pattern.
 const FILES = [
@@ -182,7 +190,10 @@ function expectedOutput() {
   return output;
 }
 
-/** Everything below the output root by directory-entry type (readdir does not follow links), so links are reported as 'other'. */
+/**
+ * Everything below the output root by directory-entry type (readdir does not follow links), so links are reported as 'other'.
+ * A file with any execute bit below evals/ is also 'other': the hand-written tree may hold data, not runnable files.
+ */
 function existing(directory = outputRoot, prefix = '') {
   const found = new Map();
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -191,7 +202,8 @@ function existing(directory = outputRoot, prefix = '') {
       found.set(path, 'directory');
       for (const [child, type] of existing(join(directory, entry.name), path)) found.set(child, type);
     } else {
-      found.set(path, entry.isFile() ? 'file' : 'other');
+      const executable = entry.isFile() && inPreservedTree(path) && (lstatSync(join(directory, entry.name)).mode & 0o111) !== 0;
+      found.set(path, entry.isFile() && !executable ? 'file' : 'other');
     }
   }
   return found;
@@ -219,7 +231,7 @@ function differences(output, found) {
       stale.push(path);
     }
   }
-  const extra = [...found].filter(([path, type]) => type !== 'directory' && !output.has(path) && !PRESERVED.has(path));
+  const extra = [...found].filter(([path, type]) => type !== 'directory' && !output.has(path) && !PRESERVED.has(path) && !isPreserved(path, type));
   return { missing, stale, extra: extra.map(([path]) => path), readme: found.get('README.md') === 'file' };
 }
 
@@ -245,7 +257,8 @@ function main() {
     // Extras go first: a link or file in the way of a directory is removed without being followed.
     for (const path of extra) rmSync(join(outputRoot, path), { force: true });
     for (const [path, type] of [...found].reverse()) {
-      if (type === 'directory' && ![...output.keys()].some(file => file.startsWith(`${path}/`))) {
+      const preserved = path === PRESERVED_TREE || inPreservedTree(path);
+      if (type === 'directory' && !preserved && ![...output.keys()].some(file => file.startsWith(`${path}/`))) {
         rmSync(join(outputRoot, path), { recursive: true, force: true });
       }
     }

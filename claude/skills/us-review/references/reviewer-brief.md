@@ -1,6 +1,6 @@
 # Fresh correctness reviewer brief
 
-Load `/useful-skills:us-concise` before responding. Review only; do not edit, run a workflow, publish, or ask another worker to fix findings.
+Load `/useful-skills:us-write-concisely` before responding. Review only; do not edit, run a workflow, publish, or ask another worker to fix findings.
 
 ## Objective
 

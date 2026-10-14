@@ -1,21 +1,21 @@
 ---
 name: us-plan
-description: Use after clarification and source inspection when planning applies in normal workflow, is selected for an eligible focused repair, or is explicitly requested. Draft an actionable plan and obtain approval before implementing that proposed plan.
+description: Drafts one actionable implementation plan with acceptance criteria, file-level work packages, and verification, then asks for explicit approval before any edits. Use when the user says "plan this", "make a plan first", or "how would you implement X", or when the plan stage applies in the development workflow or is selected for a focused repair.
 ---
 
 # Plan a proposed change
 
-Load `skill://us-concise`. Apply lane selection in `skill://us-workflow` before composing stages, even on direct loading. Use applicable research and settled decisions from `skill://us-grill-me`; inspect source to close concrete gaps. A plan is a human-readable handoff, not a workflow database. An enabled plan switch alone does not require a new planner or approval for an eligible focused correction: current bounded authorization or prior in-scope approval suffices, subject to independent requirements. With no applicable automatic plan stage, a bounded user request may authorize implementation. An explicit plan request remains independent.
+Load `skill://us-write-concisely`. Apply lane selection in `skill://us-run-workflow` before composing stages, even on direct loading. Load `skill://us-grill-me` when any user-owned choice is open and plan only on settled decisions; inspect source to close concrete gaps. A plan is a human-readable handoff, not a workflow database. An enabled plan switch alone does not require a new planner or approval for an eligible focused correction: current bounded authorization or prior in-scope approval suffices, subject to independent requirements. With no applicable automatic plan stage, a bounded user request may authorize implementation. An explicit plan request remains independent.
 
-When planning is applicable and enabled in normal composition, selected and eligible for focused work, or explicitly requested, load **Native model routing** in `skill://us-workflow` before dispatching; this does not launch the workflow. The parent inspects source and owns scope, decomposition, and integration in the active workspace, never a globally selected repository. Dispatch advertised native `planner` for a bounded read-only draft. Existing mappings remain authoritative: `model: @plan` is overridden by `task.agentModelOverrides.planner`; configured roles are not observed worker metadata. Do not edit configuration. No startup flag or host override is required for the narrow session policy, which cannot bypass stronger controls.
+When planning is applicable and enabled in normal composition, selected and eligible for focused work, or explicitly requested, load **Native model routing** in `skill://us-run-workflow` before dispatching; this does not launch the workflow. The parent inspects source and owns scope, decomposition, and integration in the active workspace, never a globally selected repository. Dispatch advertised native `planner` for a bounded read-only draft. Existing mappings remain authoritative: `model: @plan` is overridden by `task.agentModelOverrides.planner`; configured roles are not observed worker metadata. Do not edit configuration. No startup flag or host override is required for the narrow session policy, which cannot bypass stronger controls.
 
 ## Inputs
 
-Require the requested outcome, available source/research brief, repository conventions, current constraints, and unresolved risks. If an essential consequence remains unknown, return to source inspection or `skill://us-grill-me`, or mark the smallest experiment needed; do not hide an assumption.
+Require the requested outcome, available source/research brief, repository conventions, current constraints, and unresolved risks. If a user-owned choice remains, load `skill://us-grill-me` and ask; if a fact is unknown, return to source inspection; if it needs a prototype or measurement, mark the smallest experiment. Do not hide an assumption.
 
 ## Dispatch and integrate one actionable plan
 
-Give `planner` the requested outcome, research brief, repository conventions, constraints, proposed work-package boundaries, and unresolved risks. Its draft is read-only: it does not edit, delegate, launch a workflow, or request approval. The parent checks it against current evidence, resolves factual conflicts, and integrates it into one complete plan.
+Give `planner` the requested outcome, research brief, repository conventions, constraints, proposed work-package boundaries, and unresolved risks. Its draft is read-only: it does not edit, delegate, launch a workflow, or request approval. The parent checks it against current evidence, resolves factual conflicts, and integrates it into one complete plan. The planner cannot ask the user: turn its open questions and unresolved user-owned choices into a `skill://us-grill-me` round before presenting the plan, and present the plan only on settled choices.
 
 State:
 

@@ -9,3 +9,6 @@ tasks/
 
 # HyperFrames project of the README video (the rendered MP4 lives in docs/video)
 videos/
+plugins/claude/evals/results/
+plugins/claude/tsconfig.json
+plugins/claude/.claude-plugin/types/

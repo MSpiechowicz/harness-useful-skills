@@ -133,8 +133,8 @@ test("memory approval tiers keep observation readable and mutations gated", asyn
 test("catalog accepts whitespace queries and no obsolete aliases", async t => {
   const f = await fixture(t);
   const handler = f.commands.get("useful-skills").handler;
-  await handler("  list   us-workflow  ", f.ctx);
-  assert.match(f.messages.at(-1).message, /\/skill:us-workflow/);
+  await handler("  list   us-run-workflow  ", f.ctx);
+  assert.match(f.messages.at(-1).message, /\/skill:us-run-workflow/);
   await handler("list us-ignore-workflow", f.ctx);
   assert.match(f.messages.at(-1).message, /\/skill:us-ignore-workflow/);
   await handler("library\tlist skills tdd-workflow", f.ctx);

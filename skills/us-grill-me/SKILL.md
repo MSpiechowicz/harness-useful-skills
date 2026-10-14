@@ -1,30 +1,34 @@
 ---
 name: us-grill-me
-description: Use automatically during a software-development request when consequential product, behavior, scope, or delivery decisions remain unresolved. Inspect discoverable facts first and ask only questions the user must decide; a precise request needs no questions.
+description: Asks the user one compact round of questions about behavior, interface, scope, data, cost, or delivery choices the code cannot answer, then stops until they reply. Use when a development request is ambiguous or underspecified, such as "add a feature", "build me X", or "make it better", or before planning any change where a user-owned choice would alter the result. Inspects the code first and never asks what the source already shows.
 ---
 
-# Clarify the real decision frontier
+# Ask the user before guessing
 
-Use this before planning, not as a substitute for source research. Read the request and bounded, relevant repository facts first. Do not write files, change code, dispatch workers, or treat a clarification response as plan approval.
+Run this in the parent session before planning; a subagent cannot ask the user and reports open choices to its parent instead. Read the request and bounded, relevant repository facts first. Do not write files, change code, dispatch workers, or treat an answer as plan approval.
 
 ## Inputs
 
-Collect the stated objective, constraints, known repository conventions, decisions already made, and uncertainty that could materially change behavior, interface, security, cost, scope, or verification.
+The stated objective, constraints, repository conventions, decisions already made, and anything still unknown.
 
 ## Method
 
-1. Separate discoverable facts from user-owned choices. Resolve the former through source and documentation inspection; do not ask the user to answer what the repository can show.
-2. Build the current decision frontier: questions whose prerequisites are already settled. Ask the frontier in a compact round, not a slow drip of dependent questions.
-3. For each consequential choice, state a recommendation, the principal alternative, and the effect on scope or users. Let the user reject, redirect, or answer “I do not know.”
-4. Incorporate answers, then ask the next frontier only if a real consequential choice remains. Preserve the user's scope; do not use questions to smuggle in extra work.
-5. Stop when the frontier is empty. Summarize settled decisions, assumptions that source evidence supports, and any deliberately deferred experiment.
+1. Separate discoverable facts from user-owned choices. Answer the former from source and documentation; never ask the user what the repository shows.
+2. A choice is user-owned when its answer would change behavior, interface, scope, data, cost, or delivery and neither the request nor the source settles it. Collect every such choice whose prerequisites are settled. When unsure whether a choice is the user's, treat it as theirs and ask.
+3. Ask the frontier in one reply as a numbered list: for each question give the recommended option first, marked "(Recommended)", one to three alternatives, and each option's effect on scope or users. Then end your turn; do not plan, edit, or assume an answer while waiting.
+4. After each answer, look again: answers often open dependent choices (choosing OAuth raises which providers; choosing a cache raises its invalidation). Ask the new frontier the same way, one round at a time, until no user-owned choice remains. Record "I do not know" as an explicit assumption using the recommendation. Do not use questions to add scope.
+5. Stop when the frontier is empty.
 
-Some questions are ungrillable without a prototype or measurement. Name that limitation and propose the smallest experiment for the later plan; do not guess a preference into a requirement.
+If no choice is user-owned, say so in one line naming the facts that made the request precise, and continue. A choice that needs a prototype or measurement becomes the smallest experiment in the plan, not a guess.
+
+## Come back later
+
+Return here whenever a later stage surfaces a new user-owned choice: research findings, open questions or risks in a planner draft, a review finding whose fix needs a product decision, or an implementation surprise that changes scope or behavior. Ask before presenting the plan or continuing the work; never bury the choice in the plan or decide it yourself.
 
 ## Completion evidence
 
-Produce a compact decision record: facts inspected, questions asked (if any), user choices, recommendations declined or accepted, and unresolved experimental questions. If no question was needed, explicitly say which source-supported constraints made the request sufficiently precise.
+A compact decision record: facts inspected, questions asked, answers, recommendations accepted or declined, and deferred experiments.
 
 ## Failure behavior
 
-When a required decision cannot be obtained, do not fabricate it or begin implementation. Carry it as an explicit plan risk or ask the user for the missing choice. Clarification is not the one implementation-plan approval; `skill://us-plan` requests that approval separately.
+Never fabricate an answer or start implementation while a user-owned choice is open; if the user does not answer, keep it open as an explicit plan risk. Clarification is not plan approval; `skill://us-plan` requests that separately.

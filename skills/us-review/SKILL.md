@@ -1,11 +1,11 @@
 ---
 name: us-review
-description: Use after authorized changes when correctness review applies in normal workflow, is selected for an eligible focused repair, or is explicitly requested. Obtain a fresh evidence-based review against authorized acceptance.
+description: Runs a fresh, evidence-based correctness review of changed code against the agreed acceptance, checking callers, edge cases, errors, and verification. Use when the user says "review my changes", "check this diff", "look over this code", or "is this correct", or after implementation when the review stage applies in the development workflow or is selected for a focused repair.
 ---
 
 # Fresh correctness review
 
-Load `skill://us-concise`. Apply lane selection in `skill://us-workflow`, including on direct loading; enabled `review` alone does not force a focused repair into a full cycle. Review current source and observed verification against authorized acceptance (applicable approved plan, prior in-scope approval, or bounded request), not implementer confidence. This skill is read-only and does not edit, publish, approve, or replace security review. Disabled/unknown automatic review is not selected automatically; independent review requests remain binding. A selected focused review must be fresh after affected changes, just like a required normal-workflow review.
+Load `skill://us-write-concisely`. Apply lane selection in `skill://us-run-workflow`, including on direct loading; enabled `review` alone does not force a focused repair into a full cycle. Review current source and observed verification against authorized acceptance (applicable approved plan, prior in-scope approval, or bounded request), not implementer confidence. This skill is read-only and does not edit, publish, approve, or replace security review. Disabled/unknown automatic review is not selected automatically; independent review requests remain binding. A selected focused review must be fresh after affected changes, just like a required normal-workflow review.
 
 ## Inputs
 
@@ -13,7 +13,7 @@ Require authorized scope and acceptance, implementation evidence, changed files/
 
 ## Request an independent review
 
-Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `skill://us-workflow`; loading that guidance does not launch the workflow.
+Before dispatching—even when this skill is invoked directly—load the **Native model routing** guidance in `skill://us-run-workflow`; loading that guidance does not launch the workflow.
 
 Use native `reviewer` only if advertised; otherwise dispatch the advertised general-purpose worker with a correctness-review role. Give it `skill://us-review/references/reviewer-brief.md`. The reviewer must be fresh with respect to the implementation and inspect current source, actual callers, edge conditions, errors, and whether verification proves the stated acceptance.
 

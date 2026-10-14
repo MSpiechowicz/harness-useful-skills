@@ -1,17 +1,17 @@
 ---
 name: us-improve-code-coverage
-description: Improve meaningful automated-test coverage using honest comparable measurements and consumer-observable regression tests.
+description: Raises meaningful test coverage with honest before/after measurements and consumer-observable regression tests, never padding, lowering thresholds, or adding exclusions. Use when the user asks to "improve test coverage", "add missing tests", "cover untested code", or "raise coverage".
 ---
 
 # Improve code coverage without padding
 
-Load `/useful-skills:us-concise` before preparing context or findings. This skill improves confidence in consumer-observable behavior; a percentage is a diagnostic, not the goal. It does not install tooling, lower thresholds, add exclusions, change application code, or execute the development workflow by itself.
+Load `/useful-skills:us-write-concisely` before preparing context or findings. This skill improves confidence in consumer-observable behavior; a percentage is a diagnostic, not the goal. It does not install tooling, lower thresholds, add exclusions, change application code, or execute the development workflow by itself.
 
 ## Inputs and authority
 
 Require the requested scope, repository guidance, current revision, existing tests and coverage configuration, available local scripts, and any existing plan or approval. Treat coverage artifacts and prior reports as stale until their command, revision, and configuration are verified.
 
-Use `/useful-skills:us-grill-me` only when a consequential scope or behavior decision remains unresolved. Trace relevant public interfaces, callers, tests, configuration, and plausible failures through `/useful-skills:us-research` when `research` is enabled; otherwise do essential source inspection without mandatory scout, using `/useful-skills:us-memory` for independently enabled backend/graph actions. When `plan` is enabled, use `/useful-skills:us-plan` to present proposed test scope and request explicit approval before lasting test edits. When disabled, a bounded user request can authorize tests without a mandatory planner or separate plan approval; independent authorization requirements remain. Authorization covers only bounded tests and in-scope repairs, not publication, dependency changes, threshold changes, or unrelated application changes.
+Load `/useful-skills:us-grill-me` and ask whenever a user-owned scope or behavior choice remains. Trace relevant public interfaces, callers, tests, configuration, and plausible failures through `/useful-skills:us-research` when `research` is enabled; otherwise do essential source inspection without mandatory scout, using `/useful-skills:us-manage-memory` for independently enabled backend/graph actions. When `plan` is enabled, use `/useful-skills:us-plan` to present proposed test scope and request explicit approval before lasting test edits. When disabled, a bounded user request can authorize tests without a mandatory planner or separate plan approval; independent authorization requirements remain. Authorization covers only bounded tests and in-scope repairs, not publication, dependency changes, threshold changes, or unrelated application changes.
 
 ## Inspect the measurement contract
 
@@ -43,9 +43,9 @@ When coverage analysis reveals a production defect, do not silently change appli
 
 ## Implement and verify authorized tests
 
-For authorized test changes, follow `/useful-skills:us-implement` without recursively starting `/useful-skills:us-workflow`. Reuse the repository's test conventions and fixtures. Keep tests isolated, deterministic, and consumer-observable. Run focused safe local tests as appropriate, then rerun the same coverage command and measurement contract used for the baseline. Compare like-for-like metrics and explain which behavior each retained test covers; do not credit unrelated movement in aggregate metrics as the result of a test.
+For authorized test changes, follow `/useful-skills:us-implement` without recursively starting `/useful-skills:us-run-workflow`. Reuse the repository's test conventions and fixtures. Keep tests isolated, deterministic, and consumer-observable. Run focused safe local tests as appropriate, then rerun the same coverage command and measurement contract used for the baseline. Compare like-for-like metrics and explain which behavior each retained test covers; do not credit unrelated movement in aggregate metrics as the result of a test.
 
-After implementation and combined verification, obtain fresh correctness review through `/useful-skills:us-review` when `review` is enabled and security review through `/useful-skills:us-check-security` when `security_review` is enabled. Repair verified in-scope findings through `/useful-skills:us-implement`, repeat affected verification and measurements, and obtain fresh enabled reviews after each repair. After verified work and enabled reviews, use `/useful-skills:us-memory` only for enabled backend/graph actions.
+After implementation and combined verification, obtain fresh correctness review through `/useful-skills:us-review` when `review` is enabled and security review through `/useful-skills:us-check-security` when `security_review` is enabled. Repair verified in-scope findings through `/useful-skills:us-implement`, repeat affected verification and measurements, and obtain fresh enabled reviews after each repair. After verified work and enabled reviews, use `/useful-skills:us-manage-memory` only for enabled backend/graph actions.
 
 ## Completion evidence
 
@@ -56,7 +56,7 @@ Report:
 - retained tests, the consumer contract each protects, and the meaningful bug or regression it would fail;
 - tests and coverage commands actually run, observed results, measurement limitations, and any non-comparable changes;
 - discovered production defects, whether separately approved, and any blocker such as missing tooling, unsafe commands, empty scope, or unavailable reports; and
-- actual outcomes of enabled `/useful-skills:us-review`, `/useful-skills:us-check-security`, and `/useful-skills:us-memory` actions, marking disabled stages as skipped and reporting residual limitations.
+- actual outcomes of enabled `/useful-skills:us-review`, `/useful-skills:us-check-security`, and `/useful-skills:us-manage-memory` actions, marking disabled stages as skipped and reporting residual limitations.
 
 ## Failure behavior
 

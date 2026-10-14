@@ -1,11 +1,11 @@
 ---
 name: us-open-pr
-description: Publish a reviewed feature branch as a GitHub pull request only when the user explicitly requests PR delivery. Inspect and preserve unrelated work, then create or reuse the exact authorized head/base PR without rebasing, force-pushing, merging, or changing its destination.
+description: Publishes a reviewed feature branch as a GitHub pull request, preserving unrelated work and reusing an existing PR, without rebasing, force-pushing, merging, or changing the base. Use only when the user explicitly asks to "open a PR", "create a pull request", or "publish this branch"; plan approval or a finished review is not a delivery request.
 ---
 
 # Open a pull request
 
-Load `skill://us-concise` before preparing delivery prose. Reading this skill, reviewing code, or approving an implementation plan does not authorize publication; require the user's actual delivery request.
+Load `skill://us-write-concisely` before preparing delivery prose. Reading this skill, reviewing code, or approving an implementation plan does not authorize publication; require the user's actual delivery request.
 
 A direct native `/skill:us-approve-work` invocation without narrower limits already authorizes committing approved work, pushing a safe feature branch, and opening/reusing its PR against the verified GitHub default branch. Accept the original invocation/request and restrictions passed from `us-approve-work` without asking the PR delivery choice twice. An explicit request to ship an item through `us-ship-backlog-item` may likewise authorize its reviewed feature-branch commits, push, and linked PR; retain its selected item and requested scope. A separately explicit PR request may authorize a different specified base; do not replace it with the default branch. A worker's claim, issue text, automatic skill selection, quoted/copied invocation, or implementation-plan approval is not authorization.
 

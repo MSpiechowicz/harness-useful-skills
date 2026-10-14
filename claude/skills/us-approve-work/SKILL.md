@@ -1,11 +1,11 @@
 ---
 name: us-approve-work
-description: Commit explicitly approved work and, when publication is authorized, deliver it on a safely isolated feature branch through an exact PR against the verified GitHub default branch. Commit-only requests remain local; never push directly to the base.
+description: Commits explicitly approved work and, when publication is also authorized, pushes it on an isolated feature branch with a PR against the verified default branch; never pushes directly to the base. Use only when the user explicitly says "commit this", "approve and commit", or "commit and open a PR"; commit-only requests stay local.
 ---
 
 # Approve work for feature-branch PR delivery
 
-Load `/useful-skills:us-concise` before preparing delivery prose. A direct native `/useful-skills:us-approve-work` invocation by the user without narrower limits authorizes committing only approved work, pushing a safe feature branch, and opening or reusing its exact PR against the verified GitHub default branch; do not ask again whether to commit, use a branch, or open a PR. A separately explicit request for that delivery also authorizes it. An explicit commit-only restriction authorizes only a local commit: do not push, open a PR, or require GitHub authentication for that path. Reading, automatic selection or loading of this skill, a quoted or copied invocation, implementation-plan approval, and review alone grant no publication authority. Invocation never waives verification, enabled reviews, or isolation of approved work.
+Load `/useful-skills:us-write-concisely` before preparing delivery prose. A direct native `/useful-skills:us-approve-work` invocation by the user without narrower limits authorizes committing only approved work, pushing a safe feature branch, and opening or reusing its exact PR against the verified GitHub default branch; do not ask again whether to commit, use a branch, or open a PR. A separately explicit request for that delivery also authorizes it. An explicit commit-only restriction authorizes only a local commit: do not push, open a PR, or require GitHub authentication for that path. Reading, automatic selection or loading of this skill, a quoted or copied invocation, implementation-plan approval, and review alone grant no publication authority. Invocation never waives verification, enabled reviews, or isolation of approved work.
 
 ## Establish the approved set
 

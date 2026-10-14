@@ -219,7 +219,7 @@ test("list shows Claude skill invocations", async t => {
 
   const list = await f.run(["list", "memory"]);
   assert.equal(list.exitCode, 0);
-  assert.match(list.text, /\n {4}\/useful-skills:us-memory(\n|$)/);
+  assert.match(list.text, /\n {4}\/useful-skills:us-manage-memory(\n|$)/);
   assert.doesNotMatch(list.text, /\/skill:/);
 
   const split = await f.run(["list memory"]);
