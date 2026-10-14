@@ -14,12 +14,16 @@ The stated objective, constraints, repository conventions, decisions already mad
 ## Method
 
 1. Separate discoverable facts from user-owned choices. Answer the former from source and documentation; never ask the user what the repository shows.
-2. A choice is user-owned when its answer would change behavior, interface, scope, data, cost, or delivery and neither the request nor the source settles it. Collect every such choice whose prerequisites are settled.
+2. A choice is user-owned when its answer would change behavior, interface, scope, data, cost, or delivery and neither the request nor the source settles it. Collect every such choice whose prerequisites are settled. When unsure whether a choice is the user's, treat it as theirs and ask.
 3. Ask the frontier in one reply as a numbered list: for each question give the recommended option first, marked "(Recommended)", one to three alternatives, and each option's effect on scope or users. Then end your turn; do not plan, edit, or assume an answer while waiting.
-4. Incorporate answers and ask the next frontier only if a user-owned choice remains. Record "I do not know" as an explicit assumption using the recommendation. Do not use questions to add scope.
+4. After each answer, look again: answers often open dependent choices (choosing OAuth raises which providers; choosing a cache raises its invalidation). Ask the new frontier the same way, one round at a time, until no user-owned choice remains. Record "I do not know" as an explicit assumption using the recommendation. Do not use questions to add scope.
 5. Stop when the frontier is empty.
 
 If no choice is user-owned, say so in one line naming the facts that made the request precise, and continue. A choice that needs a prototype or measurement becomes the smallest experiment in the plan, not a guess.
+
+## Come back later
+
+Return here whenever a later stage surfaces a new user-owned choice: research findings, open questions or risks in a planner draft, a review finding whose fix needs a product decision, or an implementation surprise that changes scope or behavior. Ask before presenting the plan or continuing the work; never bury the choice in the plan or decide it yourself.
 
 ## Completion evidence
 

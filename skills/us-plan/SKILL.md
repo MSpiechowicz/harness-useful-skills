@@ -15,7 +15,7 @@ Require the requested outcome, available source/research brief, repository conve
 
 ## Dispatch and integrate one actionable plan
 
-Give `planner` the requested outcome, research brief, repository conventions, constraints, proposed work-package boundaries, and unresolved risks. Its draft is read-only: it does not edit, delegate, launch a workflow, or request approval. The parent checks it against current evidence, resolves factual conflicts, and integrates it into one complete plan.
+Give `planner` the requested outcome, research brief, repository conventions, constraints, proposed work-package boundaries, and unresolved risks. Its draft is read-only: it does not edit, delegate, launch a workflow, or request approval. The parent checks it against current evidence, resolves factual conflicts, and integrates it into one complete plan. The planner cannot ask the user: turn its open questions and unresolved user-owned choices into a `skill://us-grill-me` round before presenting the plan, and present the plan only on settled choices.
 
 State:
 

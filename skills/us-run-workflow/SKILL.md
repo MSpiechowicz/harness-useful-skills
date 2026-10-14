@@ -40,7 +40,7 @@ This section is shared routing guidance, not an instruction to launch the full w
 
 Use this normal composition only after lane selection. Focused work follows its mandatory inspect/fix/verify/report path plus selected or independently required stages, not this entire sequence.
 
-1. Load `skill://us-grill-me`; whenever a user-owned choice remains, it asks before research or planning and ends the turn until answered.
+1. Load `skill://us-grill-me`; whenever a user-owned choice remains, it asks before research or planning and ends the turn until answered. Return to it whenever research, the planner draft, a review, or implementation surfaces a new user-owned choice.
 2. If `research` is enabled, load `skill://us-research` for bounded reconnaissance. If disabled, still inspect relevant current code, callers, tests, and conventions yourself without a mandatory scout. During that inspection, use `skill://us-manage-memory` for enabled `backend-memory` and/or `graphify-memory` actions independently; when both are off, make no automatic memory call.
 3. Scope and decompose the work. If `plan` is enabled, load `skill://us-plan`, dispatch `planner` with bounded evidence, integrate its draft, and request explicit approval before editing. If disabled, do not require a planner or separate plan approval; confirm the user request authorizes the bounded change, and seek authorization where independently required.
 4. Once authorized, load `skill://us-implement`. Dispatch `frontend` for frontend packages, `backend` for backend packages, and `task` only for genuinely neither packages, including one package. Split mixed packages where coherent; dispatch independent, ready, disjoint packages together and serialize shared or dependent work.
