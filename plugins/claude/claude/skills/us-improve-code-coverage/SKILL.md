@@ -1,6 +1,6 @@
 ---
 name: us-improve-code-coverage
-description: Raises meaningful test coverage with honest before/after measurements and consumer-observable regression tests, never padding, lowering thresholds, or adding exclusions. Use when the user asks to "improve test coverage", "add missing tests", "cover untested code", or "raise coverage".
+description: Use when the user asks to "improve test coverage", "add missing tests", "cover untested code", or "raise coverage". Honest before/after measurements and consumer-observable regression tests; never pads, lowers thresholds, or adds exclusions.
 ---
 
 # Improve code coverage without padding

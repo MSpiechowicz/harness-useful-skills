@@ -143,8 +143,8 @@ for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
   }
 }
 output.set('us-check-code-quality/CODE_QUALITY.md', readFileSync(join(sourceRoot, 'us-check-code-quality', 'CODE_QUALITY.md'), 'utf8'));
-if (readdirSync(sourceRoot, { withFileTypes: true }).filter(entry => entry.isDirectory() && entry.name.startsWith('us-')).length !== 18) {
-  throw new Error('Expected exactly 18 canonical skills');
+if (readdirSync(sourceRoot, { withFileTypes: true }).filter(entry => entry.isDirectory() && entry.name.startsWith('us-')).length !== 19) {
+  throw new Error('Expected exactly 19 canonical skills');
 }
 
 function filesUnder(directory, prefix = '') {

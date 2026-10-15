@@ -1,6 +1,6 @@
 ---
 name: us-grill-me
-description: Asks the user one compact round of questions about behavior, interface, scope, data, cost, or delivery choices the code cannot answer, then stops until they reply. Use when a development request is ambiguous or underspecified, such as "add a feature", "build me X", or "make it better", or before planning any change where a user-owned choice would alter the result. Inspects the code first and never asks what the source already shows.
+description: Use when a development request is ambiguous or leaves a user-owned choice (behavior, interface, scope, data, cost, delivery), e.g. "add a feature", "build me X", "make it better". Asks one compact round of questions the code cannot answer, then stops until the user replies. Inspects code first and never asks what the source already shows.
 ---
 
 # Ask the user before guessing

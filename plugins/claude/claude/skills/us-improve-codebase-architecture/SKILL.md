@@ -1,6 +1,6 @@
 ---
 name: us-improve-codebase-architecture
-description: Investigates a scoped area for evidence-backed architectural improvements, presents ranked candidates with tradeoffs, and changes code only after the user picks and authorizes one. Use when the user asks to "improve the architecture", "find refactoring opportunities", "untangle this module", or "reduce coupling".
+description: Use when the user asks to "improve the architecture", "find refactoring opportunities", "untangle this module", or "reduce coupling". Investigates a scoped area, presents ranked candidates with tradeoffs, and changes code only after the user picks and authorizes one.
 ---
 
 # Improve codebase architecture

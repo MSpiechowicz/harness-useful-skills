@@ -1,6 +1,6 @@
 ---
 name: us-write-concisely
-description: Writes answers in a short, direct style that drops filler and preamble while keeping code, paths, commands, numbers, errors, and caveats exact. Use before answering whenever the user asks for brevity in any form, even on a quick one-line question, such as "tl;dr", "keep it short", "be concise", "briefly", "short answer", "in one sentence", or "cut the fluff"; also use when preparing workflow context, progress updates, or final summaries.
+description: Use whenever the user wants brevity ("tl;dr", "keep it short", "be concise", "briefly", "short answer", "in one sentence", "cut the fluff"), even on a quick question; also when preparing workflow context, progress updates, or final summaries. Short, direct answers; code, paths, commands, numbers, errors, caveats stay exact.
 ---
 
 # Concise, readable prose

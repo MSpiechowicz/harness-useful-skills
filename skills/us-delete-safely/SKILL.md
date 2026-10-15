@@ -1,6 +1,6 @@
 ---
 name: us-delete-safely
-description: Guides deleting files and folders without risking the filesystem root, the home folder, the workspace, its parent folders, or another Git repository, and tells when to delete freely and when to ask first. Use before any recursive delete or cleanup, such as removing build output, node_modules, caches, temp files, or running git clean or find -delete.
+description: Use before ANY recursive delete or cleanup: rm -rf, git clean, find -delete, removing build output, node_modules, caches, temp files. Guards the filesystem root, home, workspace, parent folders, and other Git repositories; says when to delete freely and when to ask first.
 ---
 
 # Deleting files safely

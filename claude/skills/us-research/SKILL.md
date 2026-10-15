@@ -1,6 +1,6 @@
 ---
 name: us-research
-description: Inspects current code, callers, tests, conventions, docs, and applicable project memory before a code change, using a read-only scout when required. Use when the user asks to "investigate before we change it" or "find where X is wired up", or when the research stage applies in the development workflow or is selected for a focused repair. Not for plain explanations of existing code.
+description: Use before changing code when current code, callers, tests, or conventions must be understood first, e.g. "investigate before we change it", "find where X is wired up", or when the research stage applies in the workflow. Read-only; uses a scout when required. Not for plain explanations of existing code.
 ---
 
 # Evidence before implementation planning

@@ -1,6 +1,6 @@
 ---
 name: us-run-workflow
-description: Runs the Useful Skills development workflow for code changes, first choosing a focused-repair or full lane, then applying the enabled stages (clarify, research, plan, implement, review, memory). Use when the user asks to build a feature, fix a bug, change behavior, refactor, or says "implement X" or "make this work" and the repository workflow is enabled, unless they directly invoked us-ignore-workflow for this request. Not for explanations, code questions, or standalone audits.
+description: Use for substantial code changes: new features, behavior changes, refactors, multi-file or risky work, or unclear failures, e.g. "implement X", "build Y". Picks a focused or full lane, then applies the enabled stages (clarify, research, plan, implement, review, memory). Skip for small bounded fixes (typo, one-liner, obvious bug), explanations, code questions, standalone audits, or when us-ignore-workflow was directly invoked.
 ---
 
 # Useful Skills development workflow

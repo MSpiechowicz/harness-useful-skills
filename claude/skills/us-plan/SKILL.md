@@ -1,6 +1,6 @@
 ---
 name: us-plan
-description: Drafts one actionable implementation plan with acceptance criteria, file-level work packages, and verification, then asks for explicit approval before any edits. Use when the user says "plan this", "make a plan first", or "how would you implement X", or when the plan stage applies in the development workflow or is selected for a focused repair.
+description: Use before editing when a plan is needed: "plan this", "make a plan first", "how would you implement X", or when the plan stage applies in the workflow. Drafts one actionable plan with acceptance criteria, file-level work packages, and verification, then asks for explicit approval before any edits.
 ---
 
 # Plan a proposed change
