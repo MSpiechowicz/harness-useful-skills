@@ -1,6 +1,6 @@
 ---
 name: us-review
-description: Runs a fresh, evidence-based correctness review of changed code against the agreed acceptance, checking callers, edge cases, errors, and verification. Use when the user says "review my changes", "check this diff", "look over this code", or "is this correct", or after implementation when the review stage applies in the development workflow or is selected for a focused repair.
+description: Use after code changes or when asked: "review my changes", "check this diff", "look over this code", "is this correct", or when the review stage applies in the workflow. Fresh, evidence-based correctness review of changed code against acceptance, callers, edge cases, errors, and verification.
 ---
 
 # Fresh correctness review

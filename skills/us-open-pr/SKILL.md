@@ -1,6 +1,6 @@
 ---
 name: us-open-pr
-description: Publishes a reviewed feature branch as a GitHub pull request, preserving unrelated work and reusing an existing PR, without rebasing, force-pushing, merging, or changing the base. Use only when the user explicitly asks to "open a PR", "create a pull request", or "publish this branch"; plan approval or a finished review is not a delivery request.
+description: Use only when the user explicitly asks to "open a PR", "create a pull request", or "publish this branch". Publishes a reviewed feature branch as a GitHub PR, preserving unrelated work and reusing an existing PR; no rebase, force-push, merge, or base change. A finished review is not a delivery request.
 ---
 
 # Open a pull request

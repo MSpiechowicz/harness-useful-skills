@@ -1,6 +1,6 @@
 ---
 name: us-check-security
-description: Performs a read-only, evidence-backed security audit (trust boundaries, injection, authentication, secrets, unsafe input) without fixing code, publishing findings, or probing production. Use when the user explicitly asks for a "security audit", "security review", "check for vulnerabilities", or "is this secure", or after implementation when the security review stage applies or is selected for a focused repair.
+description: Use for "security audit", "security review", "check for vulnerabilities", "is this secure", or when the security review stage applies in the workflow. Read-only, evidence-backed audit (trust boundaries, injection, auth, secrets, unsafe input); never fixes code, publishes findings, or probes production.
 ---
 
 # Security review

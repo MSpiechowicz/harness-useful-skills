@@ -1,6 +1,6 @@
 ---
 name: us-check-performance
-description: Measures representative performance and finds bottlenecks with a baseline before recommending any change; never rewrites code speculatively. Use only when the user explicitly asks to "audit performance", "profile this", "find what is slow", "why is this slow", or "benchmark X".
+description: Use only when the user explicitly asks to "audit performance", "profile this", "find what is slow", "why is this slow", or "benchmark X". Measures with a baseline before recommending any change; never rewrites code speculatively.
 ---
 
 # Performance audit

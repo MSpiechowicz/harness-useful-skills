@@ -44,6 +44,7 @@
     "./claude/skills/us-open-pr/",
     "./claude/skills/us-write-concisely/",
     "./claude/skills/us-delete-safely/",
+    "./claude/skills/us-mockup-views/",
     "./claude/skills/us-review/",
     "./claude/skills/us-research/",
     "./claude/skills/us-grill-me/",

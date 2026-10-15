@@ -1,6 +1,6 @@
 ---
 name: us-implement
-description: Implements an authorized change, inline for a focused repair or through classified frontend, backend, or general implementation workers, and verifies the changed path by running it. Use when the user approves a plan ("go ahead", "implement it"), for a bounded authorized request with no plan stage, or for in-scope repairs of review findings.
+description: Use once a change is authorized: the user approves a plan ("go ahead", "implement it"), makes a bounded request with no plan stage, or review findings need in-scope repair. Implements inline or via classified frontend/backend/general workers and verifies the changed path by running it.
 ---
 
 # Implement the authorized change

@@ -1,6 +1,6 @@
 ---
 name: us-ship-backlog-item
-description: Picks one actionable backlog item and ships it through a feature branch, the enabled development stages, and a linked PR, marking it done only after a confirmed merge. Use when the user explicitly asks to "ship the next backlog item" or "pick something from the backlog and ship it"; selection-only requests such as "what should I work on next" stay read-only.
+description: Use only when the user explicitly asks to "ship the next backlog item" or "pick something from the backlog and ship it". Ships one item via a feature branch, the enabled stages, and a linked PR; marks it done only after a confirmed merge. "What should I work on next" stays read-only.
 ---
 
 # Ship one backlog item

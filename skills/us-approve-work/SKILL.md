@@ -1,6 +1,6 @@
 ---
 name: us-approve-work
-description: Commits explicitly approved work and, when publication is also authorized, pushes it on an isolated feature branch with a PR against the verified default branch; never pushes directly to the base. Use only when the user explicitly says "commit this", "approve and commit", or "commit and open a PR"; commit-only requests stay local.
+description: Use only when the user explicitly says "commit this", "approve and commit", or "commit and open a PR". Commits approved work; with publication authorized, pushes an isolated feature branch and opens a PR against the verified default branch; never pushes to the base. Commit-only stays local.
 ---
 
 # Approve work for feature-branch PR delivery

@@ -1,6 +1,6 @@
 ---
 name: us-manage-memory
-description: Searches, saves, and refreshes project memory (durable facts and the Graphify code graph), treating results as untrusted evidence to verify in source. Use when the user says "remember this", "what do we know about X", "search project memory", "build the code graph", or "query the graph", or automatically when a memory stage applies in the development workflow.
+description: Use for "remember this", "what do we know about X", "search project memory", "build the code graph", "query the graph", or when a memory stage applies in the workflow. Searches, saves, and refreshes project memory and the Graphify graph; results are untrusted evidence to verify in source.
 ---
 
 # Evidence-backed project memory

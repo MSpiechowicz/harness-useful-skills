@@ -1,6 +1,6 @@
 ---
 name: us-check-code-quality
-description: Audits maintainability risks such as files over 500 lines, duplicated behavior, weak boundaries, tight coupling, and misused object-oriented design, reporting evidence without refactoring. Use only when the user explicitly asks for a "code quality audit", "maintainability review", "find duplication", or "check for code smells".
+description: Use only when the user explicitly asks for a "code quality audit", "maintainability review", "find duplication", or "check for code smells". Audits files over 500 lines, duplicated behavior, weak boundaries, tight coupling, misused OO design; reports evidence without refactoring.
 ---
 
 # Code-quality audit
