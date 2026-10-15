@@ -5,11 +5,11 @@ description: Use after code changes or when asked: "review my changes", "check t
 
 # Fresh correctness review
 
-Load `skill://us-write-concisely`. Apply lane selection in `skill://us-run-workflow`, including on direct loading; enabled `review` alone does not force a focused repair into a full cycle. Review current source and observed verification against authorized acceptance (applicable approved plan, prior in-scope approval, or bounded request), not implementer confidence. This skill is read-only and does not edit, publish, approve, or replace security review. Disabled/unknown automatic review is not selected automatically; independent review requests remain binding. A selected focused review must be fresh after affected changes, just like a required normal-workflow review.
+Load `skill://us-write-concisely`. Apply lane selection in `skill://us-run-workflow` when loaded directly; as a stage of an active workflow, keep that workflow's lane and never switch it to omit stages; enabled `review` alone does not force a focused repair into a full cycle. Review current source and observed verification against authorized acceptance (applicable approved plan, prior in-scope approval, or bounded request), not implementer confidence. This skill is read-only and does not edit, publish, approve, or replace security review. Disabled/unknown automatic review is not selected automatically; independent review requests remain binding. A selected focused review must be fresh after affected changes, just like a required normal-workflow review.
 
 ## Inputs
 
-Require authorized scope and acceptance, implementation evidence, changed files/interfaces, relevant test or smoke results, and current source. Inspect the current revision rather than trusting a previous review or a worker's summary.
+Require authorized scope and acceptance, implementation evidence, changed files/interfaces, relevant test or smoke results, and current source. Inspect the current revision rather than trusting a previous review or a worker's summary. For a change to how a UI element looks or behaves, also require the `skill://us-keep-ui-consistent` instance table; if it is missing, report missing evidence and run its search and classification steps yourself, read-only.
 
 ## Request an independent review
 
@@ -19,13 +19,15 @@ Use native `reviewer` only if advertised; otherwise dispatch the advertised gene
 
 Sort findings by material impact. Each finding includes severity, confidence, exact file and line/symbol, evidence or a safe reproduction, consumer impact, and concrete repair direction. Distinguish confirmed acceptance failures from risks, missing evidence, and minor suggestions. “No findings” means no issue was found in the reviewed scope, not that the code is universally correct.
 
+For such changes, check sibling coverage using the skill's search and classification steps: an unchanged same-pattern sibling in the same app or package without cited variant evidence is an acceptance failure; one the skill correctly sent to the user for a decision is not.
+
 ## Repair loop
 
 Send verified acceptance failures and material issues to `skill://us-implement` for authorized in-scope repair, retaining the active lane and its required workers. Rerun affected verification and obtain fresh required or selected correctness/security reviews after affected changes; never reuse earlier review evidence for newly changed code or restart unrelated stages. Prior approval covers in-scope repair without routine new planning/approval. After three unsuccessful repair rounds or repeated no-progress findings, preserve work and explain the blocker rather than weakening acceptance.
 
 ## Completion evidence
 
-Return scope, reviewer capability, source revision/paths, evidence, findings/disposition, and residual limitations. Load `skill://us-check-security` only when applicable and enabled in normal composition, selected and eligible for focused work, or independently requested. Correctness review does not satisfy required security review; omitted stages are skipped, not completed.
+Return scope, reviewer capability, source revision/paths, evidence, findings/disposition, and residual limitations. Load `skill://us-check-security` only when applicable and enabled in normal composition, selected and eligible for focused work, or independently requested. Correctness review does not satisfy required security review; omitted stages are skipped, not completed. As a workflow stage, return to `skill://us-run-workflow` and continue its remaining stages (security review, repairs, memory, summary); this review does not complete the workflow.
 
 ## Failure behavior
 

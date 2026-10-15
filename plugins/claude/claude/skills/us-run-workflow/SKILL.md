@@ -33,7 +33,7 @@ Plugin agents use `model: inherit`. When Useful Skills session context lists con
 
 ## Compose the work
 
-Use this normal composition only after lane selection. Focused work follows its mandatory inspect/fix/verify/report path plus selected or independently required stages, not this entire sequence.
+Use this normal composition only after lane selection. Focused work follows its mandatory inspect/fix/verify/report path plus selected or independently required stages, not this entire sequence. In normal composition, run every applicable effective stage below in order through step 7. A stage skill's completion hands control back here; it does not complete the workflow. Do not stop after review or cherry-pick stages.
 
 1. Load `/useful-skills:us-grill-me`; whenever a user-owned choice remains, it asks before research or planning and ends the turn until answered. Return to it whenever research, the planner draft, a review, or implementation surfaces a new user-owned choice.
 2. If `research` is enabled, load `/useful-skills:us-research` for bounded reconnaissance. If disabled, still inspect relevant current code, callers, tests, and conventions yourself without a mandatory scout. During that inspection, use `/useful-skills:us-manage-memory` for enabled `backend_memory` and/or `graphify_memory` actions independently; when both are off, make no automatic memory call.
@@ -43,7 +43,7 @@ Use this normal composition only after lane selection. Focused work follows its 
 6. Route bounded in-scope repairs in this active normal workflow through `/useful-skills:us-implement` and the classified Claude agent without routine new planning/approval. Re-run affected verification and repeat required enabled reviews fresh after affected changes. Do not retroactively switch to focused handling to omit them. After three unsuccessful repair rounds or repeated no-progress findings, preserve work and report the blocker.
 7. Prepare a concise summary of verified work. If `backend_memory` or `graphify_memory` is enabled, load `/useful-skills:us-manage-memory` for only the corresponding automatic action(s) and report observed outcomes. If both are disabled, make no automatic memory status, search, save, graph query, or graph build call.
 
-Scale enabled stages to the task, never silently reinstate a disabled mandatory stage. Material scope changes return to the user with an explanation. Plan approval, when applicable, authorizes implementation and in-scope repair only; neither a plan nor a bounded implementation request authorizes commits, pushes, merges, releases, or PRs. Load a separate delivery skill only after an explicit delivery request.
+Scale each applicable stage's depth to the task, never by omitting it in normal composition, and never silently activate a disabled or unknown stage. Material scope changes return to the user with an explanation. Plan approval, when applicable, authorizes implementation and in-scope repair only; neither a plan nor a bounded implementation request authorizes commits, pushes, merges, releases, or PRs. Load a separate delivery skill only after an explicit delivery request.
 
 ## Completion evidence
 

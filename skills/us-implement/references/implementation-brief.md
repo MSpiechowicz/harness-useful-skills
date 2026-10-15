@@ -20,6 +20,7 @@ Own only: `<Parent fills package classification, selected worker, exact files to
 - The authorized scope is the boundary; report material scope or interface drift instead of expanding work.
 - Respect the parent's lane and selected stages. Optional focused delegation does not restart planning/full reviews/memory. Active normal-workflow repairs retain required fresh reviews, owned by the parent, without routine new planning/approval.
 - Reuse local patterns and preserve unrelated edits.
+- When the package changes how a UI element looks or behaves, apply `skill://us-keep-ui-consistent` to sibling instances inside owned files; report siblings outside ownership instead of editing them.
 - Keep code easy to read: group related declarations with the logic that uses them, separate distinct logical stages and conditional branches with whitespace rather than packing declarations or `if`/`return` statements together, and favor straightforward control flow. Expand complex inline conditionals into clear branches; simple inline cases are fine when clear.
 - For a bug or uncertain behavior, establish a behavioral regression before changing implementation when practical.
 - Keep tests consumer-observable; do not add source-text, prompt-wording, forwarding, or mock-echo tests.
@@ -32,4 +33,4 @@ Own only: `<Parent fills package classification, selected worker, exact files to
 
 ## Output
 
-Return changed paths, a concise account of the observable behavior implemented, scoped verification actually run and its observed result, retained regression tests and their contract, plus exact blockers/limitations. Include the assigned package classification and any actual worker/model metadata supplied at runtime. A completion claim is evidence for the parent to inspect, not approval to publish or proof of the routed model.
+Return changed paths, a concise account of the observable behavior implemented, scoped verification actually run and its observed result, retained regression tests and their contract, plus exact blockers/limitations. Include the assigned package classification and any actual worker/model metadata supplied at runtime. A completion claim is evidence for the parent to inspect, not approval to publish or proof of the routed model. For UI changes, include the sibling instance table.
