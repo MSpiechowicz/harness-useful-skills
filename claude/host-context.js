@@ -2,26 +2,14 @@ import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
 import path from "node:path";
 
-import { createLocalFacts } from "./local-facts.js";
+import { resolveHostRoots } from "../host-roots.js";
 import { claudeConfigDir } from "./models.js";
+
+const CLAUDE_FACTS = Object.freeze({ label: "Claude", backend: "claude-local-facts", directory: "claude-facts" });
 
 /** Resolve the Claude project and plugin data roots used by memory tools and doctor setup. */
 export async function resolveHostContext({ workspace, data } = {}) {
-  if (!workspace || !data || !path.isAbsolute(workspace) || !path.isAbsolute(data)) {
-    throw new Error("Claude project root and persistent plugin data root are required.");
-  }
-
-  const [cwd, resolvedData] = await Promise.all([realpath(workspace), realpath(data)]);
-  if (path.resolve(data) !== resolvedData) {
-    throw new Error("Claude plugin data root must not contain symbolic links.");
-  }
-
-  const [workspaceEntry, dataEntry] = await Promise.all([lstat(cwd), lstat(resolvedData)]);
-  if (!workspaceEntry.isDirectory() || !dataEntry.isDirectory()) {
-    throw new Error("Claude project and plugin data roots must be directories.");
-  }
-
-  return { cwd, agentDir: resolvedData, memory: createLocalFacts({ cwd, agentDir: resolvedData }) };
+  return resolveHostRoots({ workspace, data, label: "Claude", facts: CLAUDE_FACTS });
 }
 
 /** Claude Code names a plugin's data directory after `<plugin>@<marketplace>` with unsafe characters replaced. */

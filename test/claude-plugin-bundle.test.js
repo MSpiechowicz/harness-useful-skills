@@ -16,6 +16,7 @@ const FORBIDDEN = [
   /(^|\/)skills\/us-library(\/|$)/,
   /(^|\/)references\/ecc(\/|$)/,
   /^omp(\/|$)/,
+  /^opencode(\/|$)/,
   /^(extension|updater)\.js$/,
   /^useful-skills$/,
   /^test(\/|$)/,

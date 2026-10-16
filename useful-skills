@@ -1,16 +1,22 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { formatDoctor } from "./doctor.js";
-import { installPlugin, runUpdate, UpdateError } from "./updater.js";
+import { installPlugin, PACKAGE_ROOT, runUpdate, UpdateError } from "./updater.js";
 import { formatResources, listResources, parseCatalogArguments, resourceInventory, safetyEnabled } from "./resources.js";
 const USAGE = `Usage:
   ./useful-skills install [--scope user|project] [--profile PROFILE]
   ./useful-skills update check|install [--profile PROFILE]
   ./useful-skills list [query]
   ./useful-skills doctor
+  ./useful-skills install --host opencode [--scope user|project]
+  ./useful-skills update check|install --host opencode [--scope user|project]
+  ./useful-skills uninstall --host opencode [--scope user|project]
+  ./useful-skills doctor --host opencode [--scope user|project]
 
 Requires Node.js 22+ and OMP with marketplace support.
+--host omp is the default; --host opencode installs into OpenCode instead (restart OpenCode afterwards).
 Owned us-* skills are selected by description or /skill:us-<name>.
 No startup workflow.
 Development uses one plan approval; publication requires an explicit request.
@@ -62,6 +68,111 @@ function parseOptions(argv, allowed) {
   return options;
 }
 
+/** Commands that accept `--host`; `list` and `help` are host-agnostic. */
+const HOSTED_COMMANDS = new Set(["install", "update", "uninstall", "doctor"]);
+const OMP_UNINSTALL = "uninstall needs --host opencode; for OMP run `omp plugin uninstall harness-useful-skills@harness-useful-skills`.";
+
+/** Remove `--host VALUE` from the arguments; an omitted host means OMP. */
+function splitHost(argv) {
+  const index = argv.indexOf("--host");
+  if (index === -1) {
+    return { host: "omp", rest: argv };
+  }
+
+  const host = optionValue(argv, index, "--host");
+  if (host !== "omp" && host !== "opencode") {
+    throw new UpdateError("--host must be omp or opencode.");
+  }
+
+  const rest = [...argv.slice(0, index), ...argv.slice(index + 2)];
+  if (rest.includes("--host")) {
+    throw new UpdateError("--host may be given only once.");
+  }
+  return { host, rest };
+}
+
+function openCodeScope(argv) {
+  if (argv.includes("--profile")) {
+    throw new UpdateError("--profile is an OMP option; it cannot be combined with --host opencode.");
+  }
+
+  const { scope } = parseOptions(argv, new Set(["--scope"]));
+  if (scope !== undefined && scope !== "user" && scope !== "project") {
+    throw new UpdateError("--scope must be user or project.");
+  }
+  return scope;
+}
+
+/** Validate an OpenCode command line, returning the operation to run; argument errors throw before anything runs. */
+function openCodeOperation(command, argv) {
+  if (command === "update") {
+    const [action, ...rest] = argv;
+    if (action !== "check" && action !== "install") {
+      throw new UpdateError("Expected update check or update install.");
+    }
+    return { command, action, scope: openCodeScope(rest) ?? "user" };
+  }
+
+  return { command, scope: openCodeScope(argv) };
+}
+
+/** Check or install an update for the runtime installed in `scope`, never for this checkout. */
+async function openCodeUpdate({ action, scope }, context) {
+  const { runtimeInstall, scopeRootFor } = await import("./opencode/paths.js");
+  const runtimeRoot = path.join(scopeRootFor({ scope, ...context }), "plugins", "useful-skills");
+  if (!runtimeInstall(runtimeRoot)) {
+    const flag = scope === "project" ? " --scope project" : "";
+    throw new Error(`Useful Skills is not installed for OpenCode in ${scope} scope; run ./useful-skills install --host opencode${flag} first.`);
+  }
+
+  const { checkOpenCodeUpdate, installOpenCodeUpdate } = await import("./opencode/updater.js");
+  const run = action === "check" ? checkOpenCodeUpdate : installOpenCodeUpdate;
+  return (await run({ environment: context.environment, runtimeRoot })).message;
+}
+
+async function openCodeDoctor({ scope }, context) {
+  const { inspectOpenCodeInstall } = await import("./opencode/install-status.js");
+  const scopes = scope === "project" ? ["user", "project"] : ["user"];
+  return scopes.map(each => inspectOpenCodeInstall({ scope: each, ...context }).text).join("\n\n");
+}
+
+async function runOpenCode(operation) {
+  const context = { cwd: process.cwd(), environment: process.env };
+  if (operation.command === "install") {
+    const { installOpenCode } = await import("./opencode/install.js");
+    const bundleRoot = path.join(PACKAGE_ROOT, "plugins", "opencode");
+    return installOpenCode({ scope: operation.scope ?? "user", ...context, bundleRoot }).message;
+  }
+
+  if (operation.command === "uninstall") {
+    const { uninstallOpenCode } = await import("./opencode/uninstall.js");
+    return uninstallOpenCode({ scope: operation.scope ?? "user", ...context }).message;
+  }
+
+  if (operation.command === "update") {
+    return openCodeUpdate(operation, context);
+  }
+
+  return openCodeDoctor(operation, context);
+}
+
+/**
+ * Argument errors exit 2 with usage; a failed OpenCode operation exits 1 with its multi-line reason intact.
+ * Success and error output both pass the one sanitizer (newlines kept) because paths in them come from disk.
+ */
+async function openCodeCommand(command, argv) {
+  const operation = openCodeOperation(command, argv);
+  const { printableText } = await import("./opencode/paths.js");
+  try {
+    console.log(printableText(await runOpenCode(operation)));
+    return 0;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`useful-skills: ${printableText(message)}\n`);
+    return 1;
+  }
+}
+
 export async function main(argv = process.argv.slice(2)) {
   try {
     if (argv.length === 1 && (argv[0] === "help" || argv[0] === "--help" || argv[0] === "-h")) {
@@ -72,6 +183,14 @@ export async function main(argv = process.argv.slice(2)) {
     if (argv[0] === "list") {
       await listCommand(argv);
       return 0;
+    }
+
+    if (HOSTED_COMMANDS.has(argv[0])) {
+      const { host, rest } = splitHost(argv.slice(1));
+      if (host === "opencode") {
+        return await openCodeCommand(argv[0], rest);
+      }
+      argv = [argv[0], ...rest];
     }
 
     if (argv.length === 1 && argv[0] === "doctor") {
@@ -96,6 +215,10 @@ export async function main(argv = process.argv.slice(2)) {
         console.log(`Useful Skills ${report.currentVersion}: ${report.message || "No newer stable release available."}`);
       }
       return 0;
+    }
+
+    if (argv[0] === "uninstall") {
+      throw new UpdateError(OMP_UNINSTALL);
     }
 
     throw new UpdateError("Expected install, list, doctor, update check, update install, or help.");

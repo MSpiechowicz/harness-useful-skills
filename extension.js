@@ -1,4 +1,5 @@
 import { formatDoctor } from "./doctor.js";
+import { boundedDisplay, runGraphTest } from "./graph-test.js";
 import { runUpdate } from "./updater.js";
 import { readWorkflowSettings, STAGES, writeWorkflowSetting } from "./workflow-settings.js";
 import { effectiveWorkflow } from "./workflow-policy.js";
@@ -38,7 +39,7 @@ const OWNED_GUIDANCE = new Set([
   ...STAGES.map(stage => `Useful Skills profile: automatic ${stage} stage enabled when the development workflow applies. Follow the relevant us-* skill's requirements for this stage; this setting is not evidence that the stage ran or permission to bypass other controls.`),
   ...STAGES.flatMap(stage => Object.values(STAGE_GUIDANCE[stage])),
 ]);
-const GRAPH_TEST_QUERY = "main";
+const GRAPH_NOTICE_LIMIT = 4_096;
 const HELP = [
   "Useful Skills for Oh My Pi",
   "/skill:us-<name> — load an owned skill; natural requests also select skills by description.",
@@ -106,49 +107,16 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
   }
 
   function graphNotice(ctx, message, level = "info") {
-    const text = redactText(message);
-    const bytes = Buffer.from(text);
-    const limit = 4_096;
-    const suffix = "\n[display truncated]";
-    notify(ctx, bytes.length <= limit ? text : `${bytes.subarray(0, limit - Buffer.byteLength(suffix)).toString("utf8")}${suffix}`, level);
+    notify(ctx, boundedDisplay(redactText(message), GRAPH_NOTICE_LIMIT), level);
   }
 
   async function graphTest(ctx) {
-    graphNotice(ctx, "Building this workspace's Graphify graph, then running a diagnostic query. This explicit command may set up pinned dependencies and writes graph storage under your OMP profile outside the checkout.");
-    const options = { cwd: ctx.cwd, agentDir: pi.pi.getAgentDir(), memory: ctx.memory };
-    let build;
-    try {
-      build = await memoryAction({ action: "build" }, options);
-      if (!build.ok) {
-        return graphNotice(ctx, `Graphify build failed: ${build.error || "No build result was returned."}`, "error");
-      }
-      const { generation, graph } = build.active;
-      const { nodes, edges, sources } = build.snapshot;
-      graphNotice(ctx, `Graphify built generation ${generation}: ${nodes} nodes, ${edges} edges, ${sources} source files.\nGraph storage: ${graph}`);
-    } catch (error) {
-      return graphNotice(ctx, `Graphify build failed: ${error instanceof Error ? error.message : String(error)}`, "error");
-    }
-
-    try {
-      const result = await memoryAction({ action: "query", query: GRAPH_TEST_QUERY }, options);
-      if (!result.ok) {
-        return graphNotice(ctx, `Graphify query failed: ${result.error || "No query result was returned."}`, "error");
-      }
-      if (result.active?.generation !== build.active.generation) {
-        return graphNotice(ctx, `Graphify query failed: active generation changed from ${build.active.generation} to ${result.active?.generation ?? "unknown"}; results cannot be attributed to this build.`, "error");
-      }
-      if (typeof result.output !== "string") {
-        return graphNotice(ctx, "Graphify query failed: no text output was returned.", "error");
-      }
-      const output = result.output.trim();
-      graphNotice(ctx, output
-        ? /^No matching nodes found\.?$/i.test(output)
-          ? `Graphify query "${GRAPH_TEST_QUERY}" returned no matches${result.outputTruncated ? " (Graphify output truncated)" : ""}:\n${result.output}`
-          : `Graphify query "${GRAPH_TEST_QUERY}" output${result.outputTruncated ? " (Graphify output truncated)" : ""}:\n${result.output}`
-        : `Graphify query "${GRAPH_TEST_QUERY}" returned no output${result.outputTruncated ? " (Graphify output truncated)" : ""}; no relationships are claimed.`);
-    } catch (error) {
-      graphNotice(ctx, `Graphify query failed: ${error instanceof Error ? error.message : String(error)}`, "error");
-    }
+    await runGraphTest({
+      memoryAction,
+      options: { cwd: ctx.cwd, agentDir: pi.pi.getAgentDir(), memory: ctx.memory },
+      storage: "your OMP profile",
+      report: (message, level) => graphNotice(ctx, message, level),
+    });
   }
 
   async function update(action, ctx, quiet = false) {

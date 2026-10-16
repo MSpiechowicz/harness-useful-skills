@@ -3,7 +3,7 @@ import { chmod, mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
-import { runClaudeDoctor } from "../claude/doctor-setup.js";
+import { runDoctorSetup } from "../doctor-setup.js";
 import { pluginDataName, resolveHostContext } from "../claude/host-context.js";
 import { workspaceMemoryPaths } from "../graphify.js";
 import { assertNoWrites, factsDirectory, fixture, SECRET } from "./helpers/claude-doctor-fixture.js";
@@ -115,7 +115,7 @@ test("the time budget stops setup and asks for another run", async t => {
   assert.doesNotMatch(setup.text, /after fixing the error/);
 
   const host = await resolveHostContext({ workspace: f.repo, data: f.dataDir });
-  const aborted = await runClaudeDoctor({ ...host, signal: AbortSignal.abort(), services: f.services });
+  const aborted = await runDoctorSetup({ ...host, signal: AbortSignal.abort(), services: f.services });
   assert.equal(aborted.ok, false);
   assert.deepEqual(aborted.steps.map(step => step.outcome), ["skipped", "skipped", "skipped"]);
 });

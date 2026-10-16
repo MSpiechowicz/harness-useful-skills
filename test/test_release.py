@@ -12,6 +12,7 @@ from release import bump_version, plan_release
 PLUGIN = "harness-useful-skills"
 CATALOG = ".omp-plugin/marketplace.json"
 CLAUDE_MANIFESTS = (".claude-plugin/plugin.json", "plugins/claude/.claude-plugin/plugin.json")
+OPENCODE_MANIFESTS = ("opencode/package.json", "plugins/opencode/useful-skills/package.json")
 
 
 def git(path, *args):
@@ -64,6 +65,12 @@ class ReleaseTransactionTests(unittest.TestCase):
                 '{\n  "name": "useful-skills",\n  "version": "1.0.0",\n  "license": "GPL-3.0-only"\n}\n',
                 encoding="utf-8",
             )
+        for path in OPENCODE_MANIFESTS:
+            (self.checkout / path).parent.mkdir(parents=True, exist_ok=True)
+            (self.checkout / path).write_text(
+                '{\n  "name": "useful-skills-opencode",\n  "private": true,\n  "type": "module",\n  "version": "1.0.0"\n}\n',
+                encoding="utf-8",
+            )
         self.commit(self.checkout, "Initial source")
         git(self.checkout, "push", "origin", "main")
         self.source = git(self.checkout, "rev-parse", "HEAD")
@@ -107,6 +114,16 @@ class ReleaseTransactionTests(unittest.TestCase):
                 git(self.origin, "show", f"{commit}:{path}"),
                 '{\n  "name": "useful-skills",\n  "version": "1.0.1",\n  "license": "GPL-3.0-only"\n}',
             )
+        for path in OPENCODE_MANIFESTS:
+            self.assertEqual(
+                git(self.origin, "show", f"{commit}:{path}"),
+                '{\n  "name": "useful-skills-opencode",\n  "private": true,\n  "type": "module",\n  "version": "1.0.1"\n}',
+            )
+
+        self.assertEqual(
+            git(self.origin, "diff-tree", "--no-commit-id", "--name-only", "-r", commit).splitlines(),
+            sorted([CATALOG, "package.json", *CLAUDE_MANIFESTS, *OPENCODE_MANIFESTS]),
+        )
 
         retry = plan_release(self.fresh_checkout("retry"), self.source, push=True)
         self.assertTrue(retry["reused"])
@@ -178,8 +195,8 @@ class ReleaseTransactionTests(unittest.TestCase):
         self.assertEqual(git(self.origin, "rev-parse", "refs/heads/main"), source)
         self.assertEqual(git(self.origin, "tag", "--list"), "")
 
-    def test_mismatched_claude_manifest_version_fails_before_creating_refs(self):
-        for path in CLAUDE_MANIFESTS:
+    def test_mismatched_manifest_version_fails_before_creating_refs(self):
+        for path in (*CLAUDE_MANIFESTS, *OPENCODE_MANIFESTS):
             manifest = self.checkout / path
             manifest.write_text(manifest.read_text(encoding="utf-8").replace("1.0.0", "0.9.0"), encoding="utf-8")
             self.commit(self.checkout, f"Break {path}")
@@ -194,6 +211,21 @@ class ReleaseTransactionTests(unittest.TestCase):
             manifest.write_text(manifest.read_text(encoding="utf-8").replace("0.9.0", "1.0.0"), encoding="utf-8")
             self.commit(self.checkout, f"Repair {path}")
             git(self.checkout, "push", "origin", "main")
+
+    def test_tag_with_only_the_old_manifest_set_is_not_resumed(self):
+        # A release commit that skipped an OpenCode manifest must not be reused.
+        result = plan_release(self.checkout, self.source, push=True)
+        commit = result["commit"]
+        clone = self.fresh_checkout("partial")
+        git(clone, "checkout", commit, "--", "package.json", CATALOG, *CLAUDE_MANIFESTS, OPENCODE_MANIFESTS[0])
+        git(self.origin, "tag", "-d", "v1.0.1")
+        git(clone, "tag", "-d", "v1.0.1")
+        self.commit(clone, "partial release")
+        git(clone, "-c", "tag.gpgsign=false", "tag", "v1.0.1")
+        git(clone, "push", "origin", "refs/tags/v1.0.1")
+
+        with self.assertRaisesRegex(ValueError, "already exists and is not this release"):
+            plan_release(self.fresh_checkout("retry"), self.source, push=True)
 
     def test_bump_resets_lower_components_and_rejects_unstable_versions(self):
         self.assertEqual(bump_version("3.9.8", "minor"), "3.10.0")

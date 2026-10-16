@@ -1,5 +1,4 @@
-import { realpath } from "node:fs/promises";
-import { STAGES, readWorkflowSettings } from "../workflow-settings.js";
+import { STAGES, readWorkflowSnapshot } from "../workflow-settings.js";
 import { claudeConfigDir } from "./models.js";
 
 const KEYS = Object.freeze(["workflow", ...STAGES]);
@@ -41,28 +40,13 @@ export function readClaudeSettings(environment = process.env) {
   return { values, errors };
 }
 
-/** Read the OMP-compatible file store under the Claude config dir, or mark every key unreadable. */
-async function readStore(environment, cwd) {
-  try {
-    // The store rejects symlinked profile paths, so resolve a linked ~/.claude first.
-    const agentDir = await realpath(claudeConfigDir(environment));
-    return await readWorkflowSettings({ agentDir, cwd });
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    return {
-      values: Object.fromEntries(KEYS.map(key => [key, undefined])),
-      errors: Object.fromEntries(KEYS.map(key => [key, reason])),
-      sources: Object.fromEntries(KEYS.map(key => [key, "error"])),
-    };
-  }
-}
-
 /**
  * Per key: an unreadable saved file stays unknown, a saved file wins, and only an
  * absent file falls back to the plugin userConfig option, then to enabled.
  */
 export async function readClaudeWorkflow({ environment = process.env, cwd } = {}) {
-  const store = await readStore(environment, cwd);
+  // The OMP-compatible file store under the Claude config dir.
+  const store = await readWorkflowSnapshot({ configDir: claudeConfigDir(environment), cwd });
   const options = readClaudeSettings(environment);
   const values = {};
   const errors = {};

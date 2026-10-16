@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { runCommand } from "../../claude/command.js";
-import { runClaudeDoctor } from "../../claude/doctor-setup.js";
+import { runDoctorSetup } from "../../doctor-setup.js";
 import { resolveHostContext } from "../../claude/host-context.js";
 import { workspaceMemoryPaths } from "../../graphify.js";
 import { extract, service, validGraph } from "./graph-fixture.js";
@@ -101,7 +101,7 @@ export async function gitHome(f) {
 
 export async function graphOutcome(f, workspace, system) {
   const host = await resolveHostContext({ workspace, data: f.dataDir });
-  const outcome = await runClaudeDoctor({ ...host, services: f.services, system });
+  const outcome = await runDoctorSetup({ ...host, services: f.services, system });
   return outcome.steps.at(-1);
 }
 

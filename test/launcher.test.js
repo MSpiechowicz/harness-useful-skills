@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readdir, rm, symlink } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, symlink } from "node:fs/promises";
 import { promisify } from "node:util";
 import os from "node:os";
 import path from "node:path";
@@ -68,4 +68,60 @@ test("launcher runs when invoked through a symlinked bin path", async t => {
   assert.equal(help.code, 0);
   assert.match(help.stdout, /Usage:/);
   assert.equal((await cli(["unknown"], {}, link)).code, 2);
+});
+
+test("launcher --host keeps OMP the default and validates OpenCode arguments before running anything", async () => {
+  const help = await cli(["--help"]);
+  assert.match(help.stdout, /install --host opencode \[--scope user\|project\]/);
+  assert.match(help.stdout, /uninstall --host opencode/);
+
+  const omp = await cli(["doctor", "--host", "omp"]);
+  assert.equal(omp.code, 0);
+  assert.equal(omp.stdout, (await cli(["doctor"])).stdout);
+  assert.match((await cli(["update", "check", "--host", "omp", "--scope", "user"])).stderr, /^useful-skills: --scope is not valid for this command\.\n/);
+
+  const rejected = {
+    "install --host claude": /^useful-skills: --host must be omp or opencode\.\nUsage:/,
+    "install --host": /^useful-skills: --host requires a value\.\n/,
+    "install --host opencode --profile work": /^useful-skills: --profile is an OMP option; it cannot be combined with --host opencode\.\n/,
+    "install --host opencode --scope global": /^useful-skills: --scope must be user or project\.\n/,
+    "update status --host opencode": /^useful-skills: Expected update check or update install\.\n/,
+    "uninstall": /^useful-skills: uninstall needs --host opencode; for OMP run `omp plugin uninstall harness-useful-skills@harness-useful-skills`\.\n/,
+    "uninstall --host omp": /omp plugin uninstall/,
+  };
+  for (const [args, expected] of Object.entries(rejected)) {
+    const result = await cli(args.split(" "));
+    assert.equal(result.code, 2, args);
+    assert.match(result.stderr, expected, args);
+  }
+});
+
+test("launcher OpenCode doctor and update read the given HOME without creating anything", async t => {
+  const home = await mkdtemp(path.join(os.tmpdir(), "us-launcher-opencode-"));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: path.join(home, "config"), XDG_DATA_HOME: path.join(home, "share") };
+
+  const doctor = await cli(["doctor", "--host", "opencode", "--scope", "project"], { cwd: home, env });
+  assert.equal(doctor.code, 0);
+  assert.match(doctor.stdout, /user scope/);
+  assert.match(doctor.stdout, /project scope/);
+
+  const update = await cli(["update", "check", "--host", "opencode"], { cwd: home, env });
+  assert.equal(update.code, 1);
+  assert.match(update.stderr, /^useful-skills: Useful Skills is not installed for OpenCode in user scope; run \.\/useful-skills install --host opencode first\.\n$/);
+  assert.deepEqual(await readdir(home), []);
+});
+
+test("launcher OpenCode output never carries terminal control characters from paths", async t => {
+  const home = await mkdtemp(path.join(os.tmpdir(), "us-launcher-control-"));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  const config = path.join(home, "evil\u001b[2J\u009bconfig");
+  await mkdir(path.join(config, "opencode"), { recursive: true });
+  const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: config, XDG_DATA_HOME: path.join(home, "share") };
+
+  const doctor = await cli(["doctor", "--host", "opencode"], { cwd: home, env });
+
+  assert.equal(doctor.code, 0);
+  assert.match(doctor.stdout, /no install record in .*evil \[2J config\/opencode/);
+  assert.doesNotMatch(doctor.stdout, /[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/);
 });

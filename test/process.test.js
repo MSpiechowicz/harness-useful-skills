@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { existsSync } from "node:fs";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 
 import { minimalEnvironment, runProcess } from "../process.js";
 
@@ -96,4 +103,38 @@ test("process runner escalates termination after a timeout", async () => {
   );
 
   assert.ok(Date.now() - startedAt < 2_000);
+});
+
+test("an entry point ended by a signal ends its process children, runs its cleanups, and exits 128 + signal", async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "useful-skills-process-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const pidFile = path.join(directory, "grandchild.pid");
+  const marker = path.join(directory, "cleaned");
+  const entry = path.join(directory, "entry.mjs");
+  const processModule = pathToFileURL(path.resolve(import.meta.dirname, "../process.js")).href;
+  await writeFile(entry, [
+    "import { writeFileSync } from 'node:fs';",
+    `import { exitOnTermination, onTermination, runProcess } from ${JSON.stringify(processModule)};`,
+    "const [pidFile, marker] = process.argv.slice(2);",
+    "exitOnTermination();",
+    "onTermination(() => writeFileSync(marker, 'cleaned'));",
+    "const forgotten = onTermination(() => writeFileSync(marker + '.forgotten', 'ran'));",
+    "forgotten();",
+    "const hang = `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setTimeout(() => {}, 20_000);`;",
+    "await runProcess(process.execPath, ['-e', hang], { cwd: process.cwd(), env: {}, timeoutMs: 60_000 }).catch(() => {});",
+  ].join("\n"));
+
+  const parent = spawn(process.execPath, [entry, pidFile, marker], { stdio: "ignore" });
+  const exited = once(parent, "exit");
+  while (!existsSync(pidFile) || (await readFile(pidFile, "utf8")) === "") {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  const grandchild = Number(await readFile(pidFile, "utf8"));
+  parent.kill("SIGHUP");
+
+  assert.deepEqual(await exited, [129, null]);
+  assert.equal(await readFile(marker, "utf8"), "cleaned");
+  assert.equal(existsSync(`${marker}.forgotten`), false);
+  assert.throws(() => process.kill(grandchild, 0), { code: "ESRCH" });
 });

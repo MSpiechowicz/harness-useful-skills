@@ -1,8 +1,11 @@
 import { spawn } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 
 const DEFAULT_MAX_BYTES = 1024 * 1024;
 const TERMINATION_GRACE_MS = 250;
+// Shorter than the grace opencode/node-runner.js gives this process, so children end before it is killed.
+const ENTRY_TERMINATION_GRACE_MS = 100;
 
 function requiredPath(value, name) {
   if (typeof value !== "string" || !path.isAbsolute(value)) {
@@ -43,7 +46,8 @@ function processError(message, details = {}) {
   return Object.assign(new Error(message), details);
 }
 
-function signalProcessTree(child, signal) {
+/** Signal a child spawned detached into its own process group, falling back to the child alone. */
+export function signalProcessTree(child, signal) {
   if (!child.pid) {
     return;
   }
@@ -61,6 +65,63 @@ function signalProcessTree(child, signal) {
     child.kill(signal);
   } catch {
     // The close/error handler reports the original process failure.
+  }
+}
+
+// runProcess children still running. Each is its own process group, so a signal to the parent does not reach it.
+const activeChildren = new Set();
+const terminationCleanups = new Set();
+
+/** Signal the process group of every runProcess child that has not closed yet. */
+export function terminateActiveProcesses(signal) {
+  for (const child of activeChildren) {
+    signalProcessTree(child, signal);
+  }
+}
+
+/**
+ * Run `cleanup` synchronously if exitOnTermination ends this process. Call the returned function once the
+ * cleanup is no longer needed.
+ */
+export function onTermination(cleanup) {
+  terminationCleanups.add(cleanup);
+  return () => terminationCleanups.delete(cleanup);
+}
+
+function runTerminationCleanups() {
+  for (const cleanup of terminationCleanups) {
+    try {
+      cleanup();
+    } catch {
+      // The process is exiting; one failed cleanup must not skip the others.
+    }
+  }
+}
+
+/**
+ * For a command-line entry point only: on SIGTERM, SIGHUP, or SIGINT, end the process groups of running
+ * runProcess children (SIGTERM, then SIGKILL after a short grace), run the onTermination cleanups, and exit
+ * with 128 + the signal number. Without it those children would outlive the entry point.
+ */
+export function exitOnTermination() {
+  let terminating = false;
+
+  for (const name of ["SIGTERM", "SIGHUP", "SIGINT"]) {
+    process.on(name, () => {
+      if (terminating) {
+        return;
+      }
+
+      terminating = true;
+      terminateActiveProcesses("SIGTERM");
+
+      const grace = activeChildren.size > 0 ? ENTRY_TERMINATION_GRACE_MS : 0;
+      setTimeout(() => {
+        terminateActiveProcesses("SIGKILL");
+        runTerminationCleanups();
+        process.exit(128 + os.constants.signals[name]);
+      }, grace);
+    });
   }
 }
 
@@ -120,6 +181,8 @@ export function runProcess(file, args, options) {
       stdio: ["ignore", "pipe", "pipe", ...inheritedFds],
       windowsHide: true,
     });
+
+    activeChildren.add(child);
 
     const finish = (error, result) => {
       if (settled) {
@@ -199,11 +262,14 @@ export function runProcess(file, args, options) {
     });
 
     child.once("error", (error) => {
+      activeChildren.delete(child);
       clearTimeout(escalation);
       finish(processError(`Cannot start process: ${error.message}`, { cause: error }));
     });
 
     child.once("close", (code, closeSignal) => {
+      activeChildren.delete(child);
+
       if (failure) {
         if (!terminating) {
           return finish(failure);

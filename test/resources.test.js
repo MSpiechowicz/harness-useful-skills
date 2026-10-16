@@ -109,3 +109,24 @@ test("redaction preserves clean and nontext results and removes secret-shaped ou
   assert.deepEqual(content.slice(0, 2), [null, { type: "image", data: "opaque" }]);
   assert.equal(content[2].text, "Bearer [REDACTED] api_key=[REDACTED] [REDACTED]");
 });
+
+test("quoted frontmatter descriptions are listed as their decoded text", async (t) => {
+  const { root, skill } = await fixture(t);
+  await skill("skills/us-double", "us-double", String.raw`"Say \"hi\" on a path\\ and tab\t, newline\nA é"`);
+  await skill("skills/us-single", "us-single", "'It''s a \"quoted\" word'");
+  await skill("skills/us-plain", "us-plain", `Plain "inner" text`);
+
+  const descriptions = Object.fromEntries((await listResources("skills", { root })).map(x => [x.name, x.description]));
+  assert.equal(descriptions["us-double"], 'Say "hi" on a path\\ and tab , newline A é');
+  assert.equal(descriptions["us-single"], 'It\'s a "quoted" word');
+  assert.equal(descriptions["us-plain"], 'Plain "inner" text');
+});
+
+test("quoted frontmatter escapes never put control characters in descriptions", async (t) => {
+  const { root, skill } = await fixture(t);
+  await skill("skills/us-escape", "us-escape", String.raw`"Red \u001b[31mtext\u001b[0m, bell \u0007, del \u007f, c1 \u009b, nul \u0000 end"`);
+
+  const [entry] = (await listResources("skills", { root })).filter(x => x.name === "us-escape");
+  assert.equal(entry.description, "Red  [31mtext [0m, bell  , del  , c1  , nul   end");
+  assert.doesNotMatch(entry.description, /[\u0000-\u001f\u007f-\u009f]/);
+});

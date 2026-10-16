@@ -1,39 +1,10 @@
 #!/usr/bin/env node
 // Claude policy is derived from the OMP skills. Host-specific differences live only here.
-import { readFileSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseCheckFlag, renderSkills, replace, line, section } from './skill-render-core.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const sourceRoot = join(root, 'skills');
-const outputRoot = join(root, 'claude', 'skills');
-const check = process.argv[2] === '--check';
-if (process.argv.length > 3 || (process.argv[2] && !check)) {
-  throw new Error('Usage: node scripts/render-claude-skills.js [--check]');
-}
-
-function replace(text, before, after) {
-  const first = text.indexOf(before);
-  if (first === -1 || text.indexOf(before, first + before.length) !== -1) {
-    throw new Error(`Expected exactly one occurrence of ${JSON.stringify(before.slice(0, 90))}`);
-  }
-  return text.slice(0, first) + after + text.slice(first + before.length);
-}
-
-function line(text, beginning, replacement) {
-  const rows = text.split('\n');
-  const matches = rows.flatMap((row, index) => row.startsWith(beginning) ? [index] : []);
-  if (matches.length !== 1) throw new Error(`Expected one line starting with ${beginning}`);
-  rows[matches[0]] = replacement;
-  return rows.join('\n');
-}
-
-function section(text, heading, nextHeading, body) {
-  const start = text.indexOf(heading + '\n');
-  const end = text.indexOf(nextHeading + '\n', start + heading.length);
-  if (start < 0 || end < 0) throw new Error(`Missing section ${heading} or ${nextHeading}`);
-  return text.slice(0, start) + heading + '\n\n' + body + '\n\n' + text.slice(end);
-}
 
 function adapt(file, source) {
   const name = file.split('/')[0];
@@ -125,55 +96,14 @@ function adapt(file, source) {
   return text;
 }
 
-const output = new Map();
-for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
-  if (!entry.isDirectory() || !entry.name.startsWith('us-')) continue;
-  const name = entry.name;
-  output.set(`${name}/SKILL.md`, adapt(`${name}/SKILL.md`, readFileSync(join(sourceRoot, name, 'SKILL.md'), 'utf8')));
-  const references = join(sourceRoot, name, 'references');
-  try {
-    for (const child of readdirSync(references, { withFileTypes: true })) {
-      if (child.isFile() && child.name.endsWith('.md')) {
-        const path = `${name}/references/${child.name}`;
-        output.set(path, adapt(path, readFileSync(join(references, child.name), 'utf8')));
-      }
-    }
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-  }
-}
-output.set('us-check-code-quality/CODE_QUALITY.md', readFileSync(join(sourceRoot, 'us-check-code-quality', 'CODE_QUALITY.md'), 'utf8'));
-if (readdirSync(sourceRoot, { withFileTypes: true }).filter(entry => entry.isDirectory() && entry.name.startsWith('us-')).length !== 20) {
-  throw new Error('Expected exactly 20 canonical skills');
-}
+const usage = 'Usage: node scripts/render-claude-skills.js [--check]';
 
-function filesUnder(directory, prefix = '') {
-  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
-    const path = prefix ? `${prefix}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) return filesUnder(join(directory, entry.name), path);
-    return [path];
-  });
-}
-
-let stale = false;
-for (const [path, content] of output) {
-  const destination = join(outputRoot, path);
-  if (check) {
-    try {
-      if (readFileSync(destination, 'utf8') !== content) stale = true;
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
-      stale = true;
-    }
-  } else {
-    mkdirSync(dirname(destination), { recursive: true });
-    writeFileSync(destination, content);
-  }
-}
-if (check && filesUnder(outputRoot).some(path => !output.has(path))) stale = true;
-if (stale) {
-  console.error('Claude skills are stale; run node scripts/render-claude-skills.js');
-  process.exitCode = 1;
-} else {
-  console.log(`${check ? 'Checked' : 'Rendered'} ${output.size} Claude skill and support files from canonical OMP sources`);
-}
+renderSkills({
+  root,
+  outputDir: join(root, 'claude', 'skills'),
+  adapt,
+  check: parseCheckFlag(process.argv.slice(2), usage),
+  label: 'Claude',
+  command: 'node scripts/render-claude-skills.js',
+  source: 'canonical OMP sources',
+});

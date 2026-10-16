@@ -9,3 +9,10 @@ export function isPathWithin(parent, child) {
     && !path.isAbsolute(relative)
   );
 }
+
+/** True when `value` is a plain repository-relative POSIX path: no empty, '.', '..', or '.git' (any case) segment, no backslash or NUL, already normalized. */
+export function isPlainRelativePath(value) {
+  if (value.includes("\\") || value.includes("\0")) return false;
+  if (value.split("/").some(segment => segment === "" || segment === "." || segment === ".." || segment.toLowerCase() === ".git")) return false;
+  return path.posix.normalize(value) === value;
+}

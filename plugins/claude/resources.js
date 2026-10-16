@@ -43,8 +43,30 @@ function frontmatterField(contents, field) {
     return undefined;
   }
 
+  return unquoteScalar(value);
+}
+
+// Double-quoted scalars use JSON-style escapes; single-quoted scalars double their quote. Plain text passes through.
+// Decoded escapes must not smuggle terminal control characters into listings, so quoted results drop them.
+function unquoteScalar(value) {
   const quoted = /^("|')(.*)\1$/.exec(value);
-  return quoted ? quoted[2] : value;
+  if (!quoted) {
+    return value;
+  }
+
+  if (quoted[1] === "'") {
+    return stripControlCharacters(quoted[2].replaceAll("''", "'"));
+  }
+
+  try {
+    return stripControlCharacters(JSON.parse(value));
+  } catch {
+    return stripControlCharacters(quoted[2]);
+  }
+}
+
+function stripControlCharacters(text) {
+  return text.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ");
 }
 
 async function readOptional(file) {

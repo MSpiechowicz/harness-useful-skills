@@ -305,6 +305,24 @@ export async function readWorkflowSettings({ agentDir, cwd } = {}) {
   return snapshot;
 }
 
+/**
+ * Read the settings store under a host config dir, or mark every key unreadable. The store rejects
+ * symlinked profile paths, so a linked config dir (such as a symlinked ~/.claude) is resolved first.
+ */
+export async function readWorkflowSnapshot({ configDir, cwd } = {}) {
+  try {
+    const agentDir = await realpath(configDir);
+    return await readWorkflowSettings({ agentDir, cwd });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return {
+      values: Object.fromEntries(KEYS.map(key => [key, undefined])),
+      errors: Object.fromEntries(KEYS.map(key => [key, reason])),
+      sources: Object.fromEntries(KEYS.map(key => [key, "error"])),
+    };
+  }
+}
+
 export async function writeWorkflowSetting({ agentDir, cwd, key, enabled } = {}) {
   validateKey(key);
   if (typeof enabled !== "boolean") {

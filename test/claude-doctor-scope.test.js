@@ -3,7 +3,7 @@ import { mkdir, stat } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
-import { runClaudeDoctor } from "../claude/doctor-setup.js";
+import { runDoctorSetup } from "../doctor-setup.js";
 import { resolveHostContext } from "../claude/host-context.js";
 import { extract, mountLine, validGraph } from "./helpers/graph-fixture.js";
 import { fixture, gitHome, graphOutcome, HOME_BLOCKED } from "./helpers/claude-doctor-fixture.js";
@@ -28,7 +28,7 @@ test("a project root at the home directory is never scanned and installs no depe
   const f = await fixture(t);
   const host = await resolveHostContext({ workspace: f.repo, data: f.dataDir });
 
-  const outcome = await runClaudeDoctor({ ...host, services: f.services, home: f.repo });
+  const outcome = await runDoctorSetup({ ...host, services: f.services, home: f.repo });
   assert.equal(outcome.ok, true);
   assert.deepEqual(outcome.steps.slice(1), [
     { label: "Dependencies", outcome: "skipped", detail: HOME_BLOCKED },
@@ -36,7 +36,7 @@ test("a project root at the home directory is never scanned and installs no depe
   ]);
   assert.deepEqual(f.calls, { install: 0, build: 0 });
 
-  const check = await runClaudeDoctor({ ...host, check: true, services: f.services, home: f.repo });
+  const check = await runDoctorSetup({ ...host, check: true, services: f.services, home: f.repo });
   assert.equal(check.ok, true);
   assert.deepEqual(check.steps.slice(1), [
     { label: "Dependencies", outcome: "missing", detail: HOME_BLOCKED },
@@ -45,7 +45,7 @@ test("a project root at the home directory is never scanned and installs no depe
 
   const partial = await fixture(t, { dependencyState: "partial" });
   const partialHost = await resolveHostContext({ workspace: partial.repo, data: partial.dataDir });
-  const incomplete = await runClaudeDoctor({ ...partialHost, check: true, services: partial.services, home: partial.repo });
+  const incomplete = await runDoctorSetup({ ...partialHost, check: true, services: partial.services, home: partial.repo });
   assert.deepEqual(incomplete.steps[1], { label: "Dependencies", outcome: "incomplete", detail: HOME_BLOCKED });
   assert.equal(partial.calls.install, 0);
 });
@@ -53,12 +53,12 @@ test("a project root at the home directory is never scanned and installs no depe
 test("an existing graph still gets missing dependencies installed even when the scope now blocks a build", async t => {
   const f = await fixture(t);
   const host = await resolveHostContext({ workspace: f.repo, data: f.dataDir });
-  const built = await runClaudeDoctor({ ...host, services: f.services });
+  const built = await runDoctorSetup({ ...host, services: f.services });
   assert.equal(built.ok, true);
   assert.deepEqual(f.calls, { install: 1, build: 1 });
 
   const services = { ...f.services, dependencyStatus: async () => ({ ready: false, state: "missing" }) };
-  const outcome = await runClaudeDoctor({ ...host, services, home: f.repo });
+  const outcome = await runDoctorSetup({ ...host, services, home: f.repo });
   assert.equal(outcome.ok, true);
   assert.deepEqual(outcome.steps.slice(1), [
     { label: "Dependencies", outcome: "installed" },
@@ -73,7 +73,7 @@ test("an unreadable graph status installs no dependencies when the scope blocks 
   const graphify = { ...f.services.graphify, graphStatus: async () => ({ available: false, error: "Graph snapshot is unreadable." }) };
   const services = { ...f.services, graphify };
 
-  const outcome = await runClaudeDoctor({ ...host, services, home: f.repo });
+  const outcome = await runDoctorSetup({ ...host, services, home: f.repo });
   assert.equal(outcome.ok, false);
   assert.deepEqual(outcome.steps.slice(1), [
     { label: "Dependencies", outcome: "skipped", detail: HOME_BLOCKED },
@@ -81,7 +81,7 @@ test("an unreadable graph status installs no dependencies when the scope blocks 
   ]);
   assert.deepEqual(f.calls, { install: 0, build: 0 });
 
-  const allowed = await runClaudeDoctor({ ...host, services });
+  const allowed = await runDoctorSetup({ ...host, services });
   assert.deepEqual(allowed.steps[1], { label: "Dependencies", outcome: "installed" });
   assert.equal(f.calls.install, 1);
 });
@@ -104,14 +104,14 @@ test("a Git work tree that is or contains the home directory is never scanned", 
 
   for (const [workspace, home] of [[config, dotfilesHome], [users, nestedHome], [outer, nestedHome]]) {
     const host = await resolveHostContext({ workspace, data: f.dataDir });
-    const outcome = await runClaudeDoctor({ ...host, services: f.services, home });
+    const outcome = await runDoctorSetup({ ...host, services: f.services, home });
     assert.deepEqual(outcome.steps.at(-1), { label: "Graph", outcome: "skipped", detail: HOME_BLOCKED }, workspace);
     assert.equal(outcome.ok, true);
   }
   assert.deepEqual(f.calls, { install: 0, build: 0 });
 
   const host = await resolveHostContext({ workspace: f.repo, data: f.dataDir });
-  const normal = await runClaudeDoctor({ ...host, services: f.services, home: f.root });
+  const normal = await runDoctorSetup({ ...host, services: f.services, home: f.root });
   assert.equal(normal.ok, true);
   assert.deepEqual(normal.steps.slice(1), [
     { label: "Dependencies", outcome: "installed" },
@@ -188,13 +188,13 @@ test("a project containing a nested mount is never scanned, and the build re-che
   const detail = `workspace contains a nested mount at ${path.join(f.repo, "data")}`;
   const mounted = { readMountInfo: async () => nested };
 
-  const setup = await runClaudeDoctor({ ...host, services: f.services, system: mounted });
+  const setup = await runDoctorSetup({ ...host, services: f.services, system: mounted });
   assert.equal(setup.ok, true);
   assert.deepEqual(setup.steps.slice(1), [
     { label: "Dependencies", outcome: "skipped", detail },
     { label: "Graph", outcome: "skipped", detail },
   ]);
-  const check = await runClaudeDoctor({ ...host, check: true, services: f.services, system: mounted });
+  const check = await runDoctorSetup({ ...host, check: true, services: f.services, system: mounted });
   assert.deepEqual(check.steps.at(-1), { label: "Graph", outcome: "not built", detail });
   assert.deepEqual(f.calls, { install: 0, build: 0 });
 
@@ -206,7 +206,7 @@ test("a project containing a nested mount is never scanned, and the build re-che
     f.calls.build++;
     return extract(args, validGraph);
   };
-  const raced = await runClaudeDoctor({ ...host, services: { ...dependencies, runProcess }, system: late });
+  const raced = await runDoctorSetup({ ...host, services: { ...dependencies, runProcess }, system: late });
   assert.deepEqual(raced.steps.at(-1), { label: "Graph", outcome: "failed", detail: `Graphify build refused: ${detail}.` });
   assert.equal(f.calls.build, 0);
 });

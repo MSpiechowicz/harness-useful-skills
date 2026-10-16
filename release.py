@@ -17,6 +17,10 @@ CATALOG = ".omp-plugin/marketplace.json"
 CLAUDE_MANIFEST = ".claude-plugin/plugin.json"
 CLAUDE_BUNDLE_MANIFEST = "plugins/claude/.claude-plugin/plugin.json"
 CLAUDE_MANIFESTS = (CLAUDE_MANIFEST, CLAUDE_BUNDLE_MANIFEST)
+OPENCODE_MANIFEST = "opencode/package.json"
+OPENCODE_BUNDLE_MANIFEST = "plugins/opencode/useful-skills/package.json"
+OPENCODE_MANIFESTS = (OPENCODE_MANIFEST, OPENCODE_BUNDLE_MANIFEST)
+VERSIONED_MANIFESTS = (*CLAUDE_MANIFESTS, *OPENCODE_MANIFESTS)
 PLUGIN = "harness-useful-skills"
 
 
@@ -67,9 +71,9 @@ def catalog_for(repo, source, current_version, version):
     return catalog
 
 
-def check_claude_manifests(repo, source, current_version):
-    """Require every Claude manifest in the tested source to carry the current version."""
-    for path in CLAUDE_MANIFESTS:
+def check_manifests(repo, source, current_version):
+    """Require every Claude and OpenCode manifest in the tested source to carry the current version."""
+    for path in VERSIONED_MANIFESTS:
         if json.loads(git(repo, "show", f"{source}:{path}")).get("version") != current_version:
             raise ValueError(f"{path} version must match package.json")
 
@@ -93,7 +97,7 @@ def is_matching_release(repo, source, metadata, catalog, version, message, commi
         parents = git(repo, "show", "-s", "--format=%P", commit)
         released = json.loads(git(repo, "show", f"{commit}:package.json"))
         released_catalog = json.loads(git(repo, "show", f"{commit}:{CATALOG}"))
-        released_manifests = [json.loads(git(repo, "show", f"{commit}:{path}")) for path in CLAUDE_MANIFESTS]
+        released_manifests = [json.loads(git(repo, "show", f"{commit}:{path}")) for path in VERSIONED_MANIFESTS]
     except (KeyError, json.JSONDecodeError, subprocess.SubprocessError):
         return False
 
@@ -101,7 +105,7 @@ def is_matching_release(repo, source, metadata, catalog, version, message, commi
     return (
         parents == source
         and git(repo, "show", "-s", "--format=%B", commit) == message
-        and changed == sorted([CATALOG, "package.json", *CLAUDE_MANIFESTS])
+        and changed == sorted([CATALOG, "package.json", *VERSIONED_MANIFESTS])
         and released == dict(metadata, version=version)
         and released_catalog == catalog
         and all(manifest.get("version") == version for manifest in released_manifests)
@@ -137,7 +141,7 @@ def plan_release(repo, source, bump="patch", push=False):
     metadata = json.loads(git(repo, "show", f"{source}:package.json"))
     version = bump_version(metadata["version"], bump)
     catalog = catalog_for(repo, source, metadata["version"], version)
-    check_claude_manifests(repo, source, metadata["version"])
+    check_manifests(repo, source, metadata["version"])
     tag = f"v{version}"
     message = f"chore(release): {tag}\n\nRelease-Source: {source}\nRelease-Bump: {bump}"
 
@@ -170,7 +174,7 @@ def plan_release(repo, source, bump="patch", push=False):
     if not push:
         return result
 
-    paths = ("package.json", *CLAUDE_MANIFESTS)
+    paths = ("package.json", *VERSIONED_MANIFESTS)
     bumped = {
         path: bump_manifest((repo / path).read_text(encoding="utf-8"), metadata["version"], version, path)
         for path in paths
@@ -179,7 +183,7 @@ def plan_release(repo, source, bump="patch", push=False):
         (repo / path).write_text(text, encoding="utf-8")
 
     (repo / CATALOG).write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
-    git(repo, "add", "--", "package.json", CATALOG, *CLAUDE_MANIFESTS)
+    git(repo, "add", "--", "package.json", CATALOG, *VERSIONED_MANIFESTS)
 
     git(
         repo,
