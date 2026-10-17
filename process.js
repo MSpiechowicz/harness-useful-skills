@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readSync, realpathSync, writeSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -66,6 +67,161 @@ export function signalProcessTree(child, signal) {
   } catch {
     // The close/error handler reports the original process failure.
   }
+}
+
+/**
+ * Set only by opencode/node-runner.js: the private file in which this process records the process group of each
+ * running runProcess child. The runner ends those groups itself, so they do not outlive this process even when it
+ * is too busy to handle the runner's SIGTERM. Each line is `+<pgid>` when a child starts or `-<pgid>` when it closes.
+ */
+export const PROCESS_GROUPS_FILE = "USEFUL_SKILLS_PROCESS_GROUPS_FILE";
+
+// A record never grows past this, so reading it stays cheap; groups started after it fills are not recorded.
+const RECORD_MAX_BYTES = 64 * 1024;
+const RECORD_LINE = /^[+-][1-9]\d*$/;
+const RUN_DIRECTORY_PREFIX = "useful-skills-run-";
+const RECORD_NAME = "process-groups";
+
+/**
+ * Whether `file` is where the runner records a run: `process-groups` in a `useful-skills-run-*` directory directly
+ * in the real temporary directory, which is a real directory that this user owns and only this user can enter.
+ * Anything else, such as a path that a script set for itself or a symlink, is ignored.
+ */
+function isRunRecord(file) {
+  if (typeof file !== "string" || typeof process.getuid !== "function") {
+    return false;
+  }
+
+  const directoryName = path.basename(path.dirname(file));
+  if (!directoryName.startsWith(RUN_DIRECTORY_PREFIX) || directoryName === RUN_DIRECTORY_PREFIX) {
+    return false;
+  }
+
+  try {
+    const directory = path.join(realpathSync(os.tmpdir()), directoryName);
+    if (file !== path.join(directory, RECORD_NAME)) {
+      return false;
+    }
+
+    const stats = lstatSync(directory);
+    return stats.isDirectory() && stats.uid === process.getuid() && (stats.mode & 0o777) === 0o700;
+  } catch {
+    return false;
+  }
+}
+
+function recordProcessGroup(change, child) {
+  const file = process.env[PROCESS_GROUPS_FILE];
+  if (!file || !child.pid || process.platform === "win32" || !isRunRecord(file)) {
+    return;
+  }
+
+  const line = `${change}${child.pid}\n`;
+  let descriptor;
+  try {
+    // Never follows a symlink, and never waits on a FIFO put in its place.
+    const flags = constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW | constants.O_NONBLOCK;
+    descriptor = openSync(file, flags, 0o600);
+
+    const stats = fstatSync(descriptor);
+    if (stats.isFile() && stats.size + line.length <= RECORD_MAX_BYTES) {
+      writeSync(descriptor, line);
+    }
+  } catch {
+    // The runner removed the file once it no longer needs it.
+  } finally {
+    if (descriptor !== undefined) {
+      closeSync(descriptor);
+    }
+  }
+}
+
+/** The process group of this process, where /proc reports it. */
+function ownProcessGroup() {
+  try {
+    const stat = readFileSync("/proc/self/stat", "utf8");
+    // After the parenthesized command name: state, parent pid, process group.
+    return Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[2]);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Whether `stats` belong to this user, where the platform reports one (not on Windows). */
+function ownedByThisUser(stats) {
+  return typeof process.getuid !== "function" || stats.uid === process.getuid();
+}
+
+/**
+ * Up to RECORD_MAX_BYTES of a regular file that this user owns, in a real directory that this user owns and only
+ * this user can enter, without following a symlink or waiting on a FIFO; undefined otherwise. Another user can
+ * create neither, even where the runner has removed its own.
+ */
+function readRecord(file) {
+  let descriptor;
+  try {
+    descriptor = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+
+    const stats = fstatSync(descriptor);
+    if (!stats.isFile() || !ownedByThisUser(stats) || stats.size > RECORD_MAX_BYTES) {
+      return undefined;
+    }
+
+    const directory = lstatSync(path.dirname(file));
+    if (!directory.isDirectory() || !ownedByThisUser(directory) || (directory.mode & 0o777) !== 0o700) {
+      return undefined;
+    }
+
+    const buffer = Buffer.alloc(RECORD_MAX_BYTES + 1);
+    let length = 0;
+    let read;
+    do {
+      read = readSync(descriptor, buffer, length, buffer.length - length, null);
+      length += read;
+    } while (read > 0 && length < buffer.length);
+
+    return length > RECORD_MAX_BYTES ? undefined : buffer.toString("utf8", 0, length);
+  } catch {
+    return undefined;
+  } finally {
+    if (descriptor !== undefined) {
+      closeSync(descriptor);
+    }
+  }
+}
+
+/**
+ * The process groups that `file` (see PROCESS_GROUPS_FILE) records as still running, or undefined if it cannot be
+ * read. Malformed lines are skipped, and so are this process's own group and its pid, which a script could write
+ * there to have the runner signal its host.
+ */
+export function recordedProcessGroups(file) {
+  const text = readRecord(file);
+  if (text === undefined) {
+    return undefined;
+  }
+
+  const excluded = new Set([process.pid, ownProcessGroup()]);
+  const groups = new Set();
+  for (const line of text.split("\n")) {
+    if (!RECORD_LINE.test(line)) {
+      continue;
+    }
+
+    // 1 (and 0, which the pattern rejects) would signal every process or this process's own group.
+    const group = Number(line.slice(1));
+    if (!Number.isSafeInteger(group) || group <= 1 || excluded.has(group)) {
+      continue;
+    }
+
+    if (line.startsWith("+")) {
+      groups.add(group);
+    } else {
+      groups.delete(group);
+    }
+  }
+
+  return groups;
 }
 
 // runProcess children still running. Each is its own process group, so a signal to the parent does not reach it.
@@ -172,6 +328,7 @@ export function runProcess(file, args, options) {
     let stdoutBytes = 0;
     let stderrBytes = 0;
     const environment = { ...options.env, NODE_V8_COVERAGE: "" };
+    delete environment[PROCESS_GROUPS_FILE];
 
     const child = spawn(file, args, {
       cwd,
@@ -183,6 +340,12 @@ export function runProcess(file, args, options) {
     });
 
     activeChildren.add(child);
+    recordProcessGroup("+", child);
+
+    const forget = () => {
+      activeChildren.delete(child);
+      recordProcessGroup("-", child);
+    };
 
     const finish = (error, result) => {
       if (settled) {
@@ -262,13 +425,13 @@ export function runProcess(file, args, options) {
     });
 
     child.once("error", (error) => {
-      activeChildren.delete(child);
+      forget();
       clearTimeout(escalation);
       finish(processError(`Cannot start process: ${error.message}`, { cause: error }));
     });
 
     child.once("close", (code, closeSignal) => {
-      activeChildren.delete(child);
+      forget();
 
       if (failure) {
         if (!terminating) {

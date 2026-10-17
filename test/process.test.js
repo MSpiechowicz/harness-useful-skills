@@ -1,14 +1,15 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
-import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { chmod, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 
-import { minimalEnvironment, runProcess } from "../process.js";
+import { runNode } from "../opencode/node-runner.js";
+import { minimalEnvironment, recordedProcessGroups, runProcess } from "../process.js";
 
 test("minimal environment retains only owned runtime locations", () => {
   const environment = minimalEnvironment({
@@ -137,4 +138,129 @@ test("an entry point ended by a signal ends its process children, runs its clean
   assert.equal(await readFile(marker, "utf8"), "cleaned");
   assert.equal(existsSync(`${marker}.forgotten`), false);
   assert.throws(() => process.kill(grandchild, 0), { code: "ESRCH" });
+});
+
+/** A run directory as opencode/node-runner.js creates it, with `record` set as this process's record for the test. */
+async function runRecord(t, record = (directory) => path.join(directory, "process-groups")) {
+  const directory = await mkdtemp(path.join(realpathSync(os.tmpdir()), "useful-skills-run-"));
+  const file = record(directory);
+  process.env.USEFUL_SKILLS_PROCESS_GROUPS_FILE = file;
+  t.after(async () => {
+    delete process.env.USEFUL_SKILLS_PROCESS_GROUPS_FILE;
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  return { directory, record: file };
+}
+
+const QUICK = { cwd: process.cwd(), env: {}, timeoutMs: 5_000 };
+
+test("under the OpenCode runner, runProcess records each child's process group while it runs and withholds the record from it", async (t) => {
+  const { record } = await runRecord(t);
+
+  const result = runProcess(process.execPath, ["-e", [
+    "process.stdout.write(JSON.stringify([process.pid, process.env.USEFUL_SKILLS_PROCESS_GROUPS_FILE ?? null]));",
+    "setTimeout(() => {}, 300);",
+  ].join("\n")], {
+    cwd: process.cwd(),
+    env: { ...minimalEnvironment({ home: "/tmp/home", cache: "/tmp/cache", tmp: "/tmp/tmp" }), USEFUL_SKILLS_PROCESS_GROUPS_FILE: record },
+    timeoutMs: 5_000,
+  });
+
+  let running = recordedProcessGroups(record);
+  while (!running?.size) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    running = recordedProcessGroups(record);
+  }
+
+  const [pid, visibleRecord] = JSON.parse((await result).stdout);
+  assert.deepEqual(running, new Set([pid]));
+  assert.equal(visibleRecord, null);
+  assert.deepEqual(recordedProcessGroups(record), new Set());
+});
+
+test("runProcess writes no record through a symlink, outside a private run directory, or at a path a script chose", async (t) => {
+  const { directory } = await runRecord(t);
+  const victim = path.join(directory, "victim.txt");
+  await writeFile(victim, "user content\n");
+  await symlink(victim, path.join(directory, "process-groups"));
+  await runProcess("/usr/bin/true", [], QUICK);
+  assert.equal(await readFile(victim, "utf8"), "user content\n");
+
+  const elsewhere = await mkdtemp(path.join(os.tmpdir(), "useful-skills-process-"));
+  t.after(() => rm(elsewhere, { recursive: true, force: true }));
+  process.env.USEFUL_SKILLS_PROCESS_GROUPS_FILE = path.join(elsewhere, "process-groups");
+  await runProcess("/usr/bin/true", [], QUICK);
+  assert.equal(existsSync(path.join(elsewhere, "process-groups")), false);
+
+  const shared = await mkdtemp(path.join(realpathSync(os.tmpdir()), "useful-skills-run-"));
+  t.after(() => rm(shared, { recursive: true, force: true }));
+  await chmod(shared, 0o755);
+  process.env.USEFUL_SKILLS_PROCESS_GROUPS_FILE = path.join(shared, "process-groups");
+  await runProcess("/usr/bin/true", [], QUICK);
+  assert.equal(existsSync(path.join(shared, "process-groups")), false);
+
+  const linked = path.join(realpathSync(os.tmpdir()), `useful-skills-run-link-${process.pid}`);
+  await symlink(directory, linked);
+  t.after(() => rm(linked, { force: true }));
+  process.env.USEFUL_SKILLS_PROCESS_GROUPS_FILE = path.join(linked, "process-groups-linked");
+  await runProcess("/usr/bin/true", [], QUICK);
+  assert.equal(existsSync(path.join(directory, "process-groups-linked")), false);
+});
+
+test("a process group record keeps only well-formed entries and never names this process or its own group", async (t) => {
+  const { record } = await runRecord(t);
+  const ownGroup = Number(execFileSync("ps", ["-o", "pgid=", "-p", String(process.pid)], { encoding: "utf8" }));
+  await writeFile(record, [
+    "+42", "+43", "-43", `+${process.pid}`, `+${ownGroup}`, "+1", "+0", "+-7", "+0x10", "+1e3", "+ 44", "+45junk", "45", "",
+  ].join("\n"));
+
+  assert.deepEqual(recordedProcessGroups(record), new Set([42]));
+});
+
+test("a process group record that is not a small regular file reads as unknown without blocking", async (t) => {
+  const { directory, record } = await runRecord(t);
+  await writeFile(record, "+42\n".repeat(20_000));
+  assert.equal(recordedProcessGroups(record), undefined);
+
+  const fifo = path.join(directory, "fifo");
+  execFileSync("mkfifo", [fifo]);
+  const processModule = pathToFileURL(path.resolve(import.meta.dirname, "../process.js")).href;
+  const reader = spawnSync(process.execPath, ["--input-type=module", "-e", [
+    `import { recordedProcessGroups } from ${JSON.stringify(processModule)};`,
+    `process.stdout.write(String(recordedProcessGroups(${JSON.stringify(fifo)})));`,
+  ].join("\n")], { encoding: "utf8", timeout: 3_000 });
+
+  assert.equal(reader.signal, null);
+  assert.equal(reader.stdout, "undefined");
+});
+
+test("a process group record reads as unknown unless this user alone can enter its directory", async (t) => {
+  const { directory, record } = await runRecord(t);
+  await writeFile(record, "+42\n");
+  assert.deepEqual(recordedProcessGroups(record), new Set([42]));
+
+  await chmod(directory, 0o755);
+  assert.equal(recordedProcessGroups(record), undefined);
+});
+
+test("a record that the OpenCode runner removed is never read again, even when recreated at once", { timeout: 10_000 }, async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "useful-skills-process-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const entry = path.join(directory, "entry.mjs");
+  await writeFile(entry, "process.stdout.write(process.env.USEFUL_SKILLS_PROCESS_GROUPS_FILE);");
+
+  // Another user of a shared temporary directory may recreate it as soon as it is removed, naming any group.
+  for (const mode of [0o755, 0o700]) {
+    const victim = spawn("sleep", ["5"], { detached: true, stdio: "ignore" });
+    t.after(() => victim.kill("SIGKILL"));
+
+    const { stdout: record } = await runNode(entry);
+    mkdirSync(path.dirname(record), { mode });
+    t.after(() => rm(path.dirname(record), { recursive: true, force: true }));
+    writeFileSync(record, `+${victim.pid}\n`);
+
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    assert.doesNotThrow(() => process.kill(victim.pid, 0), `the victim in a recreated ${mode.toString(8)} directory was signalled`);
+  }
 });

@@ -130,3 +130,12 @@ test("quoted frontmatter escapes never put control characters in descriptions", 
   assert.equal(entry.description, "Red  [31mtext [0m, bell  , del  , c1  , nul   end");
   assert.doesNotMatch(entry.description, /[\u0000-\u001f\u007f-\u009f]/);
 });
+
+test("plain frontmatter descriptions drop terminal control characters", async (t) => {
+  const { root, skill } = await fixture(t);
+  await skill("skills/us-plain", "us-plain", "raw \u001b]0;pwned\u0007 title");
+  const match = (await listResources("skills", { root })).find(x => x.name === "us-plain");
+  assert.ok(match);
+  assert.doesNotMatch(match.description, /[\u0000-\u001f\u007f-\u009f]/);
+  assert.match(match.description, /^raw\s+\]0;pwned\s+title$/);
+});

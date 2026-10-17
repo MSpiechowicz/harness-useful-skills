@@ -46,12 +46,12 @@ function frontmatterField(contents, field) {
   return unquoteScalar(value);
 }
 
-// Double-quoted scalars use JSON-style escapes; single-quoted scalars double their quote. Plain text passes through.
-// Decoded escapes must not smuggle terminal control characters into listings, so quoted results drop them.
+// Double-quoted scalars use JSON-style escapes; single-quoted scalars double their quote. Plain text is kept as written.
+// Neither decoded escapes nor raw bytes may smuggle terminal control characters into listings, so every result drops them.
 function unquoteScalar(value) {
   const quoted = /^("|')(.*)\1$/.exec(value);
   if (!quoted) {
-    return value;
+    return stripControlCharacters(value);
   }
 
   if (quoted[1] === "'") {
