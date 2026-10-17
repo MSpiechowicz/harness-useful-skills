@@ -25,7 +25,7 @@ test("rendered OpenCode skills match the canonical sources", async () => {
 
 test("every OpenCode skill has OpenCode-valid frontmatter", async () => {
   const folders = (await readdir(SKILLS, { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name);
-  assert.equal(folders.length, 20);
+  assert.equal(folders.length, 21);
 
   for (const folder of folders) {
     const rows = frontmatterOf(await readFile(path.join(SKILLS, folder, "SKILL.md"), "utf8"));

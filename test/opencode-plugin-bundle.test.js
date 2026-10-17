@@ -87,11 +87,11 @@ test("the runtime manifest carries the package version", async () => {
   assert.equal(bundled.type, "module");
 });
 
-test("the bundle ships the 20 canonical skills, 7 agent templates and 2 commands", async () => {
+test("the bundle ships the 21 canonical skills, 7 agent templates and 2 commands", async () => {
   const canonical = (await readdir(path.join(ROOT, "skills"), { withFileTypes: true }))
     .filter(entry => entry.isDirectory() && entry.name.startsWith("us-")).map(entry => entry.name).sort();
   const skills = (await readdir(path.join(RUNTIME, "opencode", "skills"))).sort();
-  assert.equal(skills.length, 20);
+  assert.equal(skills.length, 21);
   assert.deepEqual(skills, canonical);
   for (const skill of skills) assert.ok(await exists(path.join(RUNTIME, "opencode", "skills", skill, "SKILL.md")), skill);
 
@@ -120,11 +120,11 @@ test("the entry module exposes only functions when imported under Node", async (
   for (const value of Object.values(entry)) assert.equal(typeof value, "function");
 });
 
-test("the bundled command lists the 20 shipped skills", async t => {
+test("the bundled command lists the 21 shipped skills", async t => {
   const { cwd, env } = await isolated(t);
   const result = await execute(process.execPath, [path.join(RUNTIME, "opencode", "command.js"), "list"], { cwd, env });
   const names = [...result.stdout.matchAll(/^\s+(us-[a-z-]+)/gm)].map(match => match[1]);
-  assert.equal(names.length, 20);
+  assert.equal(names.length, 21);
   assert.ok(!names.includes("us-library"));
 });
 

@@ -46,6 +46,7 @@
     "./claude/skills/us-delete-safely/",
     "./claude/skills/us-mockup-views/",
     "./claude/skills/us-keep-ui-consistent/",
+    "./claude/skills/us-use-harness-memory/",
     "./claude/skills/us-review/",
     "./claude/skills/us-research/",
     "./claude/skills/us-grill-me/",
