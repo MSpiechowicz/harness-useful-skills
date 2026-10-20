@@ -113,10 +113,10 @@ async function runInstaller({ env = {}, archive, api, bin, path: pathOverride, r
 /** A gzipped ustar archive with exactly these entries, so names tar would refuse to create can be listed. */
 function rawArchive(entries) {
   const blocks = [];
-  for (const { name, content = "", type = content === "" && name.endsWith("/") ? "5" : "0" } of entries) {
+  for (const { name, content = "", mode = "0000644", type = content === "" && name.endsWith("/") ? "5" : "0" } of entries) {
     const header = Buffer.alloc(512);
     header.write(name, 0, "utf8");
-    header.write("0000644\0", 100);
+    header.write(`${mode}\0`, 100);
     header.write("0000000\0", 108);
     header.write("0000000\0", 116);
     header.write(`${Buffer.byteLength(content).toString(8).padStart(11, "0")}\0`, 124);
@@ -428,4 +428,44 @@ test("a manifest version that is not a plain version is not echoed", { skip }, a
   assert.notEqual(outcome.status, 0);
   assert.match(outcome.stderr, /has version \(missing or not a version\), expected 1\.2\.3/);
   assert.doesNotMatch(outcome.stderr, /\u001b\[31m/);
+});
+
+test("entries without an owner write bit are refused, including a directory with no permissions", { skip }, async () => {
+  for (const entries of [
+    [{ name: "top/" }, { name: "top/readonly", content: "x", mode: "0000444" }],
+    [{ name: "top/" }, { name: "top/locked/", mode: "0000000" }, { name: "top/locked/inner", content: "x" }],
+  ]) {
+    const archive = await rawArchiveFile(entries);
+    const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+    assert.notEqual(outcome.status, 0);
+    assert.match(outcome.stderr, /without owner write permission/);
+    assert.equal(outcome.recorded, null);
+    assert.deepEqual(outcome.leftovers, []);
+  }
+});
+
+test("a name segment that ends in a dot or a space is refused", { skip }, async () => {
+  for (const name of ["top/file.", "top/file ", "top/dir./inner", "top/dir /inner"]) {
+    const archive = await rawArchiveFile([{ name: "top/" }, { name, content: "x" }]);
+    const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+    assert.notEqual(outcome.status, 0, name);
+    assert.match(outcome.stderr, /unsafe entry name/, name);
+    assert.equal(outcome.recorded, null);
+    assert.deepEqual(outcome.leftovers, []);
+  }
+});
+
+test("a walk of the extracted tree that cannot finish is refused, never passed", { skip }, async () => {
+  const { archive } = await buildRelease();
+  const real = spawnSync("sh", ["-c", "command -v find"], { encoding: "utf8" }).stdout.trim();
+  for (const body of ["exit 1", `"${real}" "$@"; exit 1`]) {
+    const bin = await directory("find-stub");
+    await writeFile(path.join(bin, "find"), `#!/bin/sh\n${body}\n`);
+    await chmod(path.join(bin, "find"), 0o755);
+    const outcome = await runInstaller({ archive, bin, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+    assert.notEqual(outcome.status, 0);
+    assert.match(outcome.stderr, /couldn't read the whole extracted release/);
+    assert.equal(outcome.recorded, null);
+    assert.deepEqual(outcome.leftovers, []);
+  }
 });

@@ -195,7 +195,7 @@
     if ($Expanded -gt $MaxExpandedBytes) { throw "The release archive expands beyond the size limit." }
 
     # Check every entry before extracting anything: only regular files and directories, only relative names without dot
-    # segments, sizes within the limit, and exactly one top-level directory.
+    # segments or trailing dots and spaces, sizes within the limit, and exactly one top-level directory.
     $Names = @(Invoke-Tar @("-tzf", $Archive) "list")
     $Details = @(Invoke-Tar @("-tvzf", $Archive) "list")
     if ($Names.Count -eq 0 -or $Names.Count -gt $MaxEntries -or $Names.Count -ne $Details.Count) {
@@ -208,10 +208,14 @@
       if ($Detail -cnotmatch '^[-d]' -or $Detail.Contains(" -> ") -or $Detail.Contains(" link to ")) {
         throw "The release archive contains an entry that is not a plain file or directory (links and special files are refused)."
       }
+      # An entry without an owner write bit would be extracted read-only on Windows and could not be removed afterwards.
+      if ($Detail -cnotmatch '^[-d].w') {
+        throw "The release archive contains an entry without owner write permission (refused)."
+      }
       $Trimmed = if ($Name.EndsWith("/")) { $Name.Substring(0, $Name.Length - 1) } else { $Name }
       $Parts = $Trimmed -split "/"
       # A colon is refused anywhere: a drive letter, or an alternate data stream (name:stream) on NTFS.
-      if ($Name.Length -gt $MaxEntryName -or $Name -match '[\x00-\x1f\x7f\\:]' -or $Name.StartsWith("/") -or @($Parts | Where-Object { $_ -eq "" -or $_ -eq "." -or $_ -eq ".." }).Count -gt 0) {
+      if ($Name.Length -gt $MaxEntryName -or $Name -match '[\x00-\x1f\x7f\\:]' -or $Name.StartsWith("/") -or @($Parts | Where-Object { $_ -eq "" -or $_ -eq "." -or $_ -eq ".." -or $_ -cmatch '[. ]\z' }).Count -gt 0) {
         throw "The release archive contains an unsafe entry name."
       }
       $Tops[$Parts[0]] = $true
@@ -262,6 +266,8 @@
     Pop-Location
     # Cleanup never changes the outcome. Directory.Delete removes a link itself and does not follow it.
     try {
+      # Read-only entries would make Delete fail: clear the attribute first.
+      Get-ChildItem -LiteralPath $Tmp -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object { $_.Attributes = 'Normal' }
       [IO.Directory]::Delete($Tmp, $true)
     } catch {
       Write-Verbose "Could not remove ${Tmp}: $($_.Exception.Message)"

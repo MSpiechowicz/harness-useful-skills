@@ -165,7 +165,7 @@ main() {
   [ "$EXPANDED_BYTES" -le "$MAX_EXPANDED_BYTES" ] || fail "the release archive expands beyond the size limit"
 
   # Check every entry before extracting anything: only regular files and directories, only relative names without dot
-  # segments, sizes within the limit, and exactly one top-level directory.
+  # segments or trailing dots and spaces, sizes within the limit, and exactly one top-level directory.
   cl tar -tzf "$ARCHIVE" >"$TMP/names" 2>/dev/null || fail "the release download is not a valid tar archive"
   cl tar -tvzf "$ARCHIVE" >"$TMP/verbose" 2>/dev/null || fail "the release download is not a valid tar archive"
   cl cut -c1 "$TMP/verbose" >"$TMP/types"
@@ -181,7 +181,11 @@ main() {
   if grep_status -Fq -e ' -> ' -e ' link to ' "$TMP/verbose"; then
     fail "the release archive contains a link (links are refused)"
   fi
-  if names_match '^/' || names_match '(^|/)\.\.?(/|$)' || names_match '//' || names_match '^$' || grep_status -Fq "\\" "$TMP/names" || names_match '[[:cntrl:]]'; then
+  # Entries without an owner write bit would leave read-only files behind on Windows, so the same rule applies here.
+  if grep_status -Evq '^[-d].w' "$TMP/verbose"; then
+    fail "the release archive contains an entry without owner write permission (refused)"
+  fi
+  if names_match '^/' || names_match '(^|/)\.\.?(/|$)' || names_match '//' || names_match '^$' || grep_status -Fq "\\" "$TMP/names" || names_match '[[:cntrl:]]' || names_match '[. ](/|$)'; then
     fail "the release archive contains an unsafe entry name"
   fi
   # shellcheck disable=SC2016
@@ -202,11 +206,19 @@ main() {
   mkdir "$EXTRACT"
   cl tar --no-same-owner --no-same-permissions -xzf "$ARCHIVE" -C "$EXTRACT" || fail "tar could not extract the release archive"
 
+  # Make every extracted directory readable first (the archive could carry one without permissions), so the walk below
+  # sees the whole tree. The walk fails closed: a find that cannot finish, or that prints nothing, stops the installer.
+  chmod -R u+rwX "$EXTRACT" 2>/dev/null || true
+  find "$EXTRACT" >"$TMP/walk" 2>/dev/null || fail "couldn't read the whole extracted release"
+  [ -s "$TMP/walk" ] || fail "couldn't read the whole extracted release"
+
   # Walk the extracted tree without following links: nothing but plain, singly linked files and directories may be there.
-  if [ -n "$(find "$EXTRACT" ! -type f ! -type d | head -n 1)" ]; then
+  find "$EXTRACT" ! -type f ! -type d >"$TMP/odd" 2>/dev/null || fail "couldn't read the whole extracted release"
+  if [ -s "$TMP/odd" ]; then
     fail "the extracted release contains an entry that is not a plain file or directory"
   fi
-  if [ -n "$(find "$EXTRACT" -type f -links +1 | head -n 1)" ]; then
+  find "$EXTRACT" -type f -links +1 >"$TMP/linked" 2>/dev/null || fail "couldn't read the whole extracted release"
+  if [ -s "$TMP/linked" ]; then
     fail "the extracted release contains a hard link (links are refused)"
   fi
   [ "$(find "$EXTRACT" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" = "1" ] && [ -d "$EXTRACT/$TOP" ] || fail "the release archive must contain exactly one top-level directory"
