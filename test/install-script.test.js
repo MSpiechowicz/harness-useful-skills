@@ -1,0 +1,431 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { chmod, link, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { after, before, test } from "node:test";
+import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
+
+const SCRIPT = fileURLToPath(new URL("../install.sh", import.meta.url));
+const skip = process.platform === "win32" ? "install.sh is for macOS and Linux" : false;
+
+const base = await realpath(await mkdtemp(path.join(os.tmpdir(), "us-install-script-")));
+after(() => rm(base, { recursive: true, force: true }));
+
+const shims = path.join(base, "shims");
+const CURL_STUB = `#!/bin/sh
+# Records the URL (the last argument) and serves the fixture named by the environment.
+for last; do :; done
+printf '%s\\n' "$last" >>"$STUB_LOG"
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-o" ]; then OUT="$2"; fi
+  shift
+done
+case "$last" in
+  https://api.github.com/*) [ -z "\${STUB_API_FAIL:-}" ] || exit 22; cp "$STUB_API" "$OUT" ;;
+  https://codeload.github.com/*) [ -z "\${STUB_ARCHIVE_FAIL:-}" ] || exit 22; cp "$STUB_ARCHIVE" "$OUT" ;;
+  *) exit 22 ;;
+esac
+`;
+const NODE_STUB = `#!/bin/sh
+# Pretends to be another Node.js version when asked for it, otherwise runs the real node.
+if [ -n "\${FAKE_NODE_VERSION:-}" ] && [ "$1" = "-p" ]; then
+  printf '%s\\n' "$FAKE_NODE_VERSION"
+  exit 0
+fi
+exec "${process.execPath}" "$@"
+`;
+// The fixture's installer records how it was started, then exits with INSTALLER_EXIT.
+const INSTALLER = `#!/usr/bin/env node
+import { writeFileSync } from "node:fs";
+writeFileSync(process.env.HOME + "/argv.json", JSON.stringify({ argv: process.argv.slice(1), cwd: process.cwd() }));
+process.exit(Number(process.env.INSTALLER_EXIT ?? 0));
+`;
+
+before(async () => {
+  await mkdir(shims);
+  for (const [name, body] of [["curl", CURL_STUB], ["node", NODE_STUB]]) {
+    await writeFile(path.join(shims, name), body);
+    await chmod(path.join(shims, name), 0o755);
+  }
+});
+
+let counter = 0;
+async function directory(name) {
+  const dir = path.join(base, `${name}-${counter++}`);
+  await mkdir(dir, { recursive: true });
+  return dir;
+}
+
+function tar(args, cwd) {
+  const result = spawnSync("tar", args, { cwd, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+}
+
+/** A release tarball: one top-level directory holding a minimal OpenCode release. */
+async function buildRelease({ version = "1.2.3", manifestVersion = version, top = `harness-useful-skills-${version}`, extra } = {}) {
+  const work = await directory("release");
+  const root = path.join(work, "tree", top);
+  await mkdir(path.join(root, "plugins", "opencode", "useful-skills"), { recursive: true });
+  await writeFile(path.join(root, "package.json"), JSON.stringify({ name: "useful-skills", version: manifestVersion }));
+  await writeFile(path.join(root, "plugins", "opencode", "useful-skills", "package.json"), JSON.stringify({ version: manifestVersion }));
+  await writeFile(path.join(root, "plugins", "opencode", "useful-skills.js"), "export {};\n");
+  await writeFile(path.join(root, "useful-skills"), INSTALLER);
+  await chmod(path.join(root, "useful-skills"), 0o755);
+  await extra?.(root, path.join(work, "tree"));
+  const archive = path.join(work, "release.tar.gz");
+  tar(["-czf", archive, "-C", path.join(work, "tree"), ...(await readdir(path.join(work, "tree"))).sort()], work);
+  return { archive, top };
+}
+
+/** Runs install.sh with the stub curl and node first on PATH. Returns the outcome and the observable side effects. */
+async function runInstaller({ env = {}, archive, api, bin, path: pathOverride, relativeTemp = false } = {}) {
+  const work = await directory("run");
+  const home = path.join(work, "home");
+  const temp = path.join(work, "tmp");
+  await mkdir(home);
+  await mkdir(temp);
+  const log = path.join(work, "curl.log");
+  await writeFile(log, "");
+  let apiFile = path.join(work, "api.json");
+  if (api !== undefined) await writeFile(apiFile, typeof api === "string" ? api : JSON.stringify(api));
+  else apiFile = "";
+  const result = spawnSync("sh", [SCRIPT], {
+    encoding: "utf8",
+    cwd: work,
+    env: {
+      PATH: pathOverride ?? `${bin ? `${bin}:` : ""}${shims}:/usr/bin:/bin`,
+      HOME: home,
+      TMPDIR: relativeTemp ? "tmp" : temp,
+      STUB_LOG: log,
+      STUB_ARCHIVE: archive ?? "",
+      STUB_API: apiFile,
+      ...env,
+    },
+  });
+  const downloads = (await readFile(log, "utf8")).split("\n").filter(Boolean);
+  const leftovers = await readdir(temp);
+  const recorded = await readFile(path.join(home, "argv.json"), "utf8").then(JSON.parse, () => null);
+  return { status: result.status, stdout: result.stdout, stderr: result.stderr, downloads, leftovers, recorded, home };
+}
+
+/** A gzipped ustar archive with exactly these entries, so names tar would refuse to create can be listed. */
+function rawArchive(entries) {
+  const blocks = [];
+  for (const { name, content = "", type = content === "" && name.endsWith("/") ? "5" : "0" } of entries) {
+    const header = Buffer.alloc(512);
+    header.write(name, 0, "utf8");
+    header.write("0000644\0", 100);
+    header.write("0000000\0", 108);
+    header.write("0000000\0", 116);
+    header.write(`${Buffer.byteLength(content).toString(8).padStart(11, "0")}\0`, 124);
+    header.write("00000000000\0", 136);
+    header.write("        ", 148);
+    header.write(type, 156);
+    header.write("ustar\0" + "00", 257, "latin1");
+    const sum = [...header].reduce((total, byte) => total + byte, 0);
+    header.write(`${sum.toString(8).padStart(6, "0")}\0 `, 148);
+    blocks.push(header);
+    if (content !== "") {
+      const data = Buffer.from(content);
+      blocks.push(data, Buffer.alloc((512 - (data.length % 512)) % 512));
+    }
+  }
+  blocks.push(Buffer.alloc(1024));
+  return gzipSync(Buffer.concat(blocks));
+}
+
+async function rawArchiveFile(entries) {
+  const file = path.join(await directory("raw"), "raw.tar.gz");
+  await writeFile(file, rawArchive(entries));
+  return file;
+}
+
+/** A `tar` that lists the real archive in bsdtar's format with the given month word, and runs the real tar otherwise. */
+async function bsdListingStub(month) {
+  const real = spawnSync("sh", ["-c", "command -v tar"], { encoding: "utf8" }).stdout.trim();
+  const bin = await directory("bsd-stub");
+  await writeFile(path.join(bin, "tar"), `#!/bin/sh
+if [ "$1" = "-tvzf" ]; then
+  "${real}" -tzf "$2" | while IFS= read -r name; do
+    case "$name" in */) kind=drwxr-xr-x ;; *) kind=-rw-r--r-- ;; esac
+    printf '%s  0 u g 10 ${month}  1 00:00 %s\\n' "$kind" "$name"
+  done
+else
+  exec "${real}" "$@"
+fi
+`);
+  await chmod(path.join(bin, "tar"), 0o755);
+  return bin;
+}
+
+/** A directory holding a `tar` that lists the given plain and verbose lines, so listings tar would not print can be tested. */
+async function tarListingStub({ names, verbose }) {
+  const bin = await directory("tar-stub");
+  const lines = (list) => list.map((line) => `printf '%s\\n' '${line}'`).join("\n");
+  await writeFile(path.join(bin, "tar"), `#!/bin/sh
+case "$1" in
+  -tzf) ${lines(names)} ;;
+  -tvzf) ${lines(verbose)} ;;
+  *) echo "unexpected tar call: $*" >&2; exit 9 ;;
+esac
+`);
+  await chmod(path.join(bin, "tar"), 0o755);
+  return bin;
+}
+
+test("a malformed HARNESS_SKILLS_VERSION is refused before any download", { skip }, async () => {
+  for (const version of ["1.2", "v1.2.3/../../x", "v1.2.3-rc1", "v1.2.3?x=1", "1.2.3\n", "$(id)"]) {
+    const outcome = await runInstaller({ env: { HARNESS_SKILLS_VERSION: version } });
+    assert.notEqual(outcome.status, 0, version);
+    assert.match(outcome.stderr, /unexpected version/, version);
+    assert.deepEqual(outcome.downloads, [], version);
+    assert.deepEqual(outcome.leftovers, [], version);
+  }
+});
+
+test("Node.js older than 22 is refused before any download", { skip }, async () => {
+  const outcome = await runInstaller({ env: { FAKE_NODE_VERSION: "20.11.1", HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /Harness Skills needs Node\.js 22 or newer, but found 20\.11\.1/);
+  assert.deepEqual(outcome.downloads, []);
+});
+
+test("installs from the release tag and runs its installer for OpenCode in the user scope", { skip }, async () => {
+  const { archive, top } = await buildRelease();
+  const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "1.2.3" } });
+  assert.equal(outcome.status, 0, outcome.stderr);
+  assert.deepEqual(outcome.downloads, ["https://codeload.github.com/MSpiechowicz/harness-useful-skills/tar.gz/refs/tags/v1.2.3"]);
+  assert.equal(outcome.recorded.argv.length, 6);
+  assert.equal(path.basename(outcome.recorded.argv[0]), "useful-skills");
+  assert.equal(path.basename(path.dirname(outcome.recorded.argv[0])), top);
+  assert.deepEqual(outcome.recorded.argv.slice(1), ["install", "--host", "opencode", "--scope", "user"]);
+  assert.equal(await realpath(outcome.recorded.cwd), await realpath(outcome.home));
+  assert.match(outcome.stdout, /Restart OpenCode to load Harness Skills\./);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("without a version it resolves the latest release through the GitHub API", { skip }, async () => {
+  const { archive } = await buildRelease();
+  const outcome = await runInstaller({ archive, api: { tag_name: "v1.2.3", name: "1.2.3" } });
+  assert.equal(outcome.status, 0, outcome.stderr);
+  assert.deepEqual(outcome.downloads, [
+    "https://api.github.com/repos/MSpiechowicz/harness-useful-skills/releases/latest",
+    "https://codeload.github.com/MSpiechowicz/harness-useful-skills/tar.gz/refs/tags/v1.2.3",
+  ]);
+  assert.deepEqual(outcome.recorded.argv.slice(1), ["install", "--host", "opencode", "--scope", "user"]);
+});
+
+test("a failed release lookup suggests HARNESS_SKILLS_VERSION", { skip }, async () => {
+  const outcome = await runInstaller({ api: {}, env: { STUB_API_FAIL: "1" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /HARNESS_SKILLS_VERSION/);
+  assert.equal(outcome.recorded, null);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("a latest release with an unusable tag is refused without a download", { skip }, async () => {
+  for (const api of [{ tag_name: "main" }, { tag_name: "v1.2.3/../x" }, { tag_name: 3 }, {}, "not json"]) {
+    const outcome = await runInstaller({ api });
+    assert.notEqual(outcome.status, 0, JSON.stringify(api));
+    assert.match(outcome.stderr, /HARNESS_SKILLS_VERSION/);
+    assert.equal(outcome.downloads.length, 1, "only the API was asked");
+    assert.deepEqual(outcome.leftovers, []);
+  }
+});
+
+test("an archive with a symlink is refused and nothing runs", { skip }, async () => {
+  const { archive } = await buildRelease({ extra: (root) => symlink("/etc/passwd", path.join(root, "link")) });
+  const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /not a plain file or directory|contains a link/);
+  assert.equal(outcome.recorded, null);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("an archive with a hard link is refused", { skip }, async () => {
+  const { archive } = await buildRelease({ extra: (root) => link(path.join(root, "package.json"), path.join(root, "again.json")) });
+  const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.equal(outcome.recorded, null);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("an archive with two top-level directories is refused", { skip }, async () => {
+  const { archive } = await buildRelease({ extra: (_root, tree) => mkdir(path.join(tree, "other")).then(() => writeFile(path.join(tree, "other", "x"), "x")) });
+  const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /exactly one top-level directory/);
+  assert.equal(outcome.recorded, null);
+});
+
+test("an archive that is not a tarball is refused", { skip }, async () => {
+  const work = await directory("junk");
+  const archive = path.join(work, "junk.tar.gz");
+  await writeFile(archive, "this is not an archive");
+  const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /not a valid/);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("a failed download is reported and leaves nothing behind", { skip }, async () => {
+  const outcome = await runInstaller({ env: { HARNESS_SKILLS_VERSION: "v1.2.3", STUB_ARCHIVE_FAIL: "1" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /download failed/);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("a manifest version that differs from the tag is refused", { skip }, async () => {
+  const { archive } = await buildRelease({ version: "1.2.3", manifestVersion: "1.2.2" });
+  const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /package\.json has version 1\.2\.2, expected 1\.2\.3/);
+  assert.equal(outcome.recorded, null);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("a release without the OpenCode plugin is refused", { skip }, async () => {
+  const { archive } = await buildRelease({ extra: (root) => rm(path.join(root, "plugins", "opencode", "useful-skills.js")) });
+  const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /has no plugins\/opencode\/useful-skills\.js/);
+  assert.equal(outcome.recorded, null);
+});
+
+test("the exit code of the release installer is propagated and the download is removed", { skip }, async () => {
+  const { archive } = await buildRelease();
+  const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3", INSTALLER_EXIT: "7" } });
+  assert.equal(outcome.status, 7);
+  assert.match(outcome.stderr, /installer failed \(exit 7\)/);
+  assert.doesNotMatch(outcome.stdout, /Restart OpenCode/);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("an absolute entry name is refused", { skip }, async () => {
+  const archive = await rawArchiveFile([{ name: "/tmp/evil", content: "x" }]);
+  const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /unsafe entry name/);
+  assert.equal(outcome.recorded, null);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("an entry name with a .. segment is refused", { skip }, async () => {
+  const archive = await rawArchiveFile([{ name: "top/" }, { name: "top/../evil", content: "x" }]);
+  const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /unsafe entry name/);
+  assert.equal(outcome.recorded, null);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("an entry that declares more than the size limit is refused before extraction", { skip }, async () => {
+  const archive = (await buildRelease()).archive;
+  const bin = await tarListingStub({
+    names: ["top/", "top/big"],
+    verbose: ["drwxr-xr-x u/g 0 2024-01-01 00:00 top/", "-rw-r--r-- u/g 999999999999 2024-01-01 00:00 top/big"],
+  });
+  const outcome = await runInstaller({ archive, bin, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /expands beyond the size limit/);
+  assert.equal(outcome.recorded, null);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("entries that add up to more than the size limit are refused", { skip }, async () => {
+  const archive = (await buildRelease()).archive;
+  const bin = await tarListingStub({
+    names: ["top/", "top/a", "top/b"],
+    verbose: [
+      "drwxr-xr-x  0 u g          0 Jan  1 00:00 top/",
+      "-rw-r--r--  0 u g  300000000 Jan  1 00:00 top/a",
+      "-rw-r--r--  0 u g  300000000 Jan  1  2023 top/b",
+    ],
+  });
+  const outcome = await runInstaller({ archive, bin, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /expands beyond the size limit/);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("a listing whose sizes cannot be read is refused", { skip }, async () => {
+  const archive = (await buildRelease()).archive;
+  const bin = await tarListingStub({
+    names: ["top/", "top/a"],
+    verbose: ["drwxr-xr-x u/g 0 2024-01-01 00:00 top/", "-rw-r--r-- somebody-else top/a"],
+  });
+  const outcome = await runInstaller({ archive, bin, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /couldn't read the entry sizes/);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("a relative TMPDIR works and is cleaned up", { skip }, async () => {
+  const { archive } = await buildRelease();
+  const outcome = await runInstaller({ archive, relativeTemp: true, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.equal(outcome.status, 0, outcome.stderr);
+  assert.deepEqual(outcome.recorded.argv.slice(1), ["install", "--host", "opencode", "--scope", "user"]);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("a missing curl is refused before anything else", { skip }, async () => {
+  // Every tool the script needs except curl, linked into one directory that becomes the whole PATH.
+  const tools = await directory("tools");
+  for (const name of ["sh", "tar", "gzip", "grep", "cut", "sort", "wc", "tr", "head", "find", "awk", "mktemp", "rm", "chmod", "mkdir", "cat", "uname"]) {
+    const found = spawnSync("sh", ["-c", `command -v ${name}`], { encoding: "utf8" }).stdout.trim();
+    if (found) await symlink(found, path.join(tools, name));
+  }
+  await symlink(path.join(shims, "node"), path.join(tools, "node"));
+  const outcome = await runInstaller({ path: tools, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /'curl' is required/);
+  assert.deepEqual(outcome.downloads, []);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("a bsdtar listing with a localized month is read", { skip }, async () => {
+  for (const month of ["pa\u017a", "M\u00e4r", "oct."]) {
+    const { archive } = await buildRelease();
+    const bin = await bsdListingStub(month);
+    const outcome = await runInstaller({ archive, bin, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+    assert.equal(outcome.status, 0, `${month}: ${outcome.stderr}`);
+    assert.deepEqual(outcome.recorded.argv.slice(1), ["install", "--host", "opencode", "--scope", "user"]);
+  }
+});
+
+test("a listing that imitates other columns to shift the size field is refused", { skip }, async () => {
+  const archive = (await buildRelease()).archive;
+  const bin = await tarListingStub({
+    names: ["pkg/", "pkg/hole"],
+    verbose: ["drwxr-xr-x u/g 0 2024-01-01 00:00 pkg/", "-rw-r--r-- u/g 1 Jan 3221225472 100000000000000000 pkg/hole"],
+  });
+  const outcome = await runInstaller({ archive, bin, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /couldn't read the entry sizes/);
+  assert.equal(outcome.recorded, null);
+  assert.deepEqual(outcome.leftovers, []);
+});
+
+test("a latest release tag without the v prefix is refused", { skip }, async () => {
+  const outcome = await runInstaller({ api: { tag_name: "1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /HARNESS_SKILLS_VERSION/);
+  assert.equal(outcome.downloads.length, 1, "only the API was asked");
+});
+
+test("HARNESS_SKILLS_VERSION=latest means the latest release", { skip }, async () => {
+  const { archive } = await buildRelease();
+  const outcome = await runInstaller({ archive, api: { tag_name: "v1.2.3" }, env: { HARNESS_SKILLS_VERSION: "latest" } });
+  assert.equal(outcome.status, 0, outcome.stderr);
+  assert.equal(outcome.downloads.length, 2);
+});
+
+test("a manifest version that is not a plain version is not echoed", { skip }, async () => {
+  const { archive } = await buildRelease({ manifestVersion: "1.2.3\u001b[31mred" });
+  const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /has version \(missing or not a version\), expected 1\.2\.3/);
+  assert.doesNotMatch(outcome.stderr, /\u001b\[31m/);
+});

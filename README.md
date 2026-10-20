@@ -89,7 +89,33 @@ OMP's updater and release process do **not** update the Claude or OpenCode insta
 
 ### OpenCode
 
-The OpenCode adapter requires OpenCode v1.x (plugin API; tested on 1.19.3) and Node.js **22+** on `PATH`: the plugin itself runs under OpenCode's Bun, but settings, memory, and doctor run as Node subprocesses. Install from a checkout:
+The OpenCode adapter requires OpenCode v1.x (plugin API; tested on 1.19.3) and Node.js **22+** on `PATH`: the plugin itself runs under OpenCode's Bun, but settings, memory, and doctor run as Node subprocesses.
+
+One-line install of the latest release into your user config (macOS and Linux, needs `curl`, `tar`, `gzip`, and Node.js 22+):
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/MSpiechowicz/harness-useful-skills/main/install.sh | sh
+```
+
+On Windows (PowerShell, needs the `tar.exe` in System32 from Windows 10 or newer, and Node.js 22+):
+
+```powershell
+irm https://raw.githubusercontent.com/MSpiechowicz/harness-useful-skills/main/install.ps1 | iex
+```
+
+The script downloads the release tarball from GitHub over HTTPS, runs the same checks as `update install` (no links, no absolute or `..` paths, one top-level directory, a `package.json` and plugin manifest that both match the release tag), and then runs that release's `./useful-skills install --host opencode --scope user` from your home directory. Nothing is installed when a check fails, and the temporary download is always removed. Set `HARNESS_SKILLS_VERSION` to a release tag such as `v0.3.7` to install that release instead of the latest (also the way around a failed GitHub API lookup). Put the variable on the shell that reads the script, not on `curl`:
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/MSpiechowicz/harness-useful-skills/main/install.sh | HARNESS_SKILLS_VERSION=v0.3.7 sh
+```
+
+```powershell
+$env:HARNESS_SKILLS_VERSION = 'v0.3.7'; irm https://raw.githubusercontent.com/MSpiechowicz/harness-useful-skills/main/install.ps1 | iex
+```
+
+Re-run the installer to update. The PowerShell script cannot stop a download at the size cap (it checks `Content-Length` when sent and the file afterwards), and it does not check extracted hard links.
+
+Or install from a checkout, which also supports the `project` scope:
 
 ```bash
 ./useful-skills install --host opencode [--scope user|project]
