@@ -74,8 +74,8 @@ test("the bundle excludes other hosts, the launcher, install-time modules, and t
   assert.deepEqual(inside.filter(file => FORBIDDEN.some(pattern => pattern.test(file))), []);
 });
 
-test("the entry re-exports the plugin from the runtime tree", async () => {
-  assert.equal(await readFile(path.join(BUNDLE, "useful-skills.js"), "utf8"), 'export { UsefulSkills } from "./useful-skills/opencode/v1.js";\n');
+test("the entry re-exports the plugin definition from the runtime tree", async () => {
+  assert.equal(await readFile(path.join(BUNDLE, "useful-skills.js"), "utf8"), 'export { default } from "./useful-skills/opencode/entry.js";\n');
 });
 
 test("the runtime manifest carries the package version", async () => {
@@ -114,10 +114,13 @@ test("every relative import and URL in the bundled modules resolves inside the b
   }
 });
 
-test("the entry module exposes only functions when imported under Node", async () => {
+test("the entry module carries one definition both OpenCode plugin APIs accept when imported under Node", async () => {
   const entry = await import(pathToFileURL(path.join(BUNDLE, "useful-skills.js")).href);
-  assert.deepEqual(Object.keys(entry), ["UsefulSkills"]);
-  for (const value of Object.values(entry)) assert.equal(typeof value, "function");
+  assert.deepEqual(Object.keys(entry), ["default"]);
+  assert.deepEqual(Object.keys(entry.default).sort(), ["id", "server", "setup"]);
+  assert.equal(typeof entry.default.id, "string");
+  assert.equal(typeof entry.default.server, "function");
+  assert.equal(typeof entry.default.setup, "function");
 });
 
 test("the bundled command lists the 21 shipped skills", async t => {

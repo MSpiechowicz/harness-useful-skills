@@ -1,6 +1,6 @@
 /**
- * Host-neutral OpenCode session state and hook decisions. Plugin-API entries (see v1.js) only map host
- * shapes onto these handlers. Heavy I/O runs in `node` subprocesses; in-process work is limited to the
+ * Host-neutral OpenCode session state and hook decisions. Plugin-API entries (see v1.js and v2.js) only map
+ * host shapes onto these handlers. Heavy I/O runs in `node` subprocesses; in-process work is limited to the
  * bash guard, result redaction, and cached context.
  */
 import path from "node:path";
@@ -27,6 +27,9 @@ const IGNORE_COMMAND = "us-ignore-workflow";
 const NO_OUTPUT = "(no output)";
 const NODE_REQUIRED = "Node.js 22 or newer must be on PATH for Useful Skills in OpenCode. Install it, make sure `node` is on the PATH OpenCode starts with, then restart OpenCode.";
 const NODE_MISSING_NOTICE = "Useful Skills needs Node.js 22+ on PATH; workflow guidance is limited until then.";
+
+// The V1 shell tool is `bash`, the V2 one is `shell`.
+const SHELL_TOOLS = new Set(["bash", "shell"]);
 
 // Bash results carry text in title/output/metadata; MCP results are raw `content` and `structuredContent`.
 // Attachments and `_meta` are not text results and stay untouched.
@@ -162,6 +165,17 @@ export function createSession({ directory, runtimeRoot, run = runNode, toast, se
     return state.child === true;
   }
 
+  /** Whether the host confirms a session is a main session. An unknown session is not one. */
+  async function isMainSession(sessionID) {
+    if (!isSessionID(sessionID)) {
+      return false;
+    }
+
+    const state = sessionState(sessionID);
+    await isChildSession(sessionID, state);
+    return state.child === false;
+  }
+
   /**
    * Begin background work without blocking plugin load: generate role agents and cache their routing note,
    * and when `checkForUpdate` run one quiet update check that toasts any notice. The returned promise
@@ -185,17 +199,27 @@ export function createSession({ directory, runtimeRoot, run = runNode, toast, se
     return Promise.all([agents, update]).then(() => undefined);
   }
 
-  /** Track subagent (child) sessions so they get no workflow context, and forget deleted sessions. */
+  /** Remember whether a created session is a subagent (child) session, so it gets no workflow context. */
+  function sessionCreated(sessionID, parentID) {
+    if (isSessionID(sessionID)) {
+      sessionState(sessionID).child = isSessionID(parentID);
+    }
+  }
+
+  /** Forget a deleted session. */
+  function sessionDeleted(sessionID) {
+    if (isSessionID(sessionID)) {
+      sessions.delete(sessionID);
+    }
+  }
+
+  /** Track subagent sessions and forget deleted ones from V1 session events. */
   function onEvent(event) {
     const info = event?.properties?.info;
-    if (!isSessionID(info?.id)) {
-      return;
-    }
-
-    if (event.type === "session.created") {
-      sessionState(info.id).child = isSessionID(info.parentID);
-    } else if (event.type === "session.deleted") {
-      sessions.delete(info.id);
+    if (event?.type === "session.created") {
+      sessionCreated(info?.id, info?.parentID);
+    } else if (event?.type === "session.deleted") {
+      sessionDeleted(info?.id);
     }
   }
 
@@ -225,25 +249,29 @@ export function createSession({ directory, runtimeRoot, run = runNode, toast, se
   }
 
   /**
-   * Append cached context to a session's system prompt; nothing before its first prompt or in a child session.
+   * The cached context texts for a session's system prompt; none before its first prompt or in a child session.
    * V1 transform input carries only the session and model, so title and compaction requests for a main
-   * session also receive the context; they cannot be told apart from prompt turns.
+   * session also receive the context there; they cannot be told apart from prompt turns.
    */
-  function systemTransform(sessionID, system) {
+  function systemContext(sessionID) {
     const state = isSessionID(sessionID) ? existingState(sessionID) : undefined;
-    if (!Array.isArray(system) || !state || state.child || state.context === undefined) {
-      return;
+    if (!state || state.child || state.context === undefined) {
+      return [];
     }
 
-    system.push(state.context);
-    if (routingNote) {
-      system.push(routingNote);
+    return routingNote ? [state.context, routingNote] : [state.context];
+  }
+
+  /** Append systemContext to a V1 system prompt array in place. */
+  function systemTransform(sessionID, system) {
+    if (Array.isArray(system)) {
+      system.push(...systemContext(sessionID));
     }
   }
 
-  /** Throw the denial reason for a dangerous or malformed bash command; other tools pass. */
+  /** Throw the denial reason for a dangerous or malformed shell command; other tools pass. */
   function beforeTool(tool, args) {
-    if (tool !== "bash") {
+    if (!SHELL_TOOLS.has(tool)) {
       return;
     }
 
@@ -293,17 +321,26 @@ export function createSession({ directory, runtimeRoot, run = runNode, toast, se
     }
   }
 
+  /** The prompt text that relays a `/useful-skills` run with the raw `args` text; never rejects. */
+  function runUsefulSkills(args) {
+    return commandText(typeof args === "string" ? args.trim() : "");
+  }
+
+  /** Mark the session's next prompt (the `/us-ignore-workflow` one itself) as opted out of workflow stages. */
+  function ignoreWorkflow(sessionID) {
+    if (isSessionID(sessionID)) {
+      sessionState(sessionID).optOutPending = true;
+    }
+  }
+
   /**
-   * Handle a user-run command before its prompt is sent. `/useful-skills` runs in a subprocess and its result
-   * replaces `parts` in place (the host keeps the array, not a reassignment); its prompt is marked so
-   * onChatMessage skips it. `/us-ignore-workflow` marks the session's next prompt (its own) as opted out
-   * and leaves its prompt unchanged.
+   * Handle a V1 user-run command before its prompt is sent. `/useful-skills` runs in a subprocess and its result
+   * replaces `parts` in place (the host keeps the array, not a reassignment). `/us-ignore-workflow` leaves its
+   * prompt unchanged.
    */
   async function onCommand(name, sessionID, args, parts) {
     if (name === IGNORE_COMMAND) {
-      if (isSessionID(sessionID)) {
-        sessionState(sessionID).optOutPending = true;
-      }
+      ignoreWorkflow(sessionID);
       return;
     }
 
@@ -311,14 +348,29 @@ export function createSession({ directory, runtimeRoot, run = runNode, toast, se
       return;
     }
 
+    // This command's own prompt follows, and onChatMessage must skip it.
     if (isSessionID(sessionID)) {
       sessionState(sessionID).commandTurn = true;
     }
 
-    const text = await commandText(typeof args === "string" ? args.trim() : "");
+    const text = await runUsefulSkills(args);
     parts.length = 0;
     parts.push({ type: "text", text });
   }
 
-  return { start, onEvent, onChatMessage, systemTransform, beforeTool, afterTool, onCommand };
+  return {
+    start,
+    onEvent,
+    sessionCreated,
+    sessionDeleted,
+    onChatMessage,
+    systemContext,
+    systemTransform,
+    beforeTool,
+    afterTool,
+    onCommand,
+    runUsefulSkills,
+    ignoreWorkflow,
+    isMainSession,
+  };
 }

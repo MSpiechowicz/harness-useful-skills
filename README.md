@@ -89,7 +89,7 @@ OMP's updater and release process do **not** update the Claude or OpenCode insta
 
 ### OpenCode
 
-The OpenCode adapter requires OpenCode v1.x (plugin API; tested on 1.19.3) and Node.js **22+** on `PATH`: the plugin itself runs under OpenCode's Bun, but settings, memory, and doctor run as Node subprocesses.
+The OpenCode adapter supports OpenCode v1.x (plugin API V1, tested on 1.19.3) and OpenCode v2.x (plugin API V2, tested on 2.1.2) and needs Node.js **22+** on `PATH`: the plugin itself runs under OpenCode's own runtime, but settings, memory, and doctor run as Node subprocesses. One installed `plugins/useful-skills.js` serves both: its default export carries the V1 `server` function and the V2 `setup` function, and each OpenCode reads the one it knows ([OpenCode V2](#opencode-v2)).
 
 One-line install of the latest release into your user config (macOS and Linux, needs `curl`, `tar`, `gzip`, and Node.js 22+):
 
@@ -137,7 +137,7 @@ Outside the scope directory, the plugin keeps data at `${XDG_DATA_HOME:-~/.local
 
 **Ownership.** The installer never overwrites a file it does not own or one you edited since installing, and refuses symlinked targets. Project scope writes `<cwd>/.opencode/` and its `opencode.json` with machine-specific absolute paths; add them to `.gitignore` instead of committing them.
 
-**Update.** `./useful-skills update check|install --host opencode` (or `/useful-skills update check|install` in chat) downloads the latest stable GitHub release tarball over HTTPS, verifies it (no links, no absolute or `..` paths, matching versions) and runs its installer for the recorded scope. Nothing changes on any failure. It updates the installed copy, never the checkout, and works from the first release that contains the OpenCode adapter. At startup the plugin makes one quiet check and shows a toast when a newer release exists.
+**Update.** `./useful-skills update check|install --host opencode` (or `/useful-skills update check|install` in chat) downloads the latest stable GitHub release tarball over HTTPS, verifies it (no links, no absolute or `..` paths, matching versions) and runs its installer for the recorded scope. Nothing changes on any failure. It updates the installed copy, never the checkout, and works from the first release that contains the OpenCode adapter. On OpenCode 1.x the plugin also makes one quiet check at startup and shows a toast when a newer release exists.
 
 **Uninstall.** `./useful-skills uninstall --host opencode [--scope user|project]` removes only owned files that still match their recorded hash, marker-owned agents, and the `mcp.useful_skills` entry if it is unchanged. It keeps data, settings, and `models.yml`, and prints their paths. `./useful-skills doctor --host opencode` reports the installation from the terminal.
 
@@ -147,13 +147,30 @@ Limits:
 
 - OpenCode skips the after-tool hook when a tool fails, so failed tool output is **not** redacted.
 - `/useful-skills` output is relayed by the model: the plugin runs the command and the model is told to show the result verbatim, best-effort.
-- Workflow guidance uses `experimental.chat.system.transform`, which OpenCode may change. The layout is ready for OpenCode V2 plugins, but they will need a V2 entry that does not exist yet.
+- On OpenCode 1.x, workflow guidance uses `experimental.chat.system.transform`, which OpenCode may change.
 - Like the other hosts, the Bash guard does not stop a model from running the bundled `command.js` or editing settings files through tools; the restriction that settings change only from commands you type applies to the plugin's command path, not to everything a model can do.
-- Workflow context is added to every LLM call in a session, including OpenCode's title and compaction calls: plugin API V1 cannot tell them apart from chat turns.
+- On OpenCode 1.x, workflow context is added to every LLM call in a session, including OpenCode's title and compaction calls: plugin API V1 cannot tell them apart from chat turns. OpenCode 2.x has separate hooks, so only the agent's own requests get it.
 - Startup runs `sync-agents` (it writes `useful-skills/models.yml` and the generated agents) and one read-only update check, which may call `gh auth token` to raise the GitHub rate limit; both fail quietly.
 - The installer re-serializes `opencode.json` as 2-space JSON, so exotic numeric values and duplicate keys normalize.
 - Long `/useful-skills` commands (`doctor`, `graph test`, `update install`) have a 10-minute budget (60 seconds for the others), and their subprocesses are stopped when OpenCode quits.
 - These protections are not a sandbox or a substitute for OpenCode's permissions.
+
+#### OpenCode V2
+
+OpenCode 2.x loads `plugins/useful-skills.js` as a plugin definition (`export default { id, setup }`) and rejects a file with only named exports. OpenCode 1.x reads the same default export and calls its `server` function, so the installed entry exports one object with `id`, `server` (V1), and `setup` (V2), and the installer is the same for both. The runtime directory `plugins/useful-skills/` is ignored by the V2 loader because it has no `index` or `server` module.
+
+`opencode/v2.js` maps the V2 Promise plugin API onto the same session logic as V1, with these differences:
+
+| Behavior | OpenCode 1.x | OpenCode 2.x |
+|---|---|---|
+| Workflow guidance | `experimental.chat.system.transform` | `session.hook("context")`, appended to the system prompt of the agent's requests only (not title or compaction) |
+| Per-prompt refresh | `chat.message` | `session.hook("prompt")` |
+| Bash guard and redaction | `bash` tool, `tool.execute.before/after` | `shell` (or `bash`) tool, `tool.hook("execute.before"\|"execute.after")` |
+| Subagent sessions | `session.created` event, then a session lookup | `ctx.event.subscribe` events, then a session lookup |
+| `/useful-skills`, `/us-ignore-workflow` | `command.execute.before` | the prompt OpenCode builds from the installed command template (see below) |
+| Update and Node.js notices | toasts | none: V2 server plugins have no toast, and the startup update check is skipped |
+
+OpenCode 2.x runs a markdown command from the config directory in preference to a plugin command of the same name and has no command hook, so the plugin recognizes the expanded prompt of `commands/useful-skills.md` and `commands/us-ignore-workflow.md` (the template text, then what you typed) in the `prompt` hook. It runs `/useful-skills` and replaces the prompt text with the relayed result, and treats `/us-ignore-workflow` as the opt-out for that same request. This is done only in a session the host confirms is a main session, so a subagent prompt written by a model cannot trigger it. The plugin reads those two command files when it loads, so edits to them apply after a restart. V2 limits: a failed tool's error text is not redacted (V1 never sees failed tools at all), and long commands show no progress notice.
 
 ## Skill-led development
 

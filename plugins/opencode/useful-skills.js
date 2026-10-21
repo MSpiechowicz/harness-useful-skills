@@ -1,1 +1,1 @@
-export { UsefulSkills } from "./useful-skills/opencode/v1.js";
+export { default } from "./useful-skills/opencode/entry.js";

@@ -16,7 +16,8 @@ if (process.argv.length > 3 || (process.argv[2] && !check)) {
 }
 
 const PRESERVED = { files: ['README.md'], trees: [], required: ['README.md'] };
-const ENTRY = 'export { UsefulSkills } from "./useful-skills/opencode/v1.js";\n';
+// One default export serves both plugin APIs: OpenCode 1.x calls its `server`, OpenCode 2.x its `setup` (see opencode/entry.js).
+const ENTRY = 'export { default } from "./useful-skills/opencode/entry.js";\n';
 
 // Every runtime file, as repository-relative paths. Skills are the only walked folder; nothing else is matched by pattern.
 // opencode/install.js and uninstall.js run only from a checkout and are deliberately absent; the closure check below
@@ -34,7 +35,7 @@ const FILES = [
   'doctor-setup.js', 'local-facts.js', 'host-roots.js', 'mcp-memory-server.js',
   'entrypoint.js', 'graph-test.js', 'release-check.js',
   // OpenCode adapter.
-  'opencode/v1.js', 'opencode/session.js', 'opencode/node-runner.js', 'opencode/context.js',
+  'opencode/entry.js', 'opencode/v1.js', 'opencode/v2.js', 'opencode/command-prompt.js', 'opencode/session.js', 'opencode/node-runner.js', 'opencode/context.js',
   'opencode/paths.js', 'opencode/settings.js', 'opencode/host-context.js', 'opencode/models.js',
   'opencode/command.js', 'opencode/hook-cli.js', 'opencode/mcp-server.js',
   'opencode/install-status.js', 'opencode/install-files.js', 'opencode/config-file.js', 'opencode/updater.js',
