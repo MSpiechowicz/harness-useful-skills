@@ -502,3 +502,28 @@ test("V2 redacts secrets in shell output that reaches the model outside a tool r
 
   await hooks.session.context({ sessionID: "main", system: [], messages: "not a list" });
 });
+
+test("V2 shell output redaction rewrites only the text parts of a message", async () => {
+  const { hooks } = await plugin();
+  const file = { type: "file", mime: "text/plain", filename: SECRET, url: `data:text/plain,${SECRET}` };
+  const call = { type: "tool", tool: "shell", input: { command: `echo ${SECRET}` } };
+  const shell = {
+    role: "user",
+    content: [
+      { type: "text", text: `<shell id="sh_1" state="completed" command="cat .env">\n${SECRET}\n</shell>` },
+      file,
+      call,
+      { type: "text", text: `more ${SECRET}`, synthetic: true },
+    ],
+  };
+  const messages = [shell];
+
+  await hooks.session.context({ sessionID: "main", system: [], messages });
+  const [text, keptFile, keptCall, more] = messages[0].content;
+  assert.equal(text.text, '<shell id="sh_1" state="completed" command="cat .env">\npassword=[REDACTED]\n</shell>');
+  assert.equal(keptFile, file, "a file part is kept as it is");
+  assert.equal(keptFile.filename, SECRET);
+  assert.equal(keptCall, call, "a tool part is kept as it is");
+  assert.deepEqual(more, { type: "text", text: "more password=[REDACTED]", synthetic: true });
+  assert.equal(shell.content[3].text, `more ${SECRET}`, "the original message is not changed");
+});

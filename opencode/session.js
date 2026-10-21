@@ -49,6 +49,36 @@ function isShellOutputMessage(message) {
   return typeof text === "string" && SHELL_OUTPUT_PREFIXES.some(prefix => text.startsWith(prefix));
 }
 
+/**
+ * Redact secrets in the text of a message's content: the string itself, or the `text` of each text part. Other
+ * parts (files, images, tool calls) are kept as they are.
+ */
+function redactTextContent(content) {
+  if (typeof content === "string") {
+    return redactValue(content);
+  }
+  if (!Array.isArray(content)) {
+    return content;
+  }
+
+  let changed = false;
+  const parts = content.map(part => {
+    if (part?.type !== "text" || typeof part.text !== "string") {
+      return part;
+    }
+
+    const text = redactValue(part.text);
+    if (text === part.text) {
+      return part;
+    }
+
+    changed = true;
+    return { ...part, text };
+  });
+
+  return changed ? parts : content;
+}
+
 function isSessionID(value) {
   return typeof value === "string" && value.length > 0;
 }
@@ -327,7 +357,7 @@ export function createSession({ directory, runtimeRoot, run = runNode, toast, se
         return;
       }
 
-      const content = redactValue(message.content);
+      const content = redactTextContent(message.content);
       if (content !== message.content) {
         messages[index] = { ...message, content };
       }
