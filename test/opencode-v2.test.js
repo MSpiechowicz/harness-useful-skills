@@ -386,6 +386,33 @@ test("the plugin stops registering when something keeps replacing its commands",
   assert.ok(host.registrations <= 8, `registered ${host.registrations} times`);
 });
 
+test("the plugin gives up when another plugin takes the same names back after every registration", async () => {
+  const { host, cleanup } = await plugin();
+  let rivalRegistrations = 0;
+  let pending = false;
+  // Another plugin that re-registers the names on every command.updated it does not win, a moment later.
+  host.onChange(() => {
+    if (pending || rivalRegistrations >= 500 || host.state().get("useful-skills").description === "rival") return;
+    pending = true;
+    setTimeout(() => {
+      pending = false;
+      rivalRegistrations += 1;
+      host.push(editor => editor.add({ name: "useful-skills", description: "rival", execute: async () => {} }));
+    }, 2);
+  });
+
+  host.push(editor => editor.add({ name: "useful-skills", description: "rival", execute: async () => {} }));
+  await new Promise(resolve => setTimeout(resolve, 400));
+  const settled = host.registrations;
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  assert.ok(rivalRegistrations >= 2, `the rival re-registered ${rivalRegistrations} times`);
+  assert.ok(settled <= 21, `registered ${settled} times`);
+  assert.equal(host.registrations, settled, "the plugin stopped registering");
+  assert.equal(host.state().get("useful-skills").description, "rival");
+  await cleanup();
+});
+
 test("the plugin understands a command list returned as a plain array", async () => {
   const { feed, host, sent } = await plugin({ listShape: "array" });
   feed.emit({ type: "session.created", data: { sessionID: "main" } });

@@ -5,8 +5,8 @@
  * OpenCode 2 builds the command list from transforms applied in registration order, and the markdown commands
  * the installer ships are registered by a host plugin that starts after this one: they would replace plugin
  * commands of the same name. The plugin therefore registers its commands again whenever the host's command list
- * no longer shows them, so they are always the last registration. The markdown files stay as the fallback: their
- * text tells the model nothing ran.
+ * no longer shows them, so they are always the last registration, up to a lifetime cap so it never fights another
+ * plugin over the names forever. The markdown files stay as the fallback: their text tells the model nothing ran.
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -19,6 +19,9 @@ const FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/;
 
 // Registrations in a row that the host list did not confirm before the plugin stops: another plugin may own the names.
 const MAX_UNCONFIRMED = 5;
+// Registrations over the plugin's lifetime: another plugin that takes the names back after every confirmed
+// registration would otherwise alternate with this one forever.
+const MAX_REGISTRATIONS = 20;
 
 /** The prompt template of the markdown command `name` in `directory` without frontmatter, or undefined. */
 async function loadTemplate(directory, name) {
@@ -81,6 +84,7 @@ export async function createCommands({ ctx, session, directory }) {
 
   let registration;
   let unconfirmed = 0;
+  let registrations = 0;
   let stopped = false;
   let queue = Promise.resolve();
 
@@ -98,11 +102,12 @@ export async function createCommands({ ctx, session, directory }) {
       return;
     }
 
-    if (unconfirmed >= MAX_UNCONFIRMED) {
+    if (unconfirmed >= MAX_UNCONFIRMED || registrations >= MAX_REGISTRATIONS) {
       return;
     }
 
     unconfirmed += 1;
+    registrations += 1;
     const previous = registration;
     registration = await ctx.command.transform(editor => {
       for (const definition of definitions) {
