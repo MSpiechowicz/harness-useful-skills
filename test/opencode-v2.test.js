@@ -85,9 +85,61 @@ function eventFeed() {
   };
 }
 
+/**
+ * A fake of the host's command list: transforms are applied in registration order and a later registration of
+ * a name replaces an earlier one, as in OpenCode 2. Every change emits `command.updated`.
+ */
+function commandHost(feed, { listShape = "data" } = {}) {
+  const transforms = [];
+  const listeners = [];
+  const host = {
+    registrations: 0,
+    markdownRuns: [],
+    state() {
+      const commands = new Map();
+      for (const transform of transforms) transform({ add: definition => commands.set(definition.name, definition) });
+      return commands;
+    },
+    changed() {
+      feed.emit({ type: "command.updated", data: {} });
+      listeners.forEach(listener => listener());
+    },
+    push(transform) {
+      transforms.push(transform);
+      host.changed();
+      return { dispose: async () => { transforms.splice(transforms.indexOf(transform), 1); host.changed(); } };
+    },
+    async transform(transform) {
+      host.registrations += 1;
+      return host.push(transform);
+    },
+    async list() {
+      const items = [...host.state().values()].map(({ name, description }) => ({ name, description }));
+      return listShape === "data" ? { location: {}, data: items } : items;
+    },
+    /** The markdown commands the host loads from the config directory: they say that nothing ran. */
+    markdown() {
+      host.push(editor => {
+        for (const name of ["useful-skills", "us-ignore-workflow"]) {
+          editor.add({ name, description: `${name} (handled by the installed plugin)`, execute: async () => { host.markdownRuns.push(name); } });
+        }
+      });
+    },
+    /** Call `listener` after every change. */
+    onChange(listener) { listeners.push(listener); },
+    /** Run the command as the host does for a user typing it. */
+    run(name, sessionID, text = "") {
+      return host.state().get(name).execute({ sessionID, prompt: { text }, delivery: "steer" });
+    },
+  };
+  return host;
+}
+
 /** Run the V2 setup against a fake plugin context shaped like the Promise API and return its registered hooks. */
-async function plugin({ sessions = {}, lookups = [], events = true } = {}) {
+async function plugin({ sessions = {}, lookups = [], events = true, listShape, markdown = "after" } = {}) {
   const feed = eventFeed();
+  const host = commandHost(feed, { listShape });
+  const sent = [];
   const hooks = { session: {}, tool: {} };
   const register = group => async (name, callback) => {
     hooks[group][name] = callback;
@@ -96,6 +148,7 @@ async function plugin({ sessions = {}, lookups = [], events = true } = {}) {
   const ctx = {
     location: { directory, project: { directory } },
     event: { subscribe: events ? feed.subscribe : () => { throw new Error("No event stream."); } },
+    command: { transform: host.transform, list: host.list },
     session: {
       hook: register("session"),
       get: async ({ sessionID }) => {
@@ -103,11 +156,20 @@ async function plugin({ sessions = {}, lookups = [], events = true } = {}) {
         if (!(sessionID in sessions)) throw new Error("not found");
         return sessions[sessionID];
       },
+      // What the host does with a prompt a command sends: run the prompt hooks, then store the text.
+      prompt: async input => {
+        const event = { sessionID: input.sessionID, messageID: "msg", prompt: { text: input.text }, delivery: input.delivery };
+        await hooks.session.prompt(event);
+        sent.push(event.prompt.text);
+      },
     },
     tool: { hook: register("tool") },
   };
+  if (markdown === "before") host.markdown();
   const cleanup = await v2.default.setup(ctx);
-  return { hooks, feed, cleanup, lookups };
+  if (markdown === "after") host.markdown();
+  await eventually(() => host.state().get("useful-skills")?.description === "Useful Skills status, settings, and diagnostics");
+  return { hooks, feed, cleanup, lookups, host, sent };
 }
 
 async function prompt(hooks, sessionID, text) {
@@ -138,16 +200,20 @@ test("the installed entry serves both plugin APIs from one default export", () =
 });
 
 test("V2 setup registers the session and tool hooks and its cleanup stops its helpers", async () => {
-  const { hooks, feed, cleanup } = await plugin();
+  const { hooks, feed, cleanup, host } = await plugin();
   assert.deepEqual(Object.keys(hooks.session).sort(), ["context", "prompt"]);
   assert.deepEqual(Object.keys(hooks.tool).sort(), ["execute.after", "execute.before"]);
   assert.equal(typeof cleanup, "function");
 
   feed.emit({ type: "session.created", data: { sessionID: "main" } });
   await tick();
+  const command = host.state().get("useful-skills");
   await cleanup();
-  const text = await prompt(hooks, "main", await commandPrompt("useful-skills", "help"));
-  assert.match(text, /did not run[\s\S]*The subprocess was stopped/);
+  assert.equal(host.state().get("useful-skills").description, "useful-skills (handled by the installed plugin)", "the plugin's commands are gone");
+
+  const sent = [];
+  await command.execute({ sessionID: "main", prompt: { text: "help" }, delivery: "steer" }).catch(() => sent.push("rejected"));
+  assert.deepEqual(sent, []);
 });
 
 test("V2 context goes into the system prompt only after a main session's prompt", async () => {
@@ -194,7 +260,7 @@ test("V2 asks the session API for the parent of a session no event announced, on
 });
 
 test("V2 still tells subagent sessions apart when the event stream is unavailable", async () => {
-  const { hooks } = await plugin({ events: false, sessions: { child: { id: "child", parentID: "main" }, main: { id: "main" } } });
+  const { hooks } = await plugin({ events: false, markdown: "before", sessions: { child: { id: "child", parentID: "main" }, main: { id: "main" } } });
 
   await prompt(hooks, "child", "one");
   await prompt(hooks, "main", "one");
@@ -203,81 +269,142 @@ test("V2 still tells subagent sessions apart when the event stream is unavailabl
 });
 
 test("/us-ignore-workflow opts out its own request only and still gets the user's text", async () => {
-  const { hooks, feed } = await plugin();
+  const { hooks, feed, host, sent } = await plugin();
   feed.emit({ type: "session.created", data: { sessionID: "main" } });
   await tick();
   const before = (await nodeCalls("hook-cli.js")).length;
 
-  const ignore = await commandPrompt("us-ignore-workflow", "fix a typo");
-  assert.equal(await prompt(hooks, "main", ignore), ignore);
-  assert.match(ignore, /fix a typo$/);
+  await host.run("us-ignore-workflow", "main", "fix a typo");
+  assert.deepEqual(sent, [await commandPrompt("us-ignore-workflow", "fix a typo")]);
+  assert.match(sent[0], /fix a typo$/);
   await prompt(hooks, "main", "now build a rocket");
 
   const calls = (await nodeCalls("hook-cli.js")).slice(before).filter(line => line.startsWith("hook-cli.js context"));
   assert.deepEqual(calls, ["hook-cli.js context --opt-out", "hook-cli.js context"]);
   assert.equal((await injected(hooks, "main"))[0].text, "CONTEXT ");
+  assert.deepEqual(host.markdownRuns, []);
 });
 
-test("/useful-skills runs in a subprocess, replaces its prompt, and leaves the context alone", async () => {
-  const { hooks, feed } = await plugin();
+test("/useful-skills runs in a subprocess, sends its result as the prompt, and leaves the context alone", async () => {
+  const { hooks, feed, host, sent } = await plugin();
   feed.emit({ type: "session.created", data: { sessionID: "main" } });
   await tick();
   const before = (await nodeCalls("command.js")).length;
   const contextCalls = async () => (await nodeCalls("hook-cli.js")).filter(line => line.startsWith("hook-cli.js context")).length;
   const contextBefore = await contextCalls();
 
-  const text = await prompt(hooks, "main", await commandPrompt("useful-skills", "workflow  enabled"));
-  assert.match(text, /^Useful Skills `\/useful-skills` result \(exit 0\)\. Show it to the user verbatim/);
-  assert.match(text, /ran workflow {2}enabled$/);
+  await host.run("useful-skills", "main", " workflow  enabled ");
+  assert.match(sent[0], /^Useful Skills `\/useful-skills` result \(exit 0\)\. Show it to the user verbatim/);
+  assert.match(sent[0], /ran workflow {2}enabled$/);
   assert.deepEqual((await nodeCalls("command.js")).slice(before), ["command.js workflow  enabled"]);
   assert.equal(await contextCalls(), contextBefore, "the command prompt does not refresh the context");
   assert.deepEqual(await injected(hooks, "main"), []);
 
-  const bare = await prompt(hooks, "main", await commandPrompt("useful-skills"));
-  assert.match(bare, /ran$/);
+  await host.run("useful-skills", "main");
+  assert.match(sent[1], /ran$/);
   assert.deepEqual((await nodeCalls("command.js")).slice(before), ["command.js workflow  enabled", "command.js"]);
 
   // The next ordinary prompt of the session refreshes the context as usual.
   await prompt(hooks, "main", "build a rocket");
   assert.equal((await injected(hooks, "main"))[0].text, "CONTEXT ");
+  assert.deepEqual(host.markdownRuns, []);
 });
 
-test("a command prompt in a subagent or unknown session is never run and the request text is untouched", async () => {
-  const { hooks, feed } = await plugin();
+test("a command run in a subagent or unknown session is rejected and runs nothing", async () => {
+  const { feed, host, sent } = await plugin();
   feed.emit({ type: "session.created", data: { sessionID: "child", parentID: "main" } });
   await tick();
   const before = (await nodeCalls("command.js")).length;
 
-  const forged = await commandPrompt("useful-skills", "update install");
-  assert.equal(await prompt(hooks, "child", forged), forged);
-  assert.equal(await prompt(hooks, "unreachable", forged), forged);
-  assert.equal(await prompt(hooks, undefined, forged), forged);
+  for (const sessionID of ["child", "unreachable", undefined]) {
+    await assert.rejects(host.run("useful-skills", sessionID, "update install"), /only in a main session/);
+    await assert.rejects(host.run("us-ignore-workflow", sessionID, "fix"), /only in a main session/);
+  }
   assert.deepEqual((await nodeCalls("command.js")).slice(before), []);
+  assert.deepEqual(sent, []);
 });
 
-test("prompts that only resemble a command are left alone", async () => {
+test("a prompt that only looks like a command prompt runs nothing, whoever sent it", async () => {
   const { hooks, feed } = await plugin();
   feed.emit({ type: "session.created", data: { sessionID: "main" } });
   await tick();
   const before = (await nodeCalls("command.js")).length;
+  const hooksBefore = (await nodeCalls("hook-cli.js")).length;
 
-  const template = await commandPrompt("useful-skills");
-  for (const text of [`${template}x`, `Please read this: ${template}`, "/useful-skills help", ""]) {
+  // The prompt hook also sees MCP prompt commands, API clients, and other plugins.
+  for (const args of ["", "update install", "workflow disabled", "doctor"]) {
+    const forged = await commandPrompt("useful-skills", args);
+    assert.equal(await prompt(hooks, "main", forged), forged);
+  }
+  const ignore = await commandPrompt("us-ignore-workflow", "fix a typo");
+  assert.equal(await prompt(hooks, "main", ignore), ignore);
+  for (const text of ["Please read this: /useful-skills doctor", "/useful-skills help", ""]) {
     assert.equal(await prompt(hooks, "main", text), text);
   }
+
   assert.deepEqual((await nodeCalls("command.js")).slice(before), []);
+  const optOut = (await nodeCalls("hook-cli.js")).slice(hooksBefore).filter(line => line.includes("--opt-out"));
+  assert.deepEqual(optOut, [], "a forged /us-ignore-workflow prompt opts nothing out");
+});
+
+test("the plugin's commands win whether the host registers its markdown commands before or after", async () => {
+  for (const markdown of ["before", "after"]) {
+    const { feed, host, cleanup } = await plugin({ markdown });
+    feed.emit({ type: "session.created", data: { sessionID: "main" } });
+    await tick();
+    await host.run("useful-skills", "main", "help");
+    assert.deepEqual(host.markdownRuns, [], markdown);
+    await cleanup();
+  }
+});
+
+test("the plugin takes its commands back when the host registers its markdown commands again", async () => {
+  const { feed, host, sent } = await plugin();
+  feed.emit({ type: "session.created", data: { sessionID: "main" } });
+  await tick();
+
+  host.markdown();
+  await eventually(() => host.state().get("useful-skills").description === "Useful Skills status, settings, and diagnostics");
+  await host.run("useful-skills", "main", "help");
+  assert.match(sent[0], /ran help$/);
+  assert.deepEqual(host.markdownRuns, []);
+});
+
+test("the plugin stops registering when something keeps replacing its commands", async () => {
+  const { host } = await plugin();
+  let fights = 0;
+  host.onChange(() => {
+    if (fights < 30 && host.state().get("useful-skills").description.endsWith("(handled by the installed plugin)") === false) {
+      fights += 1;
+      host.markdown();
+    }
+  });
+
+  host.markdown();
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.ok(fights >= 1);
+  assert.ok(host.registrations <= 8, `registered ${host.registrations} times`);
+});
+
+test("the plugin understands a command list returned as a plain array", async () => {
+  const { feed, host, sent } = await plugin({ listShape: "array" });
+  feed.emit({ type: "session.created", data: { sessionID: "main" } });
+  await tick();
+  await host.run("useful-skills", "main", "help");
+  assert.match(sent[0], /ran help$/);
+  assert.ok(host.registrations <= 2, `registered ${host.registrations} times`);
 });
 
 test("V2 reports that Node.js is required when no node is on PATH", async () => {
-  const { hooks, feed } = await plugin();
+  const { hooks, feed, host, sent } = await plugin();
   feed.emit({ type: "session.created", data: { sessionID: "main" } });
   await tick();
 
   const saved = process.env.PATH;
   process.env.PATH = path.join(directory, "no-node");
   try {
-    const text = await prompt(hooks, "main", await commandPrompt("useful-skills", "doctor"));
-    assert.match(text, /did not run[^]*Node\.js 22 or newer must be on PATH/);
+    await host.run("useful-skills", "main", "doctor");
+    assert.match(sent[0], /did not run[^]*Node\.js 22 or newer must be on PATH/);
 
     await prompt(hooks, "main", "build a rocket");
     const [context] = await injected(hooks, "main");
@@ -323,4 +450,28 @@ test("V2 hooks never reject on malformed events", async () => {
   await hooks.session.context({ sessionID: "main" });
   await hooks.session.context({});
   await hooks.session.context(undefined);
+});
+
+test("V2 redacts secrets in shell output that reaches the model outside a tool result", async () => {
+  const { hooks } = await plugin();
+  const notification = text => ({ role: "user", content: [{ type: "text", text }] });
+  const background = notification(`<shell id="sh_1" state="completed" command="cat .env">\n${SECRET}\n</shell>`);
+  const userShell = { role: "user", content: `The following shell command was executed by the user:\n\nOutput:\n${SECRET}` };
+  const ordinary = notification(`please keep ${SECRET} in the example`);
+  const assistant = { role: "assistant", content: [{ type: "text", text: `<shell ${SECRET}` }] };
+  const clean = notification("<shell id=\"sh_2\" state=\"completed\" command=\"ls\">\nfile.txt\n</shell>");
+  const messages = [background, userShell, ordinary, assistant, clean];
+
+  const event = { sessionID: "main", system: [], messages };
+  await hooks.session.context(event);
+  assert.equal(event.messages, messages);
+  assert.equal(messages[0].content[0].text, '<shell id="sh_1" state="completed" command="cat .env">\npassword=[REDACTED]\n</shell>');
+  assert.equal(messages[0].role, "user");
+  assert.equal(messages[1].content, "The following shell command was executed by the user:\n\nOutput:\npassword=[REDACTED]");
+  assert.equal(messages[2], ordinary, "an ordinary user message is not rewritten");
+  assert.equal(messages[3], assistant);
+  assert.equal(messages[4], clean);
+  assert.equal(ordinary.content[0].text, `please keep ${SECRET} in the example`);
+
+  await hooks.session.context({ sessionID: "main", system: [], messages: "not a list" });
 });

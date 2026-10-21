@@ -35,6 +35,20 @@ const SHELL_TOOLS = new Set(["bash", "shell"]);
 // Attachments and `_meta` are not text results and stay untouched.
 const REDACTED_FIELDS = ["title", "output", "metadata", "content", "structuredContent"];
 
+// OpenCode 2 delivers shell output that did not come back through the tool call (a background command, or a
+// command the user ran) as a user message that starts this way.
+const SHELL_OUTPUT_PREFIXES = ["<shell ", "The following shell command was executed by the user:"];
+
+function isShellOutputMessage(message) {
+  if (message?.role !== "user") {
+    return false;
+  }
+
+  const first = Array.isArray(message.content) ? message.content[0] : undefined;
+  const text = typeof message.content === "string" ? message.content : first?.type === "text" ? first.text : undefined;
+  return typeof text === "string" && SHELL_OUTPUT_PREFIXES.some(prefix => text.startsWith(prefix));
+}
+
 function isSessionID(value) {
   return typeof value === "string" && value.length > 0;
 }
@@ -299,6 +313,27 @@ export function createSession({ directory, runtimeRoot, run = runNode, toast, se
     }
   }
 
+  /**
+   * Redact secrets in the shell output messages of a V2 model request, in place. A background shell command
+   * returns only a stub from its tool call: its output arrives later as such a message, which no tool hook sees.
+   */
+  function redactContext(messages) {
+    if (!Array.isArray(messages)) {
+      return;
+    }
+
+    messages.forEach((message, index) => {
+      if (!isShellOutputMessage(message)) {
+        return;
+      }
+
+      const content = redactValue(message.content);
+      if (content !== message.content) {
+        messages[index] = { ...message, content };
+      }
+    });
+  }
+
   async function commandText(argument) {
     const notice = LONG_COMMAND_NOTICES.get(argument.split(/\s+/).join(" "));
     const timeoutMs = notice ? LONG_COMMAND_TIMEOUT_MS : COMMAND_TIMEOUT_MS;
@@ -368,6 +403,7 @@ export function createSession({ directory, runtimeRoot, run = runNode, toast, se
     systemTransform,
     beforeTool,
     afterTool,
+    redactContext,
     onCommand,
     runUsefulSkills,
     ignoreWorkflow,

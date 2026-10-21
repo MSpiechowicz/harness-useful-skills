@@ -4,9 +4,9 @@
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadCommandMatcher } from "./command-prompt.js";
 import { createRunScope } from "./node-runner.js";
 import { createSession } from "./session.js";
+import { createCommands } from "./v2-commands.js";
 
 const RUNTIME_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const COMMANDS_DIRECTORY = path.join(RUNTIME_ROOT, "opencode", "commands");
@@ -28,14 +28,19 @@ async function sessionParent(ctx, sessionID) {
   return info.parentID;
 }
 
-/** Follow session creation and deletion events until `signal` aborts; an unavailable stream is not an error. */
-async function followSessions(ctx, session, signal) {
+/**
+ * Follow session creation and deletion events, and command list changes, until `signal` aborts; an unavailable
+ * stream is not an error.
+ */
+async function followEvents(ctx, session, commands, signal) {
   try {
     for await (const event of ctx.event.subscribe({ signal })) {
       if (event?.type === "session.created") {
         session.sessionCreated(event.data?.sessionID, event.data?.parentID);
       } else if (event?.type === "session.deleted") {
         session.sessionDeleted(event.data?.sessionID);
+      } else if (event?.type === "command.updated") {
+        void commands.refresh();
       }
     }
   } catch {
@@ -60,37 +65,28 @@ async function setup(ctx) {
     run: runs.run,
     sessionParent: sessionParent.bind(undefined, ctx),
   });
-  const matchCommand = await loadCommandMatcher(COMMANDS_DIRECTORY);
+  const commands = await createCommands({ ctx, session, directory: COMMANDS_DIRECTORY });
 
   /**
-   * Refresh the session's workflow context for a prompt. A prompt the host built from a command template runs
-   * that command first, but only in a main session: a subagent prompt is written by a model, and settings
-   * change only from commands the user types.
+   * Refresh the session's workflow context for a prompt. The commands `/useful-skills` and `/us-ignore-workflow`
+   * run from their command invocation (see v2-commands.js), never from prompt text: any client, MCP prompt, or
+   * plugin can send text that looks like a command prompt.
    */
   async function onPrompt(event) {
-    const command = matchCommand(event?.prompt?.text);
-    if (command && await session.isMainSession(event.sessionID)) {
-      if (command.name === "useful-skills") {
-        // The result replaces the prompt; this prompt neither refreshes the context nor consumes an opt-out.
-        event.prompt.text = await session.runUsefulSkills(command.args);
-        return;
-      }
-
-      session.ignoreWorkflow(event.sessionID);
-    }
-
     await session.onChatMessage(event?.sessionID);
   }
 
   // V2 plugins have no toast: the quiet update check would have nowhere to report, so only role agents sync.
   const started = setTimeout(() => session.start({ checkForUpdate: false }), 0);
   const events = new AbortController();
-  void followSessions(ctx, session, events.signal);
+  void followEvents(ctx, session, commands, events.signal);
+  const registered = setTimeout(() => void commands.refresh(), 0);
 
   await ctx.session.hook("prompt", event => quietly(() => onPrompt(event)));
   await ctx.session.hook("context", event => quietly(() => {
     const parts = session.systemContext(event?.sessionID).map(text => ({ type: "text", text }));
     event.system.push(...parts);
+    session.redactContext(event.messages);
   }));
 
   // A rejection from the before hook fails that one tool call; the after hook only rewrites a finished result.
@@ -103,7 +99,9 @@ async function setup(ctx) {
 
   return async () => {
     clearTimeout(started);
+    clearTimeout(registered);
     events.abort();
+    await commands.stop();
     await runs.terminate();
   };
 }

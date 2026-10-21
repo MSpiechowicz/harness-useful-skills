@@ -35,7 +35,7 @@ const FILES = [
   'doctor-setup.js', 'local-facts.js', 'host-roots.js', 'mcp-memory-server.js',
   'entrypoint.js', 'graph-test.js', 'release-check.js',
   // OpenCode adapter.
-  'opencode/entry.js', 'opencode/v1.js', 'opencode/v2.js', 'opencode/command-prompt.js', 'opencode/session.js', 'opencode/node-runner.js', 'opencode/context.js',
+  'opencode/entry.js', 'opencode/v1.js', 'opencode/v2.js', 'opencode/v2-commands.js', 'opencode/session.js', 'opencode/node-runner.js', 'opencode/context.js',
   'opencode/paths.js', 'opencode/settings.js', 'opencode/host-context.js', 'opencode/models.js',
   'opencode/command.js', 'opencode/hook-cli.js', 'opencode/mcp-server.js',
   'opencode/install-status.js', 'opencode/install-files.js', 'opencode/config-file.js', 'opencode/updater.js',
