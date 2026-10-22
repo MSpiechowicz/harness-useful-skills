@@ -34,14 +34,17 @@ test("selectors take a provider/model and only a known variant suffix", () => {
   }
 });
 
-test("first sync writes a role-less models file and inherit-model agents from the templates", async t => {
+test("first sync lists every role as inherit and writes inherit-model agents from the templates", async t => {
   const root = await scopeRoot(t);
   const result = syncOpenCodeAgents({ scopeRoot: root });
 
   assert.equal(result.created, true);
   assert.equal(result.configFile, modelsConfigPath(root));
   assert.equal(result.error, undefined);
-  assert.match(await readFile(result.configFile, "utf8"), /^modelRoles:\n$/m);
+  const written = await readFile(result.configFile, "utf8");
+  for (const role of ["research", "frontend", "backend", "implementation", "review", "security", "plan", "default"]) {
+    assert.match(written, new RegExp(`^  ${role}: inherit$`, "m"), role);
+  }
   assert.equal((await stat(path.dirname(result.configFile))).mode & 0o777, 0o700);
 
   assert.deepEqual((await readdir(path.join(root, "agents"))).sort(), AGENTS.map(agent => `us-${agent}.md`).sort());
@@ -133,4 +136,31 @@ test("the sync refuses a symlinked agent file, a symlinked models file and a non
   await mkdir(other, { recursive: true });
   await writeFile(path.join(other, "agents"), "a file, not a directory\n");
   assert.match(syncOpenCodeAgents({ scopeRoot: other }).blocked, /not a directory/);
+});
+
+test("an untouched role-less file from an earlier release is upgraded, an edited one is kept", async t => {
+  const legacy = [
+    "# Useful Skills model roles for OpenCode.",
+    "# Selector: <provider>/<model>[:<variant>], for example anthropic/claude-sonnet-4-5:high.",
+    "# Variant: none, minimal, low, medium, high, xhigh, max; any other `:suffix` stays part of the model ID.",
+    "# `inherit` uses the session model. Roles: research, frontend, backend, implementation, review, security, plan, default.",
+    "# A missing role uses `default`; without `default` the agent inherits the session model.",
+    "# Example rows (indent two spaces under modelRoles:):",
+    "#   default: anthropic/claude-sonnet-4-5",
+    "#   review: openai/gpt-5:high",
+    "# Changes apply to OpenCode sessions started afterwards.",
+    "modelRoles:",
+    "",
+  ].join("\n");
+
+  const root = await scopeRoot(t);
+  await mkdir(path.dirname(modelsConfigPath(root)), { recursive: true });
+  await writeFile(modelsConfigPath(root), legacy);
+  syncOpenCodeAgents({ scopeRoot: root });
+  assert.match(await readFile(modelsConfigPath(root), "utf8"), /^  review: inherit$/m, "the old default is replaced");
+
+  const edited = `${legacy}  review: openai/gpt-5:high\n`;
+  await writeFile(modelsConfigPath(root), edited);
+  syncOpenCodeAgents({ scopeRoot: root });
+  assert.equal(await readFile(modelsConfigPath(root), "utf8"), edited, "an edited file is never rewritten");
 });

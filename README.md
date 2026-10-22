@@ -353,7 +353,7 @@ Claude Code loads agents at startup, so edits to `models.yml` take effect in the
 
 ### OpenCode model roles
 
-OpenCode reads no OMP or Claude config for this. Role models live in `<scope>/useful-skills/models.yml` (`~/.config/opencode/useful-skills/models.yml` for the user scope). The installer creates it with comments and an empty `modelRoles:`, so every role inherits the session model:
+OpenCode reads no OMP or Claude config for this. Role models live in `<scope>/useful-skills/models.yml` (`~/.config/opencode/useful-skills/models.yml` for the user scope). The installer creates it with comments and every role set to `inherit`, so each role inherits the session model and is one value to replace. An untouched file from an earlier release (an empty `modelRoles:`) is upgraded to this one, an edited file is never rewritten. `default` applies only to a role whose row is removed:
 
 ```yaml
 modelRoles:

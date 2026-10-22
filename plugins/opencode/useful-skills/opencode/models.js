@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { GENERATED_MARKER, ROLE_AGENTS, syncRoleAgents } from "../model-roles.js";
+import { GENERATED_MARKER, ROLE_AGENTS, ROLES, readOptional, syncRoleAgents, writeAtomic } from "../model-roles.js";
 import { RUNTIME_ROOT, writeTargetProblem } from "./paths.js";
 
 /** OpenCode reasoning variants; any other `:suffix` is part of the model ID (such as `ollama/llama3:8b`). */
@@ -12,7 +12,21 @@ const MODEL = /^[A-Za-z0-9](?:[A-Za-z0-9._:/@+-]{0,198}[A-Za-z0-9._@+-])?$/;
 const TEMPLATE = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
 const RESERVED_FIELD = /^(model|variant):/m;
 
-const DEFAULT_CONFIG = [
+const HEADER = [
+  "# Useful Skills model roles for OpenCode.",
+  "# Selector: <provider>/<model>[:<variant>], for example anthropic/claude-sonnet-4-5:high.",
+  `# Variant: ${VARIANTS.join(", ")}; any other \`:suffix\` stays part of the model ID.`,
+  "# Every role inherits the session model. Replace `inherit` with a selector to give a role its own model.",
+  "# `default` applies only to a role whose row is removed.",
+  "# Changes apply to OpenCode sessions started afterwards.",
+  "modelRoles:",
+];
+
+/** Every role listed and inheriting, so each one is a value to replace rather than a key to look up. */
+const DEFAULT_CONFIG = [...HEADER, ...ROLES.map(role => `  ${role}: inherit`), ""].join("\n");
+
+/** The role-less file earlier releases wrote; an untouched copy of it is replaced by DEFAULT_CONFIG. */
+const LEGACY_DEFAULT_CONFIG = [
   "# Useful Skills model roles for OpenCode.",
   "# Selector: <provider>/<model>[:<variant>], for example anthropic/claude-sonnet-4-5:high.",
   `# Variant: ${VARIANTS.join(", ")}; any other \`:suffix\` stays part of the model ID.`,
@@ -118,6 +132,11 @@ export function syncOpenCodeAgents({ scopeRoot, templatesDir = path.join(RUNTIME
   const blocked = blockedWrite(scopeRoot);
   if (blocked) {
     return { configFile, created: false, blocked, agents: {} };
+  }
+
+  // Only a byte-for-byte copy of the old default is replaced: an edited file stays as the user wrote it.
+  if (readOptional(configFile) === LEGACY_DEFAULT_CONFIG) {
+    writeAtomic(configFile, DEFAULT_CONFIG);
   }
 
   return syncRoleAgents({
