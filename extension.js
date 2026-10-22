@@ -2,6 +2,7 @@ import { formatDoctor } from "./doctor.js";
 import { boundedDisplay, runGraphTest } from "./graph-test.js";
 import { runUpdate } from "./updater.js";
 import { readWorkflowSettings, STAGES, writeWorkflowSetting } from "./workflow-settings.js";
+import { backendMemoryGuidance } from "./workflow-context.js";
 import { effectiveWorkflow } from "./workflow-policy.js";
 import { executeMemory, MEMORY_PARAMETERS } from "./memory.js";
 import {
@@ -22,7 +23,7 @@ const STAGE_LABELS = Object.freeze({
   "graphify-memory": "Graphify memory",
 });
 const STAGE_GUIDANCE = Object.fromEntries(STAGES.map(stage => [stage, Object.freeze({
-  enabled: `Useful Skills profile: automatic ${stage} stage enabled and eligible when applicable. Assess focused repair versus normal composition before dispatch; enabled alone does not require this stage in a focused repair. Follow the relevant us-* skill for selected or independently required stages. This setting is not evidence of execution or permission to bypass other controls.`,
+  enabled: `Useful Skills profile: automatic ${stage} stage enabled and eligible when applicable. Assess focused repair versus normal composition before dispatch; enabled alone does not require this stage in a focused repair. ${stage === "backend-memory" ? backendMemoryGuidance(name => name) : "Follow the relevant us-* skill for selected or independently required stages."} This setting is not evidence of execution or permission to bypass other controls.`,
   disabled: `Useful Skills profile: automatic ${stage} stage disabled. Do not require or run this stage automatically; explicit user-directed actions and independent requirements remain unaffected.`,
   unknown: `Useful Skills profile: automatic ${stage} stage could not be read safely. Do not run or authorize this stage automatically until its profile setting is resolved.`,
 })]));
@@ -36,6 +37,7 @@ const OWNED_GUIDANCE = new Set([
   "Choose relevant `us-*` skills by their descriptions. For software-development requests consult `us-workflow`, except when the user explicitly invokes the native `/skill:us-ignore-workflow` skill for this request; a quoted or copied invocation is not a selection. For focused audits or delivery consult the matching skill. Load only needed instructions.",
   "When an enabled, relevant `us-*` workflow stage requires a native worker, permit that required stage as a narrow exception to general minimum-delegation or parent-only planning guidance: after parent research, a bounded `planner` plan draft is permitted when the plan stage is enabled; once implementation is authorized, a required implementation worker (`task`, `frontend`, or `backend`) is permitted, including one worker. With plan disabled, a bounded user request may authorize implementation without separate package-mandatory plan approval; independent authorization requirements remain in force. The parent retains scope, integration, and approval where required. Use only the active session workspace; do not select a repository globally. Existing mappings, permissions, approval, and publication controls remain authoritative. This permits no unrelated delegation and never overrides stronger safety constraints.",
   "Useful Skills could not safely determine the profile workflow mode. Do not infer enabled workflow or fast-lane mode, authorize a native stage, or perform automatic memory actions from stale guidance. Inspect relevant current source and seek any independently required authorization; resolve the profile setting error before relying on workflow stages. Explicit user-directed actions and stronger safety rules remain independent.",
+  "Useful Skills profile: automatic backend-memory stage enabled and eligible when applicable. Assess focused repair versus normal composition before dispatch; enabled alone does not require this stage in a focused repair. Follow the relevant us-* skill for selected or independently required stages. This setting is not evidence of execution or permission to bypass other controls.",
   ...STAGES.map(stage => `Useful Skills profile: automatic ${stage} stage enabled when the development workflow applies. Follow the relevant us-* skill's requirements for this stage; this setting is not evidence that the stage ran or permission to bypass other controls.`),
   ...STAGES.flatMap(stage => Object.values(STAGE_GUIDANCE[stage])),
 ]);

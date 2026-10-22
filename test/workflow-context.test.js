@@ -62,3 +62,11 @@ test("an enabled workflow gives one line per stage and points enabled stages at 
     assert.equal(/`host:us-[a-z-]+`/.test(line), state === "enabled", line);
   }
 });
+
+test("an enabled backend-memory stage points at Harness Memory before Useful Skills memory", () => {
+  const context = createWorkflowContext({ skill: name => `host:${name}`, ignoreInvocation: "Opt-out" });
+  const line = context.workflowContext(policy("enabled")).split("\n").find(text => text.startsWith("Automatic backend-memory"));
+
+  assert.match(line, /Harness Memory: when its `note_search` and `note_save` tools are available, follow `host:us-use-harness-memory`/);
+  assert.match(line, /Only without those tools consult `host:us-manage-memory`/);
+});

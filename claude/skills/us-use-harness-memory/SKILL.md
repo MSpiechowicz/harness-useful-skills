@@ -5,7 +5,7 @@ description: Use only when the `harness-memory` MCP tools (note_search, script_r
 
 # Working with Harness Memory
 
-Load `/useful-skills:us-write-concisely` before writing to the user. Harness Memory is a separate product with its own MCP server `harness-memory`. It is not Useful Skills memory (its own memory facts and Graphify code graph): that belongs to `/useful-skills:us-manage-memory`. Do not mix the two stores or their tools. If no `note_search` and `script_run` tools are advertised, skip this skill. Use the tool names exactly as the host advertises them.
+Load `/useful-skills:us-write-concisely` before writing to the user. Harness Memory is a separate product with its own MCP server `harness-memory`. When its tools are available it is the one store for durable facts, notes, and scripts, and the only one Harness Desktop → Memory shows: never save or search facts with Useful Skills memory as well, including for an enabled backend_memory stage or a "remember this" request. The Graphify code graph stays with `/useful-skills:us-manage-memory`. If no `note_search` and `script_run` tools are advertised, skip this skill. Use the tool names exactly as the host advertises them.
 
 Tools: `note_search`, `note_save`, `note_update`, `note_get`, `note_delete`, `entity_link`, `entity_neighbors`, `entity_delete` for project notes and their linked entities; `script_save`, `script_list`, `script_get`, `script_run`, `script_delete` for saved deterministic scripts.
 

@@ -12,6 +12,14 @@ const STAGE_SKILLS = Object.freeze({
 });
 
 /**
+ * The enabled backend-memory line: durable facts belong in Harness Memory (Harness Desktop → Memory) whenever its
+ * tools are there, so the agent never splits them across two stores. `skill(name)` names a skill as on that host.
+ */
+export function backendMemoryGuidance(skill) {
+  return `Automatic backend-memory stage enabled when applicable. Keep durable facts in Harness Memory: when its \`note_search\` and \`note_save\` tools are available, follow \`${skill("us-use-harness-memory")}\` and do not search or save facts with Useful Skills memory. Only without those tools consult \`${skill("us-manage-memory")}\`.`;
+}
+
+/**
  * Prompt context for one host. `skill(name)` turns a bare `us-*` skill name into the name the host's model
  * invokes; `ignoreInvocation` names the attested one-request opt-out, as the subject of a sentence.
  * Context is built only from validated settings, never from user prompt content.
@@ -36,7 +44,9 @@ export function createWorkflowContext({ skill, ignoreInvocation }) {
 
     for (const stage of STAGES) {
       const state = policy.stages[stage].effective;
-      if (state === "enabled") {
+      if (state === "enabled" && stage === "backend-memory") {
+        instructions.push(`${backendMemoryGuidance(skill)} This setting is not evidence the stage has run.`);
+      } else if (state === "enabled") {
         instructions.push(`Automatic ${stage} stage enabled when applicable; consult \`${skill(STAGE_SKILLS[stage])}\`. This setting is not evidence the stage has run.`);
       } else if (state === "disabled") {
         instructions.push(`Automatic ${stage} stage disabled; do not require it automatically. Explicit user requests and independent obligations still apply.`);
