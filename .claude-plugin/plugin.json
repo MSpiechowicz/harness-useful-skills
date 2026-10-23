@@ -1,7 +1,7 @@
 {
   "name": "harness-useful-skills",
   "displayName": "Useful Skills",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Claude Code engineering workflows, safety reviews, and local memory tools",
   "author": {
     "name": "MSpiechowicz"
