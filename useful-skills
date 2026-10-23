@@ -14,9 +14,15 @@ const USAGE = `Usage:
   ./useful-skills update check|install --host opencode [--scope user|project]
   ./useful-skills uninstall --host opencode [--scope user|project]
   ./useful-skills doctor --host opencode [--scope user|project]
+  ./useful-skills install --host codex [--local]
+  ./useful-skills update --host codex
+  ./useful-skills uninstall --host codex
+  ./useful-skills doctor --host codex
 
 Requires Node.js 22+ and OMP with marketplace support.
 --host omp is the default; --host opencode installs into OpenCode instead (restart OpenCode afterwards).
+--host codex installs into Codex (CODEX_HOME, default ~/.codex) and needs the codex command on PATH;
+--local adds this directory as the marketplace instead of the GitHub release (restart Codex afterwards).
 Owned us-* skills are selected by description or /skill:us-<name>.
 No startup workflow.
 Development uses one plan approval; publication requires an explicit request.
@@ -70,7 +76,9 @@ function parseOptions(argv, allowed) {
 
 /** Commands that accept `--host`; `list` and `help` are host-agnostic. */
 const HOSTED_COMMANDS = new Set(["install", "update", "uninstall", "doctor"]);
-const OMP_UNINSTALL = "uninstall needs --host opencode; for OMP run `omp plugin uninstall harness-useful-skills@harness-useful-skills`.";
+const OMP_UNINSTALL = "uninstall needs --host opencode or --host codex; for OMP run `omp plugin uninstall harness-useful-skills@harness-useful-skills`.";
+const HOSTS = new Set(["omp", "opencode", "codex"]);
+const CODEX_UPDATE = "Useful Skills for Codex updates by installing again: re-run install.sh (or install.ps1) with HARNESS_SKILLS_HOST=codex, or run `./useful-skills install --host codex` from an updated checkout.";
 
 /** Remove `--host VALUE` from the arguments; an omitted host means OMP. */
 function splitHost(argv) {
@@ -80,8 +88,8 @@ function splitHost(argv) {
   }
 
   const host = optionValue(argv, index, "--host");
-  if (host !== "omp" && host !== "opencode") {
-    throw new UpdateError("--host must be omp or opencode.");
+  if (!HOSTS.has(host)) {
+    throw new UpdateError("--host must be omp, opencode or codex.");
   }
 
   const rest = [...argv.slice(0, index), ...argv.slice(index + 2)];
@@ -173,6 +181,71 @@ async function openCodeCommand(command, argv) {
   }
 }
 
+/** Validate a Codex command line, returning the operation to run; argument errors throw before anything runs. */
+function codexOperation(command, argv) {
+  for (const option of ["--profile", "--scope"]) {
+    if (argv.includes(option)) {
+      throw new UpdateError(`${option} is not valid with --host codex; Codex installs into CODEX_HOME.`);
+    }
+  }
+
+  if (command === "update") {
+    const [action, ...rest] = argv;
+    if ((action !== undefined && action !== "check" && action !== "install") || rest.length > 0) {
+      throw new UpdateError("Expected update --host codex.");
+    }
+    return { command };
+  }
+
+  const local = argv.filter(argument => argument === "--local").length;
+  if (local > 0 && command !== "install") {
+    throw new UpdateError("--local is valid only with install --host codex.");
+  }
+
+  const unknown = argv.find(argument => argument !== "--local");
+  if (unknown !== undefined) {
+    throw new UpdateError(`Unknown argument: ${unknown}`);
+  }
+
+  if (local > 1) {
+    throw new UpdateError("--local may be given only once.");
+  }
+  return { command, local: local === 1 };
+}
+
+async function runCodex({ command, local }) {
+  if (command === "install") {
+    const { installCodex } = await import("./codex/install.js");
+    return (await installCodex({ environment: process.env, packageRoot: PACKAGE_ROOT, local })).message;
+  }
+
+  if (command === "uninstall") {
+    const { uninstallCodex } = await import("./codex/uninstall.js");
+    return uninstallCodex({ environment: process.env }).message;
+  }
+
+  if (command === "update") {
+    return CODEX_UPDATE;
+  }
+
+  const { inspectCodexInstall } = await import("./codex/install-status.js");
+  return inspectCodexInstall({ environment: process.env }).text;
+}
+
+/** Like openCodeCommand: argument errors exit 2 with usage, a failed operation exits 1 with its reason. */
+async function codexCommand(command, argv) {
+  const operation = codexOperation(command, argv);
+  const { printableText } = await import("./opencode/paths.js");
+  try {
+    console.log(printableText(await runCodex(operation)));
+    return 0;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`useful-skills: ${printableText(message)}\n`);
+    return 1;
+  }
+}
+
 export async function main(argv = process.argv.slice(2)) {
   try {
     if (argv.length === 1 && (argv[0] === "help" || argv[0] === "--help" || argv[0] === "-h")) {
@@ -189,6 +262,9 @@ export async function main(argv = process.argv.slice(2)) {
       const { host, rest } = splitHost(argv.slice(1));
       if (host === "opencode") {
         return await openCodeCommand(argv[0], rest);
+      }
+      if (host === "codex") {
+        return await codexCommand(argv[0], rest);
       }
       argv = [argv[0], ...rest];
     }

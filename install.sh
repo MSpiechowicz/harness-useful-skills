@@ -1,5 +1,5 @@
 #!/bin/sh
-# Harness Skills installer for OpenCode on macOS and Linux.
+# Harness Skills installer for OpenCode (default) or Codex on macOS and Linux.
 #
 #   curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/MSpiechowicz/harness-useful-skills/main/install.sh | sh
 #
@@ -8,11 +8,22 @@
 # OpenCode user config. Needs curl, tar, gzip and Node.js 22 or newer. Nothing is installed when any check fails, and
 # the temporary download is always removed. Restart OpenCode afterwards. Re-run this installer to update.
 #
+# For Codex, set HARNESS_SKILLS_HOST=codex (see below). It runs `useful-skills install --host codex` instead and also
+# needs the `codex` command on your PATH. What lands where:
+#   - the plugin, through the Codex marketplace `harness-useful-skills`
+#   - the agents, in $CODEX_HOME/agents/us-*.toml
+#   - the runtime, in $CODEX_HOME/useful-skills/
+#   - the MCP server `useful_skills`, registered with `codex mcp add`
+# Restart Codex afterwards. Releases up to v0.3.12 have no Codex adapter: the installer refuses them before running
+# anything, so use a newer release.
+#
 # Environment overrides:
 #   HARNESS_SKILLS_VERSION  release tag to install (default: latest), e.g. v0.3.7
+#   HARNESS_SKILLS_HOST     opencode (default when unset or empty) or codex; anything else is refused before any download
 #
-# To pin a release, put the variable on the shell that reads the script (not on curl):
+# To pin a release or pick Codex, put the variable on the shell that reads the script (not on curl):
 #   curl --proto '=https' --tlsv1.2 -fsSL <this script's URL> | HARNESS_SKILLS_VERSION=v0.3.7 sh
+#   curl --proto '=https' --tlsv1.2 -fsSL <this script's URL> | HARNESS_SKILLS_HOST=codex sh
 #
 # Everything runs inside main, which is called on the last line: a download cut short never runs a partial command.
 set -eu
@@ -24,9 +35,12 @@ MAX_ARCHIVE_BYTES=134217728
 MAX_EXPANDED_BYTES=536870912
 MAX_ENTRIES=20000
 MAX_ENTRY_NAME=4096
-# Files a release must ship for its installer to set up OpenCode, and the manifests that carry its version.
-REQUIRED_FILES="useful-skills plugins/opencode/useful-skills.js"
-VERSIONED_MANIFESTS="package.json plugins/opencode/useful-skills/package.json"
+HOST="${HARNESS_SKILLS_HOST:-opencode}"
+# Files a release must ship for its installer to set up the chosen host, and the manifests that carry its version.
+# select_host fills them in.
+HOST_LABEL=""
+REQUIRED_FILES=""
+VERSIONED_MANIFESTS=""
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 fail() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -76,6 +90,36 @@ valid_version() {
   printf '%s\n' "$1" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+$'
 }
 
+# The host is exactly opencode or codex. The value may come from the environment, so anything else (another word, a
+# newline, escapes) is refused before any download.
+valid_host() {
+  case "$1" in
+    opencode | codex) return 0 ;;
+  esac
+  return 1
+}
+
+# Checks HARNESS_SKILLS_HOST and sets what the chosen host needs from a release.
+select_host() {
+  if ! valid_host "$HOST"; then
+    # Only plain characters are echoed: the value comes from the environment and could carry terminal escapes.
+    SHOWN="$(printf '%s' "$HOST" | cl tr -cd 'A-Za-z0-9._-' | head -c 32)"
+    fail "unexpected HARNESS_SKILLS_HOST: ${SHOWN:-(no plain characters)} (expected opencode or codex)"
+  fi
+  case "$HOST" in
+    opencode)
+      HOST_LABEL="OpenCode"
+      REQUIRED_FILES="useful-skills plugins/opencode/useful-skills.js"
+      VERSIONED_MANIFESTS="package.json plugins/opencode/useful-skills/package.json"
+      ;;
+    codex)
+      HOST_LABEL="Codex"
+      REQUIRED_FILES="useful-skills plugins/codex/.codex-plugin/plugin.json plugins/codex-runtime/useful-skills/codex/mcp-server.js .agents/plugins/marketplace.json"
+      VERSIONED_MANIFESTS="package.json plugins/codex/.codex-plugin/plugin.json"
+      ;;
+  esac
+}
+
 # Pairs the verbose listing $2 with the plain name list $1 and sums the entry sizes. The size column is found by
 # anchoring on the trailing tokens, never on text a user or group name could imitate:
 #   GNU tar     ... size YYYY-MM-DD HH:MM[:SS] name
@@ -109,10 +153,14 @@ cleanup() {
 }
 
 main() {
+  select_host
   need curl
   need tar
   need gzip
   need grep
+  if [ "$HOST" = "codex" ]; then
+    command -v codex >/dev/null 2>&1 || fail "installing for Codex needs the 'codex' command, but it was not found on your PATH. Install the Codex CLI and run this again, or unset HARNESS_SKILLS_HOST to install for OpenCode"
+  fi
   command -v node >/dev/null 2>&1 || fail "Harness Skills needs Node.js 22 or newer, but 'node' was not found on your PATH. Install it from https://nodejs.org and run this again"
   NODE_VERSION="$(node -p 'process.versions.node' 2>/dev/null || true)"
   NODE_MAJOR="${NODE_VERSION%%.*}"
@@ -224,7 +272,16 @@ main() {
   [ "$(find "$EXTRACT" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" = "1" ] && [ -d "$EXTRACT/$TOP" ] || fail "the release archive must contain exactly one top-level directory"
   ROOT="$EXTRACT/$TOP"
 
-  # The release must be exactly the announced version and ship the OpenCode bundle and its installer.
+  # The release must ship the bundle and installer of the chosen host and be exactly the announced version. The files are
+  # checked first, so a release from before the Codex adapter gets the clear message instead of a version mismatch.
+  for FILE in $REQUIRED_FILES; do
+    if [ -L "$ROOT/$FILE" ] || [ ! -f "$ROOT/$FILE" ]; then
+      if [ "$HOST" = "codex" ]; then
+        fail "this release ($VERSION) has no Codex adapter (missing $FILE); use a newer release"
+      fi
+      fail "the release archive has no $FILE, so it cannot install the $HOST_LABEL plugin"
+    fi
+  done
   for MANIFEST in $VERSIONED_MANIFESTS; do
     FOUND="$(json_string "$ROOT/$MANIFEST" version)"
     if [ "$FOUND" != "$VERSION_NUMBER" ]; then
@@ -233,23 +290,22 @@ main() {
       fail "the release archive $MANIFEST has version $FOUND, expected $VERSION_NUMBER"
     fi
   done
-  for FILE in $REQUIRED_FILES; do
-    if [ -L "$ROOT/$FILE" ] || [ ! -f "$ROOT/$FILE" ]; then
-      fail "the release archive has no $FILE, so it cannot install the OpenCode plugin"
-    fi
-  done
 
-  info "Installing Harness Skills $VERSION for OpenCode"
+  info "Installing Harness Skills $VERSION for $HOST_LABEL"
   cd "$HOME"
   STATUS=0
-  node "$ROOT/useful-skills" install --host opencode --scope user || STATUS=$?
+  if [ "$HOST" = "codex" ]; then
+    node "$ROOT/useful-skills" install --host codex || STATUS=$?
+  else
+    node "$ROOT/useful-skills" install --host opencode --scope user || STATUS=$?
+  fi
   if [ "$STATUS" -ne 0 ]; then
     printf '\033[1;31merror:\033[0m %s\n' "the Harness Skills installer failed (exit $STATUS)" >&2
     exit "$STATUS"
   fi
 
   printf '\n'
-  info "Restart OpenCode to load Harness Skills."
+  info "Restart $HOST_LABEL to load Harness Skills."
 }
 
 main "$@"

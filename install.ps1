@@ -1,4 +1,4 @@
-# Harness Skills installer for OpenCode on Windows.
+# Harness Skills installer for OpenCode (default) or Codex on Windows.
 #
 #   irm https://raw.githubusercontent.com/MSpiechowicz/harness-useful-skills/main/install.ps1 | iex
 #
@@ -8,14 +8,25 @@
 # installed when any check fails, and the temporary download is always removed. Restart OpenCode afterwards. Re-run this
 # installer to update.
 #
+# For Codex, set HARNESS_SKILLS_HOST to codex (see below). It runs `useful-skills install --host codex` instead and also
+# needs the `codex` command on your PATH. What lands where:
+#   - the plugin, through the Codex marketplace `harness-useful-skills`
+#   - the agents, in $CODEX_HOME/agents/us-*.toml
+#   - the runtime, in $CODEX_HOME/useful-skills/
+#   - the MCP server `useful_skills`, registered with `codex mcp add`
+# Restart Codex afterwards. Releases up to v0.3.12 have no Codex adapter: the installer refuses them before running
+# anything, so use a newer release.
+#
 # Failures are reported by throwing, so a piped run ends with an error and a non-zero exit code under
 # `powershell -Command` without closing an interactive terminal.
 #
 # Environment overrides:
 #   HARNESS_SKILLS_VERSION  release tag to install (default: latest), e.g. v0.3.7
+#   HARNESS_SKILLS_HOST     opencode (default when unset or empty) or codex; anything else is refused before any download
 #
-# To pin a release:
+# To pin a release or pick Codex:
 #   $env:HARNESS_SKILLS_VERSION = 'v0.3.7'; irm https://raw.githubusercontent.com/MSpiechowicz/harness-useful-skills/main/install.ps1 | iex
+#   $env:HARNESS_SKILLS_HOST = 'codex'; irm https://raw.githubusercontent.com/MSpiechowicz/harness-useful-skills/main/install.ps1 | iex
 #
 # Redirects: Invoke-WebRequest keeps its default redirect limit here. GitHub answers both URLs directly today, and a limit
 # or an https check on the final address was left out rather than guessed without a Windows machine to test on.
@@ -36,9 +47,25 @@
   $MaxExpandedBytes = [long]536870912
   $MaxEntries = 20000
   $MaxEntryName = 4096
-  # Files a release must ship for its installer to set up OpenCode, and the manifests that carry its version.
-  $RequiredFiles = @("useful-skills", "plugins/opencode/useful-skills.js")
-  $VersionedManifests = @("package.json", "plugins/opencode/useful-skills/package.json")
+  # The host is exactly opencode or codex (empty means opencode). The value may come from the environment, so anything
+  # else is refused before any download. \z, not $, so a trailing newline fails; -cnotmatch, so the case must match too.
+  $HostName = if ($env:HARNESS_SKILLS_HOST) { $env:HARNESS_SKILLS_HOST } else { "opencode" }
+  if ($HostName -cnotmatch '^(opencode|codex)\z') {
+    # Only plain characters are echoed: the value comes from the environment and could carry terminal escapes.
+    $Shown = $HostName -replace '[^A-Za-z0-9._-]', ''
+    if ($Shown.Length -gt 32) { $Shown = $Shown.Substring(0, 32) }
+    throw "Unexpected HARNESS_SKILLS_HOST: $Shown (expected opencode or codex)"
+  }
+  # Files a release must ship for its installer to set up the chosen host, and the manifests that carry its version.
+  if ($HostName -ceq "codex") {
+    $HostLabel = "Codex"
+    $RequiredFiles = @("useful-skills", "plugins/codex/.codex-plugin/plugin.json", "plugins/codex-runtime/useful-skills/codex/mcp-server.js", ".agents/plugins/marketplace.json")
+    $VersionedManifests = @("package.json", "plugins/codex/.codex-plugin/plugin.json")
+  } else {
+    $HostLabel = "OpenCode"
+    $RequiredFiles = @("useful-skills", "plugins/opencode/useful-skills.js")
+    $VersionedManifests = @("package.json", "plugins/opencode/useful-skills/package.json")
+  }
   $VersionHint = "Set HARNESS_SKILLS_VERSION to a release tag (for example v0.3.7) and run this again."
   # The Windows tar. A GNU tar earlier on PATH (Git for Windows) reads C:\ paths as remote hosts.
   $TarExe = Join-Path $env:SystemRoot "System32\tar.exe"
@@ -122,6 +149,9 @@
 
   if (-not (Test-Path -LiteralPath $TarExe -PathType Leaf)) {
     throw "Harness Skills needs the Windows tar ($TarExe), which comes with Windows 10 and newer."
+  }
+  if ($HostName -ceq "codex" -and -not (Get-Command codex -ErrorAction SilentlyContinue)) {
+    throw "Installing for Codex needs the 'codex' command, but it was not found on your PATH. Install the Codex CLI and run this again, or unset HARNESS_SKILLS_HOST to install for OpenCode."
   }
   if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     throw "Harness Skills needs Node.js 22 or newer, but 'node' was not found on your PATH. Install it from https://nodejs.org and run this again."
@@ -239,7 +269,14 @@
       throw "The release archive must contain exactly one top-level directory."
     }
 
-    # The release must be exactly the announced version and ship the OpenCode bundle and its installer.
+    # The release must ship the bundle and installer of the chosen host and be exactly the announced version. The files are
+    # checked first, so a release from before the Codex adapter gets the clear message instead of a version mismatch.
+    foreach ($File in $RequiredFiles) {
+      if (-not (Test-Path -LiteralPath (Join-Path $Root $File) -PathType Leaf)) {
+        if ($HostName -ceq "codex") { throw "This release ($Tag) has no Codex adapter (missing $File); use a newer release." }
+        throw "The release archive has no $File, so it cannot install the $HostLabel plugin."
+      }
+    }
     foreach ($Manifest in $VersionedManifests) {
       $Found = Get-ManifestVersion (Join-Path $Root $Manifest)
       if ($Found -ne $VersionNumber) {
@@ -248,20 +285,19 @@
         throw "The release archive $Manifest has version $Shown, expected $VersionNumber."
       }
     }
-    foreach ($File in $RequiredFiles) {
-      if (-not (Test-Path -LiteralPath (Join-Path $Root $File) -PathType Leaf)) {
-        throw "The release archive has no $File, so it cannot install the OpenCode plugin."
-      }
-    }
 
-    Write-Step "Installing Harness Skills $Tag for OpenCode"
+    Write-Step "Installing Harness Skills $Tag for $HostLabel"
     Set-Location -LiteralPath $HOME
-    & node (Join-Path $Root "useful-skills") install --host opencode --scope user
+    if ($HostName -ceq "codex") {
+      & node (Join-Path $Root "useful-skills") install --host codex
+    } else {
+      & node (Join-Path $Root "useful-skills") install --host opencode --scope user
+    }
     $Status = $LASTEXITCODE
     if ($Status -ne 0) { throw "The Harness Skills installer failed (exit $Status)." }
 
     Write-Host ""
-    Write-Step "Restart OpenCode to load Harness Skills."
+    Write-Step "Restart $HostLabel to load Harness Skills."
   } finally {
     Pop-Location
     # Cleanup never changes the outcome. Directory.Delete removes a link itself and does not follow it.

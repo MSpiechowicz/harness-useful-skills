@@ -1,0 +1,34 @@
+{
+  "name": "useful-skills",
+  "version": "0.3.12",
+  "description": "Skill-led development workflows for Codex: clarify, research, plan, implement, review, and remember, with role agents and project memory.",
+  "author": {
+    "name": "Maciej Spiechowicz"
+  },
+  "homepage": "https://github.com/MSpiechowicz/harness-useful-skills",
+  "repository": "https://github.com/MSpiechowicz/harness-useful-skills",
+  "license": "GPL-3.0-only",
+  "keywords": [
+    "workflow",
+    "skills",
+    "review",
+    "planning",
+    "memory"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Useful Skills",
+    "shortDescription": "Skill-led development workflows",
+    "longDescription": "Owned skills that take substantial code changes through clarification, research, planning, implementation, review, and project memory. Memory tools and role agents need the Useful Skills installer for Codex.",
+    "developerName": "Maciej Spiechowicz",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "brandColor": "#2F6FEB",
+    "defaultPrompt": [
+      "Use us-run-workflow to implement this change"
+    ]
+  }
+}

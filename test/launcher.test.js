@@ -74,6 +74,7 @@ test("launcher --host keeps OMP the default and validates OpenCode arguments bef
   const help = await cli(["--help"]);
   assert.match(help.stdout, /install --host opencode \[--scope user\|project\]/);
   assert.match(help.stdout, /uninstall --host opencode/);
+  assert.match(help.stdout, /install --host codex \[--local\]/);
 
   const omp = await cli(["doctor", "--host", "omp"]);
   assert.equal(omp.code, 0);
@@ -81,12 +82,12 @@ test("launcher --host keeps OMP the default and validates OpenCode arguments bef
   assert.match((await cli(["update", "check", "--host", "omp", "--scope", "user"])).stderr, /^useful-skills: --scope is not valid for this command\.\n/);
 
   const rejected = {
-    "install --host claude": /^useful-skills: --host must be omp or opencode\.\nUsage:/,
+    "install --host claude": /^useful-skills: --host must be omp, opencode or codex\.\nUsage:/,
     "install --host": /^useful-skills: --host requires a value\.\n/,
     "install --host opencode --profile work": /^useful-skills: --profile is an OMP option; it cannot be combined with --host opencode\.\n/,
     "install --host opencode --scope global": /^useful-skills: --scope must be user or project\.\n/,
     "update status --host opencode": /^useful-skills: Expected update check or update install\.\n/,
-    "uninstall": /^useful-skills: uninstall needs --host opencode; for OMP run `omp plugin uninstall harness-useful-skills@harness-useful-skills`\.\n/,
+    "uninstall": /^useful-skills: uninstall needs --host opencode or --host codex; for OMP run `omp plugin uninstall harness-useful-skills@harness-useful-skills`\.\n/,
     "uninstall --host omp": /omp plugin uninstall/,
   };
   for (const [args, expected] of Object.entries(rejected)) {

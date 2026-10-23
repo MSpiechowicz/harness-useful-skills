@@ -107,8 +107,14 @@ export function leftNote(scopeRoot, rel, { state, detail }) {
   return state === "blocked" ? detail : `${toAbsolute(scopeRoot, rel)} (modified since it was installed)`;
 }
 
-/** Decide, before touching anything, what installing `bundle` over a previous install (`previous`: rel -> sha256) does. */
-export function planFiles(scopeRoot, bundle, previous) {
+/** OpenCode's generated agents and models file: the role sync writes them, so they must not be symlinks either. */
+const openCodeGuarded = (scopeRoot) => [...agentFiles(scopeRoot), path.join(scopeRoot, "useful-skills", "models.yml")].map((target) => path.relative(scopeRoot, target).split(path.sep).join("/"));
+
+/**
+ * Decide, before touching anything, what installing `bundle` over a previous install (`previous`: rel -> sha256) does.
+ * `guarded` lists further scope-root-relative paths written outside the plan, which must not be symlinks either.
+ */
+export function planFiles(scopeRoot, bundle, previous, guarded = openCodeGuarded(scopeRoot)) {
   // writes/unchanged: {rel, data?, sha}; stale: owned rels to delete; dropped: rels to forget; kept: left-in-place notes.
   const plan = { writes: [], unchanged: [], stale: [], dropped: [], kept: new Set(), problems: [] };
 
@@ -135,9 +141,8 @@ export function planFiles(scopeRoot, bundle, previous) {
     }
   }
 
-  // Generated agents and the models file are written by the role sync; never let it follow a symlink.
-  for (const target of [...agentFiles(scopeRoot), path.join(scopeRoot, "useful-skills", "models.yml")]) {
-    const problem = writeTargetProblem(scopeRoot, path.relative(scopeRoot, target).split(path.sep).join("/"));
+  for (const rel of guarded) {
+    const problem = writeTargetProblem(scopeRoot, rel);
     if (problem) plan.problems.push(problem);
   }
   return plan;

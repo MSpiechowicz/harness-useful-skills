@@ -20,7 +20,10 @@ CLAUDE_MANIFESTS = (CLAUDE_MANIFEST, CLAUDE_BUNDLE_MANIFEST)
 OPENCODE_MANIFEST = "opencode/package.json"
 OPENCODE_BUNDLE_MANIFEST = "plugins/opencode/useful-skills/package.json"
 OPENCODE_MANIFESTS = (OPENCODE_MANIFEST, OPENCODE_BUNDLE_MANIFEST)
-VERSIONED_MANIFESTS = (*CLAUDE_MANIFESTS, *OPENCODE_MANIFESTS)
+CODEX_MANIFEST = "codex/plugin.json"
+CODEX_BUNDLE_MANIFEST = "plugins/codex/.codex-plugin/plugin.json"
+CODEX_MANIFESTS = (CODEX_MANIFEST, CODEX_BUNDLE_MANIFEST)
+VERSIONED_MANIFESTS = (*CLAUDE_MANIFESTS, *OPENCODE_MANIFESTS, *CODEX_MANIFESTS)
 PLUGIN = "harness-useful-skills"
 
 
@@ -72,7 +75,7 @@ def catalog_for(repo, source, current_version, version):
 
 
 def check_manifests(repo, source, current_version):
-    """Require every Claude and OpenCode manifest in the tested source to carry the current version."""
+    """Require every Claude, OpenCode, and Codex manifest in the tested source to carry the current version."""
     for path in VERSIONED_MANIFESTS:
         if json.loads(git(repo, "show", f"{source}:{path}")).get("version") != current_version:
             raise ValueError(f"{path} version must match package.json")

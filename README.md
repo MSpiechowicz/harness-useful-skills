@@ -5,11 +5,11 @@
   </picture>
 </p>
 
-# Harness Skills for Oh My Pi, Claude Code, and OpenCode
+# Harness Skills for Oh My Pi, Claude Code, OpenCode, and Codex
 
 **From a natural-language request to reviewed, verified work.**
 
-Owned `us-*` skills for development, focused audits, delivery, and project memory. Oh My Pi (OMP), Claude Code, and OpenCode discover their descriptions; the model follows the relevant instructions using native tools and workers.
+Owned `us-*` skills for development, focused audits, delivery, and project memory. Oh My Pi (OMP), Claude Code, OpenCode, and Codex discover their descriptions; the model follows the relevant instructions using native tools and workers.
 
 https://github.com/user-attachments/assets/86bc6cf3-b61e-4ade-9ebd-5e48b27fac38
 
@@ -19,7 +19,7 @@ https://github.com/user-attachments/assets/86bc6cf3-b61e-4ade-9ebd-5e48b27fac38
 | --- | --- | --- | --- |
 | Clarify, research, approve, implement, review | Focused security, performance, and quality audits | Explicitly authorized feature-branch PR delivery | Durable facts alongside code relationships |
 
-**Start here:** [Installation](#installation) · [Claude Code](#claude-code) · [OpenCode](#opencode) · [Workflow & skills](#skill-led-development) · [Model configuration](#native-model-configuration) · [Memory](#agent-invoked-memory)
+**Start here:** [Installation](#installation) · [Claude Code](#claude-code) · [OpenCode](#opencode) · [Codex](#codex) · [Workflow & skills](#skill-led-development) · [Model configuration](#native-model-configuration) · [Memory](#agent-invoked-memory)
 
 **Reference:** [Management](#management) · [Audits & delivery](#focused-audits-and-delivery) · [Updates](#updates-and-releases) · [Development](#development-and-verification) · [Attribution](#attribution)
 
@@ -27,7 +27,7 @@ No Anvil dependency, custom workflow executor, model router, phase database, or 
 
 ## Installation
 
-The OMP installation below requires OMP with marketplace support and Node.js **22+**. It needs no npm dependencies, build step, host configuration, prompt file, or startup flag. [Claude Code](#claude-code) and [OpenCode](#opencode) have their own installation sections; the OpenCode installer edits OpenCode's `opencode.json` (see below).
+The OMP installation below requires OMP with marketplace support and Node.js **22+**. It needs no npm dependencies, build step, host configuration, prompt file, or startup flag. [Claude Code](#claude-code), [OpenCode](#opencode), and [Codex](#codex) have their own installation sections; the OpenCode installer edits OpenCode's `opencode.json` (see below), and the Codex installer registers an MCP server through the `codex` CLI.
 
 ```bash
 omp plugin marketplace add MSpiechowicz/harness-useful-skills
@@ -85,7 +85,7 @@ In Claude Code, `/useful-skills doctor` also prepares memory for the session's p
 
 To submit Claude Code to the Claude plugin directory, `node scripts/build-claude-plugin.js` generates a Claude-only plugin bundle at `plugins/claude/`; the self-hosted marketplace install above is unchanged. `plugins/claude/` is generated: run the script after editing Claude runtime files or skills (CI runs it with `--check`). Only `plugins/claude/README.md` and `plugins/claude/evals/` (cases for `claude plugin eval`) are hand-written, and generated output is outside the 500-line cap.
 
-OMP's updater and release process do **not** update the Claude or OpenCode installations automatically (OpenCode has its own `update` commands). There is no Codex runtime adapter yet.
+OMP's updater and release process do **not** update the Claude or OpenCode installations automatically (OpenCode has its own `update` commands, and Codex updates by re-running its installer).
 
 ### OpenCode
 
@@ -171,6 +171,54 @@ OpenCode 2.x loads `plugins/useful-skills.js` as a plugin definition (`export de
 | Update and Node.js notices | toasts | none: V2 server plugins have no toast, and the startup update check is skipped |
 
 OpenCode 2.x has no command hook. The plugin registers `useful-skills` and `us-ignore-workflow` as plugin commands, so they run only when you (or a client acting for you) run the command, never because some prompt text looks like one: the `prompt` hook also sees MCP prompt commands, API clients, and other plugins. A command runs only in a session the host confirms is a main session, and the commands in `commands/*.md` stay as the fallback that tells the model nothing ran. The host applies command registrations in order and its own markdown-command loader registers after plugins, so the plugin checks the host's command list and registers again whenever its commands are no longer the active ones, giving up after five registrations in a row that the list does not confirm. A command typed within milliseconds of a project loading can still reach the fallback text. `/useful-skills` sends its relayed result as the prompt, and `/us-ignore-workflow` sends the text of its markdown file with what you typed and opts that one request out. The plugin reads the `us-ignore-workflow` file when it loads, so edits to it apply after a restart. V2 limits: a failed tool's error text is not redacted (V1 never sees failed tools at all), background shell output is redacted in what the model receives but the host stores and shows the original, and long commands show no progress notice.
+
+### Codex
+
+The Codex adapter needs Node.js **22+** and the `codex` CLI. Installing only the plugin gives you the 21 skills, as `useful-skills:us-*`, but no agents and no memory tools:
+
+```bash
+codex plugin marketplace add MSpiechowicz/harness-useful-skills
+codex plugin add useful-skills@harness-useful-skills
+```
+
+The marketplace is `harness-useful-skills`, the plugin is `useful-skills`, and the plugin ID is `useful-skills@harness-useful-skills`. The repository has a Codex catalog at `.agents/plugins/marketplace.json`, so Codex reads it instead of falling back to `.claude-plugin/marketplace.json`; Claude Code and OMP are unaffected.
+
+For the full install (macOS and Linux, needs `curl`, `tar`, `gzip`, Node.js 22+, and `codex`):
+
+```bash
+curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/MSpiechowicz/harness-useful-skills/main/install.sh | HARNESS_SKILLS_HOST=codex sh
+```
+
+On Windows (PowerShell):
+
+```powershell
+$env:HARNESS_SKILLS_HOST = 'codex'; irm https://raw.githubusercontent.com/MSpiechowicz/harness-useful-skills/main/install.ps1 | iex
+```
+
+Or, from a checkout or an extracted release:
+
+```bash
+./useful-skills install --host codex [--local]
+```
+
+The install script verifies the release tarball as described for [OpenCode](#opencode), then runs that release's installer. `HARNESS_SKILLS_VERSION` pins a release here too. Releases up to v0.3.12 have no Codex adapter, and the script refuses them before running anything. The installer:
+
+- adds the marketplace (from GitHub at `--ref v<version>`, or from the checkout with `--local`) and the `useful-skills` plugin. Without `--local`, it first checks with `git ls-remote` that the release tag exists and stops before writing anything if it does not (use `--local` for an unreleased checkout); without `git` or a network it notes that and continues;
+- writes seven agents to `$CODEX_HOME/agents/us-<role>.toml`: `us-planner`, `us-scout`, `us-frontend`, `us-backend`, `us-general-purpose`, `us-reviewer`, and `us-security-reviewer`;
+- copies the memory runtime to `$CODEX_HOME/useful-skills/runtime/` and creates the private data directory `$CODEX_HOME/useful-skills/data`;
+- registers the MCP server `useful_skills` with `codex mcp add`, exposing `memory_status`, `memory_search`, `memory_save`, `graph_build`, and `graph_query`;
+- writes `$CODEX_HOME/useful-skills/install-record.json`.
+
+Restart Codex afterwards. The installer never edits `config.toml`. The memory server is registered by the installer, not shipped in the plugin, because Codex does not expand `${PLUGIN_ROOT}` in a plugin's `.mcp.json` and gives plugin servers no workspace. Memory has the same contract as in Claude Code and OpenCode (see [Agent-invoked memory](#agent-invoked-memory)); a long `graph_build` may need `tool_timeout_sec` under `[mcp_servers.useful_skills]` in your `config.toml`, which you set yourself.
+
+**Uninstall, doctor, update.** `./useful-skills uninstall --host codex` removes only unmodified owned files, the MCP entry if unchanged, the plugin if the installer added it, and the marketplace if the installer added it. It keeps the data directory. `./useful-skills doctor --host codex` prints a read-only health summary, including a plugin left at an older version by an interrupted upgrade. To update, re-run the installer. On Windows the installer runs `codex.exe` directly; an npm `codex.cmd` shim runs through `cmd.exe`, and the installer refuses when a path it passes contains `"`, `%`, `!`, `^`, `&`, `|`, `<` or `>`.
+
+Limits:
+
+- Workflow stages are static guidance and always enabled. Codex has no hooks, settings files, `/useful-skills` command, or model-role file. To skip the workflow for one request, invoke `$us-ignore-workflow` directly.
+- Read-only agents (such as `us-scout` and the reviewers) are read-only by instruction only: Codex subagents inherit the parent's sandbox, so the sandbox, not the agent file, is the enforcement.
+- Useful Skills does not configure a model or reasoning effort per agent; Codex's own settings apply.
+- Plugin-only installs have no `us-*` agents, so `us-run-workflow` reports the missing agent types.
 
 ## Skill-led development
 
@@ -557,9 +605,9 @@ The linked PR uses `Closes #N` when it fully resolves the issue and targets the 
 
 `update check` is quiet/read-only at interactive startup; explicit failures are reported. `update install` immediately announces that it is updating through OMP's native plugin manager, then reports the result. It retains native active-install ownership, scope/profile, and stable-version checks. Only an active, unambiguous `harness-useful-skills@harness-useful-skills` marketplace installation is eligible for upgrade. After a newer release is published, use **Update → Install** and restart OMP to load it. The release lookup authenticates with `GH_TOKEN`, `GITHUB_TOKEN`, or your `gh auth login` session when one is available, so it uses your account's GitHub API limit instead of the shared anonymous 60 requests an hour; the token is sent only to `api.github.com` and redirects are refused. A rate-limited lookup reports when to try again.
 
-Historic installations cannot migrate through `update install`; follow [Remove or migrate an OMP installation](#remove-or-migrate-an-omp-installation) to remove them and install the current ID manually. Updating this source tree or publishing a release does not change anyone's installed plugins or registered marketplace. For a source checkout, changing its Git remote to the new repository URL is optional and user-managed. The OMP updater does **not** update Claude or OpenCode installations.
+Historic installations cannot migrate through `update install`; follow [Remove or migrate an OMP installation](#remove-or-migrate-an-omp-installation) to remove them and install the current ID manually. Updating this source tree or publishing a release does not change anyone's installed plugins or registered marketplace. For a source checkout, changing its Git remote to the new repository URL is optional and user-managed. The OMP updater does **not** update Claude, OpenCode, or Codex installations.
 
-The existing single-plugin release transaction is unchanged apart from its version files: CI checks precede the atomic package/marketplace/Claude-manifest version commit and branch/tag push by `release.py`. The release bumps `package.json`, the marketplace entry, `.claude-plugin/plugin.json`, `plugins/claude/.claude-plugin/plugin.json`, `opencode/package.json`, and `plugins/opencode/useful-skills/package.json`, and fails before creating any ref if a Claude or OpenCode manifest version differs from `package.json`. No publication is performed merely by implementing a plan. Python 3.10+ is needed for release-development checks, not normal plugin installation.
+The existing single-plugin release transaction is unchanged apart from its version files: CI checks precede the atomic package/marketplace/Claude-manifest version commit and branch/tag push by `release.py`. The release bumps `package.json`, the marketplace entry, `.claude-plugin/plugin.json`, `plugins/claude/.claude-plugin/plugin.json`, `opencode/package.json`, `plugins/opencode/useful-skills/package.json`, `codex/plugin.json`, and `plugins/codex/.codex-plugin/plugin.json`, and fails before creating any ref if a Claude, OpenCode, or Codex manifest version differs from `package.json`. No publication is performed merely by implementing a plan. Python 3.10+ is needed for release-development checks, not normal plugin installation.
 
 ## Development and verification
 
@@ -568,6 +616,8 @@ node scripts/render-claude-skills.js --check
 node scripts/build-claude-plugin.js --check
 node scripts/render-opencode-skills.js --check
 node scripts/build-opencode-plugin.js --check
+node scripts/render-codex-skills.js --check
+node scripts/build-codex-plugin.js --check
 node --test 'test/**/*.test.js'
 node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-exclude='plugins/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 'test/**/*.test.js'
 python -m unittest discover -s test -p 'test_*.py'
