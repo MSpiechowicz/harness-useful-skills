@@ -59,11 +59,11 @@ export async function fixture(t, options = {}) {
   t.after(() => rm(root, { recursive: true, force: true }));
 
   const configDir = path.join(root, "claude");
-  const packageRoot = path.join(configDir, "plugins", "cache", "useful-skills-local", "useful-skills", "0.2.31");
-  const dataDir = path.join(configDir, "plugins", "data", "useful-skills-useful-skills-local");
+  const packageRoot = path.join(configDir, "plugins", "cache", "harness-useful-skills", "harness-useful-skills", "0.2.31");
+  const dataDir = path.join(configDir, "plugins", "data", "harness-useful-skills-harness-useful-skills");
   const repo = path.join(root, "repo");
   await mkdir(path.join(packageRoot, ".claude-plugin"), { recursive: true });
-  await writeFile(path.join(packageRoot, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "useful-skills" }));
+  await writeFile(path.join(packageRoot, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "harness-useful-skills" }));
   await mkdir(dataDir, { recursive: true, mode: 0o700 });
   await mkdir(path.join(repo, ".git"), { recursive: true });
   await writeFile(path.join(repo, "main.py"), "def main(): pass\n");
@@ -106,16 +106,16 @@ export async function graphOutcome(f, workspace, system) {
 }
 
 /**
- * Mimic `claude plugin marketplace add <repo>` + `plugin install useful-skills@<marketplace>`: the plugin
+ * Mimic `claude plugin marketplace add <repo>` + `plugin install harness-useful-skills@<marketplace>`: the plugin
  * runs from the repo folder and Claude records the install in its plugins state files.
  */
-export async function directoryMarketplace(f, { marketplaces = ["useful-skills-local"], installed = marketplaces, source = "." } = {}) {
+export async function directoryMarketplace(f, { marketplaces = ["harness-useful-skills"], installed = marketplaces, source = "." } = {}) {
   const pluginRepo = path.join(f.root, "plugin-repo");
   await mkdir(path.join(pluginRepo, ".claude-plugin"), { recursive: true });
-  await writeFile(path.join(pluginRepo, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "useful-skills" }));
+  await writeFile(path.join(pluginRepo, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "harness-useful-skills" }));
   await writeFile(path.join(pluginRepo, ".claude-plugin", "marketplace.json"), JSON.stringify({
-    name: "useful-skills-local",
-    plugins: [{ name: "useful-skills", source }],
+    name: "harness-useful-skills",
+    plugins: [{ name: "harness-useful-skills", source }],
   }));
 
   const pluginsDir = path.join(f.configDir, "plugins");
@@ -124,9 +124,9 @@ export async function directoryMarketplace(f, { marketplaces = ["useful-skills-l
     installLocation: pluginRepo,
     lastUpdated: "2026-10-08T00:00:00.000Z",
   }]));
-  const plugins = Object.fromEntries(installed.map(marketplace => [`useful-skills@${marketplace}`, [{
+  const plugins = Object.fromEntries(installed.map(marketplace => [`harness-useful-skills@${marketplace}`, [{
     scope: "user",
-    installPath: path.join(pluginsDir, "cache", marketplace, "useful-skills", "ce05208f1c5b"),
+    installPath: path.join(pluginsDir, "cache", marketplace, "harness-useful-skills", "ce05208f1c5b"),
     version: "ce05208f1c5b",
   }]]));
   await writeFile(path.join(pluginsDir, "known_marketplaces.json"), JSON.stringify(known));

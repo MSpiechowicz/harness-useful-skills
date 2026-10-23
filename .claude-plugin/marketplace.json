@@ -1,12 +1,12 @@
 {
-  "name": "useful-skills-local",
+  "name": "harness-useful-skills",
   "owner": {
     "name": "MSpiechowicz"
   },
   "description": "Claude Code native Useful Skills plugin",
   "plugins": [
     {
-      "name": "useful-skills",
+      "name": "harness-useful-skills",
       "source": ".",
       "description": "Claude Code engineering workflows, safety reviews, and local memory tools",
       "skills": [

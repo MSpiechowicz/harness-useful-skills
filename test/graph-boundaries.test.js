@@ -202,11 +202,11 @@ for (const [name, options, expected] of invalidPaths) {
   });
 }
 
-for (const ancestor of ["useful-skills", "memory", "workspace", "generations", "runtime"]) {
+for (const ancestor of ["harness-useful-skills", "memory", "workspace", "generations", "runtime"]) {
   test(`managed ${ancestor} symlink cannot redirect a build`, async (t) => {
     const f = await fixture(t);
     const targets = {
-      "useful-skills": path.join(f.agentDir, "useful-skills"),
+      "harness-useful-skills": path.join(f.agentDir, "harness-useful-skills"),
       memory: path.dirname(f.paths.directory),
       workspace: f.paths.directory,
       generations: f.paths.generations,

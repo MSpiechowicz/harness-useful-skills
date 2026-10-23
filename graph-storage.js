@@ -3,6 +3,7 @@ import { chmod, lstat, mkdir, readFile, rename, rm, writeFile } from "node:fs/pr
 import path from "node:path";
 
 import { graphValidationError } from "./graph-validation.js";
+import { DATA_DIRECTORY } from "./names.js";
 import { errorMessage, isObject } from "./graph-safety.js";
 import { minimalEnvironment } from "./process.js";
 
@@ -97,7 +98,7 @@ export async function existingDirectory(directory, description) {
 
 export async function checkExistingManagedPath(paths) {
   const directories = [
-    path.join(paths.agentDir, "useful-skills"),
+    path.join(paths.agentDir, DATA_DIRECTORY),
     path.dirname(paths.directory),
     paths.directory,
     paths.generations,
@@ -152,7 +153,7 @@ async function privateChild(parent, name) {
 
 export async function prepareStorage(paths) {
   await existingDirectory(paths.agentDir, "Agent profile directory");
-  const featureRoot = await privateChild(paths.agentDir, "useful-skills");
+  const featureRoot = await privateChild(paths.agentDir, DATA_DIRECTORY);
   const memoryRoot = await privateChild(featureRoot, "memory");
   const directory = await privateChild(memoryRoot, paths.workspaceHash);
   const generations = await privateChild(directory, "generations");

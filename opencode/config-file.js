@@ -3,8 +3,10 @@ import { closeSync, constants, fchmodSync, fstatSync, fsyncSync, linkSync, lstat
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
+import { MCP_SERVER_NAME, PLUGIN_NAME } from "../names.js";
+
 /** The key under OpenCode's top-level `mcp` object that names our memory server. */
-export const MCP_NAME = "useful_skills";
+export const MCP_NAME = MCP_SERVER_NAME;
 export const CONFIG_CANDIDATES = Object.freeze(["opencode.json", "opencode.jsonc"]);
 
 const MAX_CONFIG_BYTES = 1024 * 1024;
@@ -15,15 +17,15 @@ const SCHEMA_URL = "https://opencode.ai/config.json";
 export function mcpEntryFor(scopeRoot) {
   return {
     type: "local",
-    command: ["node", path.join(scopeRoot, "plugins", "useful-skills", "opencode", "mcp-server.js")],
+    command: ["node", path.join(scopeRoot, "plugins", PLUGIN_NAME, "opencode", "mcp-server.js")],
     enabled: true,
     timeout: MCP_TIMEOUT_MS,
   };
 }
 
 /** Snippet a user can paste into their config when we may not edit it ourselves. */
-export function mcpSnippet(entry) {
-  return JSON.stringify({ mcp: { [MCP_NAME]: entry } }, null, 2);
+export function mcpSnippet(entry, name = MCP_NAME) {
+  return JSON.stringify({ mcp: { [name]: entry } }, null, 2);
 }
 
 /**
@@ -89,39 +91,39 @@ function parseConfig(text) {
 }
 
 /**
- * Plan adding or replacing `mcp.useful_skills`. `text` is the current file text, undefined when the file does not exist.
+ * Plan adding or replacing `mcp.<name>` (our memory server unless `name` says otherwise). `text` is the current file text, undefined when the file does not exist.
  * Returns `{action: "create"|"update"|"unchanged", text, previous?}` or `{action: "refuse", reason}`; every other key is kept.
  */
-export function planMcpUpsert(text, entry) {
+export function planMcpUpsert(text, entry, name = MCP_NAME) {
   if (text === undefined) {
-    return { action: "create", text: render({ $schema: SCHEMA_URL, mcp: { [MCP_NAME]: entry } }) };
+    return { action: "create", text: render({ $schema: SCHEMA_URL, mcp: { [name]: entry } }) };
   }
   const { config, reason } = parseConfig(text);
   if (reason) return { action: "refuse", reason };
 
-  const previous = config.mcp?.[MCP_NAME];
+  const previous = config.mcp?.[name];
   if (isDeepStrictEqual(previous, entry)) return { action: "unchanged", text };
-  config.mcp = { ...config.mcp, [MCP_NAME]: entry };
+  config.mcp = { ...config.mcp, [name]: entry };
   return previous === undefined
     ? { action: "update", text: render(config) }
     : { action: "update", text: render(config), previous };
 }
 
 /**
- * Plan removing `mcp.useful_skills`, but only when it still equals `entry`.
+ * Plan removing `mcp.<name>`, but only when it still equals `entry`.
  * Returns `{action: "remove", text}`, `{action: "absent"}`, `{action: "keep", current}` for a value we did not write,
  * or `{action: "refuse", reason}`.
  */
-export function planMcpRemove(text, entry) {
+export function planMcpRemove(text, entry, name = MCP_NAME) {
   if (text === undefined) return { action: "absent" };
   const { config, reason } = parseConfig(text);
   if (reason) return { action: "refuse", reason };
 
-  const current = config.mcp?.[MCP_NAME];
+  const current = config.mcp?.[name];
   if (current === undefined) return { action: "absent" };
   if (!isDeepStrictEqual(current, entry)) return { action: "keep", current };
 
-  const { [MCP_NAME]: _removed, ...rest } = config.mcp;
+  const { [name]: _removed, ...rest } = config.mcp;
   if (Object.keys(rest).length === 0) delete config.mcp;
   else config.mcp = rest;
   return { action: "remove", text: render(config) };

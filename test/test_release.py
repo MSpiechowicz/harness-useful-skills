@@ -12,7 +12,7 @@ from release import bump_version, plan_release
 PLUGIN = "harness-useful-skills"
 CATALOG = ".omp-plugin/marketplace.json"
 CLAUDE_MANIFESTS = (".claude-plugin/plugin.json", "plugins/claude/.claude-plugin/plugin.json")
-OPENCODE_MANIFESTS = ("opencode/package.json", "plugins/opencode/useful-skills/package.json")
+OPENCODE_MANIFESTS = ("opencode/package.json", "plugins/opencode/harness-useful-skills/package.json")
 CODEX_MANIFESTS = ("codex/plugin.json", "plugins/codex/.codex-plugin/plugin.json")
 
 
@@ -63,19 +63,19 @@ class ReleaseTransactionTests(unittest.TestCase):
         for path in CLAUDE_MANIFESTS:
             (self.checkout / path).parent.mkdir(parents=True, exist_ok=True)
             (self.checkout / path).write_text(
-                '{\n  "name": "useful-skills",\n  "version": "1.0.0",\n  "license": "GPL-3.0-only"\n}\n',
+                '{\n  "name": "harness-useful-skills",\n  "version": "1.0.0",\n  "license": "GPL-3.0-only"\n}\n',
                 encoding="utf-8",
             )
         for path in OPENCODE_MANIFESTS:
             (self.checkout / path).parent.mkdir(parents=True, exist_ok=True)
             (self.checkout / path).write_text(
-                '{\n  "name": "useful-skills-opencode",\n  "private": true,\n  "type": "module",\n  "version": "1.0.0"\n}\n',
+                '{\n  "name": "harness-useful-skills-opencode",\n  "private": true,\n  "type": "module",\n  "version": "1.0.0"\n}\n',
                 encoding="utf-8",
             )
         for path in CODEX_MANIFESTS:
             (self.checkout / path).parent.mkdir(parents=True, exist_ok=True)
             (self.checkout / path).write_text(
-                '{\n  "name": "useful-skills",\n  "version": "1.0.0",\n  "skills": "./skills/"\n}\n',
+                '{\n  "name": "harness-useful-skills",\n  "version": "1.0.0",\n  "skills": "./skills/"\n}\n',
                 encoding="utf-8",
             )
         self.commit(self.checkout, "Initial source")
@@ -119,17 +119,17 @@ class ReleaseTransactionTests(unittest.TestCase):
         for path in CLAUDE_MANIFESTS:
             self.assertEqual(
                 git(self.origin, "show", f"{commit}:{path}"),
-                '{\n  "name": "useful-skills",\n  "version": "1.0.1",\n  "license": "GPL-3.0-only"\n}',
+                '{\n  "name": "harness-useful-skills",\n  "version": "1.0.1",\n  "license": "GPL-3.0-only"\n}',
             )
         for path in OPENCODE_MANIFESTS:
             self.assertEqual(
                 git(self.origin, "show", f"{commit}:{path}"),
-                '{\n  "name": "useful-skills-opencode",\n  "private": true,\n  "type": "module",\n  "version": "1.0.1"\n}',
+                '{\n  "name": "harness-useful-skills-opencode",\n  "private": true,\n  "type": "module",\n  "version": "1.0.1"\n}',
             )
         for path in CODEX_MANIFESTS:
             self.assertEqual(
                 git(self.origin, "show", f"{commit}:{path}"),
-                '{\n  "name": "useful-skills",\n  "version": "1.0.1",\n  "skills": "./skills/"\n}',
+                '{\n  "name": "harness-useful-skills",\n  "version": "1.0.1",\n  "skills": "./skills/"\n}',
             )
 
         self.assertEqual(

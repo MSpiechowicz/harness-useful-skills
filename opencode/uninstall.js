@@ -1,9 +1,12 @@
 import { lstatSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
+import { LEGACY_DATA_DIRECTORY, LEGACY_MCP_SERVER_NAME } from "../legacy-names.js";
 import { isGeneratedAgent } from "../model-roles.js";
+import { DATA_DIRECTORY } from "../names.js";
 import { MCP_NAME, CONFIG_CANDIDATES, deleteConfigFile, isSchemaOnly, mcpSnippet, planMcpRemove, readConfigFile, writeConfigAtomic } from "./config-file.js";
 import { agentFiles, checkedRecordPath, leftNote, ownedState, pruneEmptyDirectories, removeOwned, resolveScopeRoot } from "./install-files.js";
-import { directoryProblem, opencodeConfigDir, printableText, readInstallRecord } from "./paths.js";
+import { readLegacyRecord } from "./legacy.js";
+import { directoryProblem, installRecordPath, legacyDataDir, legacyInstallRecordPath, opencodeConfigDir, printableText, readInstallRecord } from "./paths.js";
 
 const relativeTo = (scopeRoot, target) => path.relative(scopeRoot, target).split(path.sep).join("/");
 
@@ -41,70 +44,103 @@ function removeAgents(scopeRoot) {
 }
 
 /**
- * Remove `mcp.useful_skills` from every OpenCode config in the scope root where it equals what the install wrote.
- * A config file the installer itself created (`record.configCreated`) is deleted when only `$schema` is left.
+ * Remove `mcp.<name>` from every OpenCode config in the scope root where it equals what the install wrote.
+ * A config file the installer itself created (`record.configCreated`) is deleted when only `$schema` is left,
+ * unless `keepConfigFile` says another entry is about to be written into it.
  */
-function removeMcpEntry(scopeRoot, record) {
+export function removeMcpEntry(scopeRoot, record, { name = MCP_NAME, keepConfigFile = false } = {}) {
   const entry = record.mcpEntry;
   const lines = [];
   if (!entry) return lines;
-  for (const name of CONFIG_CANDIDATES) {
-    const file = path.join(scopeRoot, name);
+  for (const candidate of CONFIG_CANDIDATES) {
+    const file = path.join(scopeRoot, candidate);
     try {
       const text = readConfigFile(file);
-      const plan = planMcpRemove(text, entry);
-      if (plan.action === "remove" && record.configCreated === true && file === record.configFile && isSchemaOnly(plan.text)) {
+      const plan = planMcpRemove(text, entry, name);
+      if (plan.action === "remove" && !keepConfigFile && record.configCreated === true && file === record.configFile && isSchemaOnly(plan.text)) {
         deleteConfigFile(file, text);
         lines.push(`Removed ${file}: Useful Skills created it and nothing else was in it.`);
       } else if (plan.action === "remove") {
         writeConfigAtomic(file, plan.text, text);
-        lines.push(`Removed mcp.${MCP_NAME} from ${file}.`);
+        lines.push(`Removed mcp.${name} from ${file}.`);
       } else if (plan.action === "keep") {
-        lines.push(`Left mcp.${MCP_NAME} in ${file}: it is not what Useful Skills wrote (${JSON.stringify(plan.current)}).`);
-      } else if (plan.action === "refuse" && text.includes(MCP_NAME)) {
-        lines.push(`Could not edit ${file} (${plan.reason}). Remove mcp.${MCP_NAME} yourself; Useful Skills wrote:`, mcpSnippet(entry));
+        lines.push(`Left mcp.${name} in ${file}: it is not what Useful Skills wrote (${JSON.stringify(plan.current)}).`);
+      } else if (plan.action === "refuse" && text.includes(name)) {
+        lines.push(`Could not edit ${file} (${plan.reason}). Remove mcp.${name} yourself; Useful Skills wrote:`, mcpSnippet(entry, name));
       }
     } catch (error) {
-      lines.push(`Could not edit ${file} (${error.message}). Remove mcp.${MCP_NAME} yourself if it is there.`);
+      lines.push(`Could not edit ${file} (${error.message}). Remove mcp.${name} yourself if it is there.`);
     }
   }
   return lines;
 }
 
-/** Paths uninstall deliberately keeps because they hold the user's data or choices. */
-function keptPaths(scopeRoot, record, environment) {
+/** Paths uninstall deliberately keeps because they hold the user's data or choices, under both the current and the earlier name. */
+function keptPaths(scopeRoot, records, environment) {
   const candidates = [
-    [record.dataDir, "data"],
-    [path.join(opencodeConfigDir(environment), "useful-skills"), "settings"],
-    [path.join(scopeRoot, "useful-skills", "models.yml"), "model roles"],
+    ...records.map(({ record }) => [record.dataDir, "data"]),
+    [path.join(opencodeConfigDir(environment), DATA_DIRECTORY), "settings"],
+    [path.join(scopeRoot, DATA_DIRECTORY, "models.yml"), "model roles"],
+    [legacyDataDir(environment), "data"],
+    [path.join(opencodeConfigDir(environment), LEGACY_DATA_DIRECTORY), "settings"],
+    [path.join(scopeRoot, LEGACY_DATA_DIRECTORY, "models.yml"), "model roles"],
   ];
-  return candidates.filter(([target]) => lstatSync(target, { throwIfNoEntry: false })).map(([target, what]) => `  ${target} (${what})`);
+  const unique = [...new Map(candidates.map(([target, what]) => [target, what])).entries()];
+  return unique.filter(([target]) => lstatSync(target, { throwIfNoEntry: false })).map(([target, what]) => `  ${target} (${what})`);
+}
+
+/** The installs found in the scope root, current first: each is `{ file, record, serverName }`. An unusable earlier record is a `note`. */
+function installsIn(scopeRoot) {
+  const installs = [];
+  const notes = [];
+
+  const file = checkedRecordPath(scopeRoot);
+  const record = readInstallRecord(file);
+  if (record) {
+    installs.push({ file, record, serverName: MCP_NAME });
+  }
+
+  const legacy = readLegacyRecord(scopeRoot);
+  if (legacy.record) {
+    installs.push({ file: legacyInstallRecordPath(scopeRoot), record: legacy.record, serverName: LEGACY_MCP_SERVER_NAME });
+  } else if (legacy.problem) {
+    notes.push(`${legacyInstallRecordPath(scopeRoot)} was not used (${legacy.problem}); delete the earlier install by hand.`);
+  }
+
+  return { installs, notes };
 }
 
 /**
- * Remove an OpenCode install: the recorded files that are unmodified, generated agents still marked as ours,
- * the MCP entry if unchanged, and the record. Data, settings and the models file are kept.
- * Returns `{message}`; anything left behind is listed in it.
+ * Remove an OpenCode install under the current name and any left from before the rename: the recorded files that
+ * are unmodified, generated agents still marked as ours, the MCP entry if unchanged, and the record. Data,
+ * settings and the models file are kept. Returns `{message}`; anything left behind is listed in it.
  */
 export function uninstallOpenCode({ scope = "user", cwd = process.cwd(), environment = process.env } = {}) {
   const scopeRoot = resolveScopeRoot({ scope, cwd, environment });
-  const recordFile = scopeRoot && checkedRecordPath(scopeRoot);
-  const record = recordFile && readInstallRecord(recordFile);
-  if (!record) {
-    return { message: printableText(`Useful Skills is not installed for OpenCode (${scope} scope): no install record${scopeRoot ? ` at ${recordFile}` : ""}. Nothing was removed.`) };
+  const { installs, notes } = scopeRoot ? installsIn(scopeRoot) : { installs: [], notes: [] };
+  if (installs.length === 0) {
+    const where = scopeRoot ? ` at ${installRecordPath(scopeRoot)}` : "";
+    return { message: printableText([`Useful Skills is not installed for OpenCode (${scope} scope): no install record${where}. Nothing was removed.`, ...notes].join("\n")) };
   }
 
-  const files = removeFiles(scopeRoot, record);
-  const agents = removeAgents(scopeRoot);
-  const config = removeMcpEntry(scopeRoot, record);
-  rmSync(recordFile);
-  pruneEmptyDirectories(scopeRoot, recordFile);
+  const removed = { files: 0, left: [], config: [] };
+  for (const { file, record, serverName } of installs) {
+    const files = removeFiles(scopeRoot, record);
+    removed.files += files.removed;
+    removed.left.push(...files.left);
+    removed.config.push(...removeMcpEntry(scopeRoot, record, { name: serverName }));
+    rmSync(file);
+    pruneEmptyDirectories(scopeRoot, file);
+  }
 
-  const kept = keptPaths(scopeRoot, record, environment);
-  const left = [...files.left, ...agents.left];
+  const agents = removeAgents(scopeRoot);
+  const kept = keptPaths(scopeRoot, installs, environment);
+  const left = [...removed.left, ...agents.left];
+  const versions = installs.map(({ record }) => record.version).join(" and ");
   const lines = [
-    `Uninstalled Useful Skills ${record.version} from OpenCode (${scope} scope): ${files.removed} files and ${agents.removed} generated agents removed.`,
-    ...config,
+    `Uninstalled Useful Skills ${versions} from OpenCode (${scope} scope): ${removed.files} files and ${agents.removed} generated agents removed.`,
+    ...removed.config,
+    ...notes,
     ...(left.length > 0 ? ["Left in place for you to review or delete:", ...left.map((item) => `  ${item}`)] : []),
     ...(kept.length > 0 ? ["Kept:", ...kept] : []),
     "Restart OpenCode.",

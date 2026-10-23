@@ -24,14 +24,14 @@ function record(scopeRoot, overrides = {}) {
     dataDir: path.join(scopeRoot, "data"),
     configFile: path.join(scopeRoot, "opencode.json"),
     mcpEntry: { type: "local", command: ["node", "/x/mcp-server.js"], enabled: true },
-    files: { "plugins/useful-skills.js": "a".repeat(64) },
+    files: { "plugins/harness-useful-skills.js": "a".repeat(64) },
     ...overrides,
   };
 }
 
-/** An installed runtime tree `<scopeRoot>/plugins/useful-skills` with an install record. */
+/** An installed runtime tree `<scopeRoot>/plugins/harness-useful-skills` with an install record. */
 async function installedRuntime(scopeRoot, recordValue = record(scopeRoot)) {
-  const runtimeRoot = path.join(scopeRoot, "plugins", "useful-skills");
+  const runtimeRoot = path.join(scopeRoot, "plugins", "harness-useful-skills");
   await mkdir(runtimeRoot, { recursive: true });
   await writeFile(installRecordPath(scopeRoot), JSON.stringify(recordValue));
   return runtimeRoot;
@@ -44,8 +44,8 @@ test("config and data dirs follow absolute XDG variables, else the home director
   assert.equal(opencodeConfigDir({ HOME: home, XDG_CONFIG_HOME: "relative/config" }), "/home/tester/.config/opencode");
   assert.equal(opencodeConfigDir({ HOME: home, OPENCODE_CONFIG_DIR: "/elsewhere" }), "/home/tester/.config/opencode");
 
-  assert.equal(defaultDataDir({ HOME: home }), "/home/tester/.local/share/opencode/useful-skills");
-  assert.equal(defaultDataDir({ HOME: home, XDG_DATA_HOME: "/xdg/data" }), "/xdg/data/opencode/useful-skills");
+  assert.equal(defaultDataDir({ HOME: home }), "/home/tester/.local/share/opencode/harness-useful-skills");
+  assert.equal(defaultDataDir({ HOME: home, XDG_DATA_HOME: "/xdg/data" }), "/xdg/data/opencode/harness-useful-skills");
 });
 
 test("scope roots: user is the config dir, project is <cwd>/.opencode, anything else is refused", () => {
@@ -53,7 +53,7 @@ test("scope roots: user is the config dir, project is <cwd>/.opencode, anything 
   assert.equal(scopeRootFor({ scope: "user", cwd: "/work/repo", environment }), "/xdg/config/opencode");
   assert.equal(scopeRootFor({ scope: "project", cwd: "/work/repo", environment }), "/work/repo/.opencode");
   assert.throws(() => scopeRootFor({ scope: "global", cwd: "/work/repo", environment }), /--scope must be user or project/);
-  assert.equal(installRecordPath("/x/opencode"), "/x/opencode/plugins/useful-skills/install-record.json");
+  assert.equal(installRecordPath("/x/opencode"), "/x/opencode/plugins/harness-useful-skills/install-record.json");
 });
 
 test("an install record reads back when valid and is absent when missing", async t => {
@@ -117,7 +117,7 @@ test("runtimeInstall finds the record of an installed runtime tree only", async 
   assert.deepEqual(runtimeInstall(runtimeRoot), { scopeRoot: root, record: record(root) });
   assert.equal(runtimeInstall(RUNTIME_ROOT), null, "a checkout is not an installed runtime");
 
-  const unrecorded = path.join(root, "other", "plugins", "useful-skills");
+  const unrecorded = path.join(root, "other", "plugins", "harness-useful-skills");
   await mkdir(unrecorded, { recursive: true });
   assert.equal(runtimeInstall(unrecorded), null);
 
@@ -140,7 +140,7 @@ test("bundleVersion reads the OpenCode package manifest of a runtime tree or a c
   const checkout = JSON.parse(await readFile(path.join(RUNTIME_ROOT, "opencode", "package.json"), "utf8"));
   assert.equal(bundleVersion(RUNTIME_ROOT), checkout.version);
 
-  await writeFile(path.join(root, "package.json"), JSON.stringify({ name: "useful-skills-opencode", version: "9.8.7" }));
+  await writeFile(path.join(root, "package.json"), JSON.stringify({ name: "harness-useful-skills-opencode", version: "9.8.7" }));
   assert.equal(bundleVersion(root), "9.8.7");
 
   await writeFile(path.join(root, "package.json"), JSON.stringify({ name: "something-else", version: "1.0.0" }));

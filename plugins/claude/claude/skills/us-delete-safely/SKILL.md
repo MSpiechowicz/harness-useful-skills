@@ -5,7 +5,7 @@ description: Use before ANY recursive delete or cleanup: rm -rf, git clean, find
 
 # Deleting files safely
 
-Load `/useful-skills:us-write-concisely` before asking the user. A recursive delete cannot be undone, so decide what to remove before running anything.
+Load `/harness-useful-skills:us-write-concisely` before asking the user. A recursive delete cannot be undone, so decide what to remove before running anything.
 
 ## Never delete
 

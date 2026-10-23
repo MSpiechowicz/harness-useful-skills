@@ -1,20 +1,64 @@
-import { constants } from "node:fs";
+import { constants, lstatSync, readFileSync } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
 import path from "node:path";
 
+import { migrateDirectory } from "../data-migration.js";
 import { resolveHostRoots } from "../host-roots.js";
+import { LEGACY_CLAUDE_PLUGIN_ID, LEGACY_DATA_DIRECTORY } from "../legacy-names.js";
+import { DATA_DIRECTORY, PLUGIN_ID } from "../names.js";
 import { claudeConfigDir } from "./models.js";
 
 const CLAUDE_FACTS = Object.freeze({ label: "Claude", backend: "claude-local-facts", directory: "claude-facts" });
 
-/** Resolve the Claude project and plugin data roots used by memory tools and doctor setup. */
-export async function resolveHostContext({ workspace, data } = {}) {
-  return resolveHostRoots({ workspace, data, label: "Claude", facts: CLAUDE_FACTS });
-}
-
 /** Claude Code names a plugin's data directory after `<plugin>@<marketplace>` with unsafe characters replaced. */
 export function pluginDataName(pluginId) {
   return String(pluginId).replace(/[^A-Za-z0-9_-]/g, "-");
+}
+
+/**
+ * Claude keys a plugin's data directory by its id, so the renamed plugin starts with an empty one. Carry the memory
+ * saved by the plugin under its earlier id over, from the sibling directory the earlier plugin used.
+ */
+function migrateLegacyPluginData(data) {
+  if (typeof data !== "string" || path.basename(data) !== pluginDataName(PLUGIN_ID)) {
+    return;
+  }
+
+  const legacyData = path.join(path.dirname(data), pluginDataName(LEGACY_CLAUDE_PLUGIN_ID));
+  migrateDirectory(path.join(legacyData, LEGACY_DATA_DIRECTORY), path.join(data, DATA_DIRECTORY));
+}
+
+/**
+ * What the plugin under its earlier id left behind: the plugin itself when it is still installed (it declares the
+ * same hooks and agents, so both would run), and files in its data directory that migration kept because they differ.
+ */
+export function claudeLegacyNotes(environment = process.env) {
+  const configDir = claudeConfigDir(environment);
+  const notes = [];
+
+  let installed;
+  try {
+    installed = JSON.parse(readFileSync(path.join(configDir, "plugins", "installed_plugins.json"), "utf8"));
+  } catch {
+    installed = undefined;
+  }
+
+  if (isRecord(installed?.plugins) && Object.hasOwn(installed.plugins, LEGACY_CLAUDE_PLUGIN_ID)) {
+    notes.push(`The earlier plugin ${LEGACY_CLAUDE_PLUGIN_ID} is still installed. Remove it with \`claude plugin uninstall ${LEGACY_CLAUDE_PLUGIN_ID}\`, then \`/reload-plugins\`.`);
+  }
+
+  const legacyData = path.join(configDir, LEGACY_DATA_DIRECTORY);
+  if (lstatSync(legacyData, { throwIfNoEntry: false })) {
+    notes.push(`${legacyData} still holds files that were not moved to ${path.join(configDir, DATA_DIRECTORY)} because they differ from the ones there. Review them, then delete the old folder.`);
+  }
+
+  return notes;
+}
+
+/** Resolve the Claude project and plugin data roots used by memory tools and doctor setup. */
+export async function resolveHostContext({ workspace, data } = {}) {
+  migrateLegacyPluginData(data);
+  return resolveHostRoots({ workspace, data, label: "Claude", facts: CLAUDE_FACTS });
 }
 
 const PLUGIN_STATE_MAX_BYTES = 1024 * 1024;

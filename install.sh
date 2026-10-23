@@ -12,9 +12,11 @@
 # needs the `codex` command on your PATH. What lands where:
 #   - the plugin, through the Codex marketplace `harness-useful-skills`
 #   - the agents, in $CODEX_HOME/agents/us-*.toml
-#   - the runtime, in $CODEX_HOME/useful-skills/
-#   - the MCP server `useful_skills`, registered with `codex mcp add`
-# Restart Codex afterwards. Releases up to v0.3.12 have no Codex adapter: the installer refuses them before running
+#   - the runtime, in $CODEX_HOME/harness-useful-skills/
+#   - the MCP server `harness-useful-skills`, registered with `codex mcp add`
+#   - the model roles file $CODEX_HOME/harness-useful-skills/models.yml, which sets `model` and `model_reasoning_effort` of the agents
+# Re-running the installer also replaces an install from before the names were unified (plugin, MCP server and data
+# folder called `useful-skills`). Restart Codex afterwards. Releases up to v0.3.12 have no Codex adapter: the installer refuses them before running
 # anything, so use a newer release.
 #
 # Environment overrides:
@@ -37,7 +39,8 @@ MAX_ENTRIES=20000
 MAX_ENTRY_NAME=4096
 HOST="${HARNESS_SKILLS_HOST:-opencode}"
 # Files a release must ship for its installer to set up the chosen host, and the manifests that carry its version.
-# select_host fills them in.
+# select_host fills them in. Where a file moved when the names were unified, the entry lists the current path and the
+# earlier one joined by `|`, so a pinned earlier release still installs.
 HOST_LABEL=""
 REQUIRED_FILES=""
 VERSIONED_MANIFESTS=""
@@ -109,15 +112,30 @@ select_host() {
   case "$HOST" in
     opencode)
       HOST_LABEL="OpenCode"
-      REQUIRED_FILES="useful-skills plugins/opencode/useful-skills.js"
-      VERSIONED_MANIFESTS="package.json plugins/opencode/useful-skills/package.json"
+      REQUIRED_FILES="useful-skills plugins/opencode/harness-useful-skills.js|plugins/opencode/useful-skills.js"
+      VERSIONED_MANIFESTS="package.json plugins/opencode/harness-useful-skills/package.json|plugins/opencode/useful-skills/package.json"
       ;;
     codex)
       HOST_LABEL="Codex"
-      REQUIRED_FILES="useful-skills plugins/codex/.codex-plugin/plugin.json plugins/codex-runtime/useful-skills/codex/mcp-server.js .agents/plugins/marketplace.json"
+      REQUIRED_FILES="useful-skills plugins/codex/.codex-plugin/plugin.json plugins/codex-runtime/harness-useful-skills/codex/mcp-server.js|plugins/codex-runtime/useful-skills/codex/mcp-server.js .agents/plugins/marketplace.json"
       VERSIONED_MANIFESTS="package.json plugins/codex/.codex-plugin/plugin.json"
       ;;
   esac
+}
+
+# Prints the first of the `|`-separated paths in $1 that the release ships as a regular file, else the first path.
+first_shipped() {
+  _rest="$1|"
+  _first="${_rest%%|*}"
+  while [ -n "$_rest" ]; do
+    _one="${_rest%%|*}"
+    _rest="${_rest#*|}"
+    if [ -f "$ROOT/$_one" ] && [ ! -L "$ROOT/$_one" ]; then
+      printf '%s' "$_one"
+      return 0
+    fi
+  done
+  printf '%s' "$_first"
 }
 
 # Pairs the verbose listing $2 with the plain name list $1 and sums the entry sizes. The size column is found by
@@ -274,7 +292,8 @@ main() {
 
   # The release must ship the bundle and installer of the chosen host and be exactly the announced version. The files are
   # checked first, so a release from before the Codex adapter gets the clear message instead of a version mismatch.
-  for FILE in $REQUIRED_FILES; do
+  for ENTRY in $REQUIRED_FILES; do
+    FILE="$(first_shipped "$ENTRY")"
     if [ -L "$ROOT/$FILE" ] || [ ! -f "$ROOT/$FILE" ]; then
       if [ "$HOST" = "codex" ]; then
         fail "this release ($VERSION) has no Codex adapter (missing $FILE); use a newer release"
@@ -282,7 +301,8 @@ main() {
       fail "the release archive has no $FILE, so it cannot install the $HOST_LABEL plugin"
     fi
   done
-  for MANIFEST in $VERSIONED_MANIFESTS; do
+  for ENTRY in $VERSIONED_MANIFESTS; do
+    MANIFEST="$(first_shipped "$ENTRY")"
     FOUND="$(json_string "$ROOT/$MANIFEST" version)"
     if [ "$FOUND" != "$VERSION_NUMBER" ]; then
       # Only a plain version is echoed: the value comes from the archive and could carry terminal escapes.

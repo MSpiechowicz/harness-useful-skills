@@ -1,15 +1,19 @@
-import { mkdirSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync } from "node:fs";
 import path from "node:path";
 
+import { migrateDataDirectory, migrateDirectory } from "../data-migration.js";
 import { ensurePrivateDirectory, readOptional, writeAtomic } from "../model-roles.js";
-import { applyPlan, planFiles, recordText, sha256 } from "../opencode/install-files.js";
+import { PLUGIN_NAME } from "../names.js";
+import { applyPlan, planFiles, pruneEmptyDirectories, recordText, sha256 } from "../opencode/install-files.js";
 import { directoryProblem, isPrintable, lstatOrNull, printableText } from "../opencode/paths.js";
-import { AGENT_MARKER, readAgents } from "./agents.js";
+import { readAgents } from "./agents.js";
+import { adoptMarkedAgents } from "./apply-models.js";
 import { codexClient, marketplaceRef, releaseTagState, sameMcp, sameSource } from "./codex-cli.js";
-import { AGENT_RELS, DATA_REL, GITHUB_SOURCE, INSTALL_COMMAND, MARKETPLACE_NAME, PACKAGE_ROOT, PLUGIN_ID, RECORD_REL, RUNTIME_DIR, agentRel, atHome, codexHomeFor, mcpEntryFor, readCodexRecord } from "./paths.js";
+import { describeSelection, ensureCodexModels, readCodexModels, renderCodexAgent, selectionFor } from "./models.js";
+import { AGENT_RELS, DATA_REL, GITHUB_SOURCE, INSTALL_COMMAND, LEGACY_LAYOUT, MARKETPLACE_NAME, PACKAGE_ROOT, PLUGIN_ID, RECORD_REL, RUNTIME_DIR, agentRel, atHome, codexHomeFor, mcpEntryFor, readCodexRecord, readLegacyRecord } from "./paths.js";
 
 const PLUGIN_MANIFEST = "plugins/codex/.codex-plugin/plugin.json";
-const RUNTIME_BUNDLE = "plugins/codex-runtime/useful-skills";
+const RUNTIME_BUNDLE = `plugins/codex-runtime/${PLUGIN_NAME}`;
 const MARKETPLACE_FILE = ".agents/plugins/marketplace.json";
 const STABLE_VERSION = /^\d+\.\d+\.\d+$/;
 
@@ -35,13 +39,14 @@ function readTree(directory, prefix, files) {
 }
 
 /**
- * Read what the installer copies: the runtime bundle under `<CODEX_HOME>/useful-skills/runtime` and the seven agent
- * files under `<CODEX_HOME>/agents`. Returns `{version, files}` with CODEX_HOME-relative paths.
+ * Read what the installer copies: the runtime bundle under `<CODEX_HOME>/harness-useful-skills/runtime` and the seven
+ * agent files under `<CODEX_HOME>/agents`, with the model of each role from `roles` (the parsed models file) added
+ * to them. Returns `{version, files}` with CODEX_HOME-relative paths.
  */
-export async function readCodexBundle(packageRoot) {
+export async function readCodexBundle(packageRoot, roles = {}) {
   const manifest = readJson(path.join(packageRoot, PLUGIN_MANIFEST), "the Codex plugin manifest");
-  if (manifest?.name !== "useful-skills" || typeof manifest.version !== "string" || !STABLE_VERSION.test(manifest.version)) {
-    throw new Error(`${path.join(packageRoot, PLUGIN_MANIFEST)} must name useful-skills with a stable x.y.z version.`);
+  if (manifest?.name !== PLUGIN_NAME || typeof manifest.version !== "string" || !STABLE_VERSION.test(manifest.version)) {
+    throw new Error(`${path.join(packageRoot, PLUGIN_MANIFEST)} must name ${PLUGIN_NAME} with a stable x.y.z version.`);
   }
 
   const runtimeRoot = path.join(packageRoot, RUNTIME_BUNDLE);
@@ -52,7 +57,7 @@ export async function readCodexBundle(packageRoot) {
   const files = new Map();
   readTree(runtimeRoot, RUNTIME_DIR, files);
   for (const { role, text } of await readAgents(path.join(runtimeRoot, "codex", "agents"))) {
-    files.set(agentRel(role), Buffer.from(text));
+    files.set(agentRel(role), Buffer.from(renderCodexAgent(text, selectionFor(role, roles))));
   }
   return { version: manifest.version, files };
 }
@@ -90,18 +95,6 @@ function prepareCodexHome(home) {
   if (!statSync(resolved).isDirectory()) throw new Error(`${home} is not a directory.`);
   if (!isPrintable(resolved)) throw new Error("The Codex home directory contains control characters; use a directory without them.");
   return resolved;
-}
-
-/** The record's files, plus agent files that carry our marker but were not recorded (a lost record): those may be replaced. */
-function adoptMarkedAgents(codexHome, files) {
-  const adopted = { ...files };
-  for (const rel of AGENT_RELS) {
-    const target = atHome(codexHome, rel);
-    if (adopted[rel] !== undefined || directoryProblem(codexHome, rel) || !lstatOrNull(target)?.isFile()) continue;
-    const data = readFileSync(target);
-    if (data.toString("utf8").split("\n")[0] === AGENT_MARKER) adopted[rel] = sha256(data);
-  }
-  return adopted;
 }
 
 /**
@@ -152,13 +145,15 @@ function dataDirProblem(codexHome) {
 }
 
 /** Check, before anything is written, that the files, the marketplace and the MCP server can be installed. */
-function preflight({ codex, codexHome, bundle, previous, desired }) {
-  const owned = adoptMarkedAgents(codexHome, previous?.files ?? {});
+function preflight({ codex, codexHome, bundle, previous, legacy, desired, models }) {
+  // An install from before the rename owns its files too: unchanged ones are replaced or removed, edited ones are kept.
+  const owned = adoptMarkedAgents(codexHome, { ...legacy?.files, ...previous?.files });
   const plan = planFiles(codexHome, bundle, owned, [RECORD_REL]);
   const problems = [...plan.problems, ...unrecordedRuntime(codexHome, bundle, owned), ...dataDirProblem(codexHome)];
+  if (models.error) problems.push(`${models.configFile} cannot be used (${models.error}). Fix or move it, then run the install again.`);
 
   const live = codex.listMarketplaces().find((item) => item.name === MARKETPLACE_NAME);
-  const marketplace = planMarketplace({ live, liveRef: live ? marketplaceRef(codexHome, MARKETPLACE_NAME) : null, desired, recorded: previous?.marketplace });
+  const marketplace = planMarketplace({ live, liveRef: live ? marketplaceRef(codexHome, MARKETPLACE_NAME) : null, desired, recorded: previous?.marketplace ?? legacy?.marketplace });
   if (marketplace.problem) problems.push(marketplace.problem);
 
   const mcp = mcpEntryFor(codexHome);
@@ -168,7 +163,7 @@ function preflight({ codex, codexHome, bundle, previous, desired }) {
     problems.push(`Codex already has an MCP server named ${mcp.name} (${liveMcp.command ? [liveMcp.command, ...liveMcp.args].join(" ") : `${liveMcp.transport} transport`}) that Useful Skills did not register. Remove it with \`codex mcp remove ${mcp.name}\` if you no longer need it.`);
   }
 
-  return { plan, problems, marketplace, live, mcp, mcpCurrent };
+  return { plan, problems, marketplace, live, mcp, mcpCurrent, owned };
 }
 
 /**
@@ -226,16 +221,100 @@ function readPreviousRecord(codexHome, recordFile) {
 }
 
 /**
+ * Move the data directory of an install from before the rename to the current one, never replacing a file that differs
+ * from the one already there. Returns report lines.
+ */
+function migrateLegacyData({ codexHome, dataDir }) {
+  const legacyData = atHome(codexHome, LEGACY_LAYOUT.dataRel);
+
+  // The memory folder inside the data directory is renamed first, so the environment cache it holds is not copied.
+  migrateDataDirectory(legacyData);
+  const moved = [migrateDirectory(legacyData, dataDir), migrateDataDirectory(dataDir)];
+  return moved.flatMap((result) => result.kept).map((kept) => `Left ${kept} in place: it differs from the file at the new location. Compare them and delete the old one.`);
+}
+
+/**
+ * After the new install is in place, remove what an install from before the rename registered: its MCP server and
+ * plugin, each only while it is still what that install registered, then its record. A step that fails is reported and
+ * keeps the rest of the record for the next run. Its files were handled by the install plan. Returns report lines.
+ */
+function removeLegacyRegistrations({ client, codexHome, record }) {
+  if (!record) return [];
+
+  const lines = [];
+  const recordFile = atHome(codexHome, LEGACY_LAYOUT.recordRel);
+
+  // The marketplace now belongs to the new record, and the earlier files are gone or were reported.
+  record.files = {};
+  record.marketplace = null;
+
+  const remove = (what, run) => {
+    try {
+      run();
+      return true;
+    } catch (error) {
+      lines.push(`Could not remove ${what} (${error instanceof Error ? error.message : String(error)}). Run the installer again, or remove it yourself.`);
+      return false;
+    }
+  };
+
+  if (record.mcp) {
+    const live = client.getMcp(record.mcp.name);
+    if (!live) {
+      record.mcp = null;
+    } else if (!sameMcp(live, record.mcp)) {
+      lines.push(`Left MCP server ${record.mcp.name} alone: it is no longer what the earlier install registered.`);
+      record.mcp = null;
+    } else if (remove(`MCP server ${record.mcp.name}`, () => client.removeMcp(record.mcp.name))) {
+      lines.push(`Removed the earlier MCP server ${record.mcp.name}.`);
+      record.mcp = null;
+    }
+  }
+
+  if (record.pluginId) {
+    const installed = client.listPlugins().some((item) => item.pluginId === record.pluginId && item.installed);
+    if (!installed) {
+      record.pluginId = null;
+    } else if (remove(`plugin ${record.pluginId}`, () => client.removePlugin(record.pluginId))) {
+      lines.push(`Removed the earlier plugin ${record.pluginId}.`);
+      record.pluginId = null;
+    }
+  }
+
+  if (record.mcp === null && record.pluginId === null) {
+    rmSync(recordFile);
+    pruneEmptyDirectories(codexHome, recordFile);
+  } else {
+    writeAtomic(recordFile, recordText(record));
+  }
+
+  return lines;
+}
+
+/** Lines naming the model of each role that does not inherit, then where the models file is. */
+function modelLines(models, created) {
+  const lines = [`Model roles: ${models.configFile}${created ? " (created; every role inherits)" : ""}.`];
+  for (const rel of AGENT_RELS) {
+    const role = path.basename(rel, ".toml").slice("us-".length);
+    const selection = selectionFor(role, models.roles ?? {});
+    if (selection.model || selection.effort) lines.push(`  us-${role}: ${describeSelection(selection)}.`);
+  }
+  return lines;
+}
+
+/**
  * Install Useful Skills for Codex: copy the runtime and agents into CODEX_HOME, add the marketplace and plugin, and
  * register the memory MCP server. Refuses, before writing anything, when a target is not ours, a file we installed was
  * edited, a path is a symlink, or the marketplace or MCP name is taken. A failure later leaves a truthful record.
+ * An install from before the rename is replaced: its unmodified files, MCP server and plugin are removed and its data moved.
  * Resolves to `{message}`.
  */
 export async function installCodex({ environment = process.env, packageRoot = PACKAGE_ROOT, local = false } = {}) {
   codexClient({ environment }).version();
 
   const configuredHome = codexHomeFor(environment);
-  const bundle = await readCodexBundle(packageRoot);
+  const models = readCodexModels(configuredHome);
+  const bundle = await readCodexBundle(packageRoot, models.roles);
   const desired = desiredSource(packageRoot, bundle.version, local);
   const notes = checkReleaseTag(environment, desired);
 
@@ -243,8 +322,10 @@ export async function installCodex({ environment = process.env, packageRoot = PA
   const client = codexClient({ environment, codexHome });
   const recordFile = atHome(codexHome, RECORD_REL);
   const previous = readPreviousRecord(codexHome, recordFile);
+  const legacy = readLegacyRecord(codexHome);
+  if (legacy.problem) notes.push(`Left the earlier install alone: its record cannot be used (${legacy.problem}).`);
 
-  const checked = preflight({ codex: client, codexHome, bundle, previous, desired });
+  const checked = preflight({ codex: client, codexHome, bundle, previous, legacy: legacy.record, desired, models });
   if (checked.problems.length > 0) {
     throw new Error(printableText(`Refusing to install; nothing was changed:\n${checked.problems.map((problem) => `  ${problem}`).join("\n")}\nMove or remove these, or restore the files Useful Skills installed, then run the install again.`));
   }
@@ -257,7 +338,7 @@ export async function installCodex({ environment = process.env, packageRoot = PA
     codexHome,
     dataDir,
     files: { ...previous?.files },
-    marketplace: previous?.marketplace ?? null,
+    marketplace: previous?.marketplace ?? legacy.record?.marketplace ?? null,
     pluginId: previous?.pluginId ?? null,
     // `version` is the runtime and agents copied below; the plugin's version is recorded only once `plugin add` succeeds.
     pluginVersion: previous?.pluginVersion ?? null,
@@ -283,6 +364,8 @@ export async function installCodex({ environment = process.env, packageRoot = PA
       throw error;
     }
     saveRecord();
+    const modelsCreated = ensureCodexModels(models);
+    lines.push(...migrateLegacyData({ codexHome, dataDir }));
     ensurePrivateDirectory(dataDir);
     done.push(`${plan.writes.length + plan.unchanged.length} files in place`);
 
@@ -308,6 +391,11 @@ export async function installCodex({ environment = process.env, packageRoot = PA
     }
     record.mcp = mcp;
     saveRecord();
+    done.push("MCP server registered");
+
+    stage = "removing the earlier install";
+    lines.push(...removeLegacyRegistrations({ client, codexHome, record: legacy.record }));
+    lines.push(...modelLines(models, modelsCreated));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(printableText([

@@ -10,7 +10,7 @@ import { promisify } from "node:util";
 const execute = promisify(execFile);
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const BUNDLE = path.join(ROOT, "plugins", "opencode");
-const RUNTIME = path.join(BUNDLE, "useful-skills");
+const RUNTIME = path.join(BUNDLE, "harness-useful-skills");
 const BUILD = path.join(ROOT, "scripts", "build-opencode-plugin.js");
 // Matched against paths relative to the runtime tree.
 const FORBIDDEN = [
@@ -69,13 +69,13 @@ test("the committed OpenCode plugin bundle matches its generator", async () => {
 
 test("the bundle excludes other hosts, the launcher, install-time modules, and test files", async () => {
   const files = await bundleFiles();
-  const inside = files.filter(file => file.startsWith("useful-skills/")).map(file => file.slice("useful-skills/".length));
-  assert.deepEqual(files.filter(file => !file.startsWith("useful-skills/")).sort(), ["README.md", "useful-skills.js"]);
+  const inside = files.filter(file => file.startsWith("harness-useful-skills/")).map(file => file.slice("harness-useful-skills/".length));
+  assert.deepEqual(files.filter(file => !file.startsWith("harness-useful-skills/")).sort(), ["README.md", "harness-useful-skills.js"]);
   assert.deepEqual(inside.filter(file => FORBIDDEN.some(pattern => pattern.test(file))), []);
 });
 
 test("the entry re-exports the plugin definition from the runtime tree", async () => {
-  assert.equal(await readFile(path.join(BUNDLE, "useful-skills.js"), "utf8"), 'export { default } from "./useful-skills/opencode/entry.js";\n');
+  assert.equal(await readFile(path.join(BUNDLE, "harness-useful-skills.js"), "utf8"), 'export { default } from "./harness-useful-skills/opencode/entry.js";\n');
 });
 
 test("the runtime manifest carries the package version", async () => {
@@ -115,7 +115,7 @@ test("every relative import and URL in the bundled modules resolves inside the b
 });
 
 test("the entry module carries one definition both OpenCode plugin APIs accept when imported under Node", async () => {
-  const entry = await import(pathToFileURL(path.join(BUNDLE, "useful-skills.js")).href);
+  const entry = await import(pathToFileURL(path.join(BUNDLE, "harness-useful-skills.js")).href);
   assert.deepEqual(Object.keys(entry), ["default"]);
   assert.deepEqual(Object.keys(entry.default).sort(), ["id", "server", "setup"]);
   assert.equal(typeof entry.default.id, "string");

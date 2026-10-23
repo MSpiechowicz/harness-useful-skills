@@ -1,6 +1,6 @@
 # Read-only security reviewer brief
 
-Load `/useful-skills:us-write-concisely` before responding. Use only native read-only inspection and bounded, safe local reproduction. Do not edit files, install dependencies, start shared services, publish anything, access production, or launch another worker.
+Load `/harness-useful-skills:us-write-concisely` before responding. Use only native read-only inspection and bounded, safe local reproduction. Do not edit files, install dependencies, start shared services, publish anything, access production, or launch another worker.
 
 - **Objective:** [Audit the approved implementation/revision against its acceptance criteria and relevant trust boundaries.]
 - **Evidence:** [Plan, changed paths, verification results, repository guidance, and relevant source paths.]

@@ -1,8 +1,8 @@
 import { createWorkflowContext } from "../workflow-context.js";
 
 const claude = createWorkflowContext({
-  skill: name => `useful-skills:${name}`,
-  ignoreInvocation: "An attested native invocation of `useful-skills:us-ignore-workflow`",
+  skill: name => `harness-useful-skills:${name}`,
+  ignoreInvocation: "An attested native invocation of `harness-useful-skills:us-ignore-workflow`",
 });
 
 export function fastLaneContext() {

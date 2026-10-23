@@ -1,16 +1,22 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { rmSync } from "node:fs";
+import { migrateDataDirectory, migrateDirectory } from "../data-migration.js";
+import { LEGACY_MCP_SERVER_NAME } from "../legacy-names.js";
 import { ensurePrivateDirectory, readOptional, writeAtomic } from "../model-roles.js";
+import { DATA_DIRECTORY, PLUGIN_NAME } from "../names.js";
 import { MCP_NAME, chooseConfigFile, mcpEntryFor, mcpSnippet, planMcpUpsert, readConfigFile, writeConfigAtomic } from "./config-file.js";
-import { applyPlan, checkedRecordPath, planFiles, readBundle, recordText, resolveScopeRoot } from "./install-files.js";
+import { applyPlan, checkedRecordPath, planFiles, pruneEmptyDirectories, readBundle, recordText, resolveScopeRoot } from "./install-files.js";
+import { readLegacyRecord } from "./legacy.js";
 import { syncOpenCodeAgents } from "./models.js";
-import { defaultDataDir, isPrintable, opencodeConfigDir, printableText, readInstallRecord, scopeRootFor } from "./paths.js";
+import { defaultDataDir, isPrintable, legacyDataDir, legacyInstallRecordPath, opencodeConfigDir, printableText, readInstallRecord, scopeRootFor } from "./paths.js";
+import { removeMcpEntry } from "./uninstall.js";
 
 const DEFAULT_BUNDLE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "plugins", "opencode");
 
 const sortedFiles = (files) => Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b)));
 
-/** Add or refresh `mcp.useful_skills`, reporting rather than guessing when the config cannot be edited safely. */
+/** Add or refresh `mcp.harness-useful-skills`, reporting rather than guessing when the config cannot be edited safely. */
 function editConfig({ file, warning }, entry) {
   const lines = warning ? [`Warning: ${warning}`] : [];
   const refused = (reason) => ({
@@ -71,6 +77,37 @@ function agentLines(sync) {
 }
 
 /**
+ * Carry an install from before the rename over to the current names: move its data and settings (never a file that
+ * differs from the one already in the new place), drop its MCP entry and its record. Its files were handled by the
+ * install plan, which treats them as owned. Returns report lines.
+ */
+function migrateLegacyInstall({ scopeRoot, legacy, environment, dataDir }) {
+  const lines = legacy.problem ? [`Left the earlier install alone: its record cannot be used (${legacy.problem}).`] : [];
+
+  // The memory folder inside the data directory is renamed first, so the environment cache it holds is not copied.
+  const legacyData = legacy.record?.dataDir ?? legacyDataDir(environment);
+  migrateDataDirectory(legacyData);
+  const moved = [
+    migrateDirectory(legacyData, dataDir),
+    migrateDataDirectory(dataDir),
+    migrateDataDirectory(opencodeConfigDir(environment)),
+    migrateDataDirectory(scopeRoot),
+  ];
+  for (const kept of moved.flatMap((result) => result.kept)) {
+    lines.push(`Left ${kept} in place: it differs from the file at the new location. Compare them and delete the old one.`);
+  }
+
+  if (legacy.record) {
+    lines.push(...removeMcpEntry(scopeRoot, legacy.record, { name: LEGACY_MCP_SERVER_NAME, keepConfigFile: true }));
+    const recordFile = legacyInstallRecordPath(scopeRoot);
+    rmSync(recordFile);
+    pruneEmptyDirectories(scopeRoot, recordFile);
+  }
+
+  return lines;
+}
+
+/**
  * Install the OpenCode plugin bundle into a scope and register the memory MCP server.
  * Throws, before writing anything, when a target exists that Useful Skills does not own, an owned file was edited,
  * or a path component is a symlink. A config edit that cannot be made safely is reported as `actionRequired`.
@@ -85,7 +122,10 @@ export function installOpenCode({ scope = "user", cwd = process.cwd(), environme
   const recordFile = checkedRecordPath(scopeRoot);
 
   const previous = readInstallRecord(recordFile);
-  const plan = planFiles(scopeRoot, bundle, previous?.files ?? {});
+  // An install from before the rename owns its files too: unchanged ones are replaced or removed, edited ones are kept.
+  const legacy = readLegacyRecord(scopeRoot);
+  const owned = { ...legacy.record?.files, ...previous?.files };
+  const plan = planFiles(scopeRoot, bundle, owned);
   if (plan.problems.length > 0) {
     throw new Error(printableText(`Refusing to install; nothing was changed:\n${plan.problems.map((problem) => `  ${problem}`).join("\n")}\nMove or remove these, or restore the files Useful Skills installed, then run the install again.`));
   }
@@ -93,9 +133,10 @@ export function installOpenCode({ scope = "user", cwd = process.cwd(), environme
   const entry = mcpEntryFor(scopeRoot);
   const dataDir = defaultDataDir(environment);
   const chosen = chooseConfigFile(scopeRoot);
-  const files = { ...previous?.files };
+  const files = { ...owned };
   // Whether this installer created the config file, so uninstall may delete it again once only `$schema` is left.
-  let configCreated = previous?.configCreated === true && previous.configFile === chosen.file;
+  const created = previous ?? legacy.record;
+  let configCreated = created?.configCreated === true && created.configFile === chosen.file;
   const saveRecord = () => {
     const text = recordText({ schema: 1, version: bundle.version, scope, scopeRoot, dataDir, configFile: chosen.file, mcpEntry: entry, configCreated, files: sortedFiles(files) });
     if (readOptional(recordFile) !== text) writeAtomic(recordFile, text);
@@ -111,12 +152,14 @@ export function installOpenCode({ scope = "user", cwd = process.cwd(), environme
     }
     throw error;
   }
-  ensurePrivateDirectory(dataDir);
-  // Workflow settings always live in the user config dir, even for a project install; create it so they stay writable.
-  ensurePrivateDirectory(path.join(opencodeConfigDir(environment), "useful-skills"));
   saveRecord();
 
-  const sync = syncOpenCodeAgents({ scopeRoot, templatesDir: path.join(scopeRoot, "plugins", "useful-skills", "opencode", "agents") });
+  const migration = migrateLegacyInstall({ scopeRoot, legacy, environment, dataDir });
+  ensurePrivateDirectory(dataDir);
+  // Workflow settings always live in the user config dir, even for a project install; create it so they stay writable.
+  ensurePrivateDirectory(path.join(opencodeConfigDir(environment), DATA_DIRECTORY));
+
+  const sync = syncOpenCodeAgents({ scopeRoot, templatesDir: path.join(scopeRoot, "plugins", PLUGIN_NAME, "opencode", "agents") });
   const config = editConfig(chosen, entry);
   if (config.created) {
     configCreated = true;
@@ -129,6 +172,7 @@ export function installOpenCode({ scope = "user", cwd = process.cwd(), environme
       ? `Useful Skills ${bundle.version} is already installed for OpenCode (${scope} scope) in ${scopeRoot}; nothing to update.`
       : `Installed Useful Skills ${bundle.version} for OpenCode (${scope} scope) in ${scopeRoot}: ${plan.writes.length} files written, ${plan.unchanged.length} unchanged, ${plan.stale.length} stale removed.`,
     ...[...plan.kept].map((note) => `Left a stale file from an earlier install in place: ${note}`),
+    ...migration,
     ...agentLines(sync),
     ...config.lines,
     `Data directory: ${dataDir}`,

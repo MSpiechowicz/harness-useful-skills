@@ -18,11 +18,11 @@ function sandbox(t) {
 
 test("the MCP entry points at the installed server with a long tool timeout", () => {
   const built = mcpEntryFor("/scope");
-  assert.deepEqual(built.command, ["node", "/scope/plugins/useful-skills/opencode/mcp-server.js"]);
+  assert.deepEqual(built.command, ["node", "/scope/plugins/harness-useful-skills/opencode/mcp-server.js"]);
   assert.equal(built.type, "local");
   assert.equal(built.enabled, true);
   assert.equal(built.timeout, 600000);
-  assert.deepEqual(JSON.parse(mcpSnippet(built)), { mcp: { useful_skills: built } });
+  assert.deepEqual(JSON.parse(mcpSnippet(built)), { mcp: { "harness-useful-skills": built } });
 });
 
 test("opencode.json wins, then opencode.jsonc, then a new opencode.json", (t) => {
@@ -40,7 +40,7 @@ test("opencode.json wins, then opencode.jsonc, then a new opencode.json", (t) =>
 test("the config choice warns when the other file already mentions the server", (t) => {
   const dir = sandbox(t);
   writeFileSync(path.join(dir, "opencode.json"), "{}");
-  writeFileSync(path.join(dir, "opencode.jsonc"), '{ "mcp": { "useful_skills": {} } }');
+  writeFileSync(path.join(dir, "opencode.jsonc"), '{ "mcp": { "harness-useful-skills": {} } }');
   const { file, warning } = chooseConfigFile(dir);
   assert.equal(file, path.join(dir, "opencode.json"));
   assert.match(warning, /opencode\.jsonc/);
@@ -49,7 +49,7 @@ test("the config choice warns when the other file already mentions the server", 
 test("upsert creates a config for a missing file", () => {
   const plan = planMcpUpsert(undefined, entry);
   assert.equal(plan.action, "create");
-  assert.deepEqual(JSON.parse(plan.text).mcp, { useful_skills: entry });
+  assert.deepEqual(JSON.parse(plan.text).mcp, { "harness-useful-skills": entry });
   assert.ok(plan.text.endsWith("}\n"));
 });
 
@@ -62,17 +62,17 @@ test("upsert keeps every other key and formats with two spaces", () => {
   assert.equal(parsed.model, "a/b");
   assert.equal(parsed.theme, "dark");
   assert.deepEqual(parsed.mcp.other, { type: "remote", url: "https://x" });
-  assert.deepEqual(parsed.mcp.useful_skills, entry);
+  assert.deepEqual(parsed.mcp["harness-useful-skills"], entry);
   assert.match(plan.text, /^\{\n {2}"model"/);
 });
 
 test("upsert reports a different existing entry and leaves a matching one alone", () => {
-  const different = JSON.stringify({ mcp: { useful_skills: { type: "remote", url: "https://mine" } } });
+  const different = JSON.stringify({ mcp: { "harness-useful-skills": { type: "remote", url: "https://mine" } } });
   const replaced = planMcpUpsert(different, entry);
   assert.equal(replaced.action, "update");
   assert.deepEqual(replaced.previous, { type: "remote", url: "https://mine" });
 
-  const matching = planMcpUpsert(JSON.stringify({ mcp: { useful_skills: entry } }), entry);
+  const matching = planMcpUpsert(JSON.stringify({ mcp: { "harness-useful-skills": entry } }), entry);
   assert.equal(matching.action, "unchanged");
 });
 
@@ -95,18 +95,18 @@ test("upsert refuses configs it cannot edit without guessing", () => {
 });
 
 test("remove deletes only an entry equal to ours and drops an emptied mcp object", () => {
-  const ours = JSON.stringify({ model: "a/b", mcp: { useful_skills: entry, other: { type: "remote" } } });
+  const ours = JSON.stringify({ model: "a/b", mcp: { "harness-useful-skills": entry, other: { type: "remote" } } });
   const removed = planMcpRemove(ours, entry);
   assert.equal(removed.action, "remove");
   assert.deepEqual(JSON.parse(removed.text), { model: "a/b", mcp: { other: { type: "remote" } } });
 
-  const only = planMcpRemove(JSON.stringify({ model: "a/b", mcp: { useful_skills: entry } }), entry);
+  const only = planMcpRemove(JSON.stringify({ model: "a/b", mcp: { "harness-useful-skills": entry } }), entry);
   assert.deepEqual(JSON.parse(only.text), { model: "a/b" });
 });
 
 test("remove keeps a changed entry, ignores an absent one, and refuses an unparsable file", () => {
   const changed = { ...entry, timeout: 1 };
-  const kept = planMcpRemove(JSON.stringify({ mcp: { useful_skills: changed } }), entry);
+  const kept = planMcpRemove(JSON.stringify({ mcp: { "harness-useful-skills": changed } }), entry);
   assert.equal(kept.action, "keep");
   assert.deepEqual(kept.current, changed);
 

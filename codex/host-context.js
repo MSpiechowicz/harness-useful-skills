@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { errorMessage } from "../command-core.js";
 import { resolveHostRoots } from "../host-roots.js";
+import { DATA_DIRECTORY } from "../names.js";
 
 const CODEX_FACTS = Object.freeze({ label: "Codex", backend: "codex-local-facts", directory: "codex-facts" });
 const UNRESOLVED = "Codex project root or Useful Skills data directory cannot be resolved; run `./useful-skills install --host codex` (or the install script with HARNESS_SKILLS_HOST=codex) again.";
@@ -14,7 +15,7 @@ function homeDirectory(environment) {
 
 /**
  * The Useful Skills data directory for Codex: an absolute USEFUL_SKILLS_DATA (set by `codex mcp add --env`),
- * else `$HOME/.codex/useful-skills/data`. Codex does not pass CODEX_HOME to MCP servers, so it is not consulted.
+ * else `$HOME/.codex/harness-useful-skills/data`. Codex does not pass CODEX_HOME to MCP servers, so it is not consulted.
  * Returns the path, or `{ reason }` for a relative override.
  */
 export function resolveCodexDataDir(environment = process.env) {
@@ -23,7 +24,7 @@ export function resolveCodexDataDir(environment = process.env) {
     return path.isAbsolute(override) ? override : { reason: "USEFUL_SKILLS_DATA must be an absolute path." };
   }
 
-  return path.join(homeDirectory(environment), ".codex", "useful-skills", "data");
+  return path.join(homeDirectory(environment), ".codex", DATA_DIRECTORY, "data");
 }
 
 /** Resolve the Codex project and private data roots to `{ cwd, agentDir, memory }`, or throw. */

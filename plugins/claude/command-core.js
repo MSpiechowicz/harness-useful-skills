@@ -15,6 +15,8 @@
  * - `resolveDoctorHost({ environment, workspace, packageRoot })`: resolves to `{ host }`, the
  *   `{ cwd, agentDir, memory }` doctor setup needs, or `{ reason }` when memory cannot be located safely.
  * - `runDoctor(options)`: doctor memory setup, normally doctor-setup.js `runDoctorSetup`.
+ * - Optional `legacyNotes({ environment })`: lines naming what an earlier (pre-rename) install left behind, which
+ *   `doctor` appends to its report.
  * - Exactly one of `updateGuidance` (fixed text for `update check|install`) or
  *   `update(action, context)` (a handler for action "check" or "install").
  * - Exactly one of `graphGuidance` (fixed text for any `graph ...` command) or
@@ -253,12 +255,14 @@ export function createCommandRunner(host) {
       host.readWorkflow({ environment, cwd: projectRoot }),
     ]);
     const settings = doctorSettings(snapshot);
+    const leftovers = host.legacyNotes ? host.legacyNotes({ environment }) : [];
+    const withLeftovers = report => (leftovers.length > 0 ? `${report}\n${["Leftover from an earlier install", ...leftovers.map(note => `  ${printable(note)}`)].join("\n")}` : report);
 
     // Every host adapter applies the command guard to shell tools.
     const { host: doctorHost, reason } = await host.resolveDoctorHost({ environment, workspace: projectRoot, packageRoot });
     if (!doctorHost) {
       const unavailable = printable(redactText(reason));
-      return commandResult(formatDoctor({ core, safety: true, setup: { mode, settings, steps: [], ok: false, unavailable } }), 1);
+      return commandResult(withLeftovers(formatDoctor({ core, safety: true, setup: { mode, settings, steps: [], ok: false, unavailable } })), 1);
     }
 
     const controller = new AbortController();
@@ -277,7 +281,7 @@ export function createCommandRunner(host) {
     }));
     const memory = doctorMemory(outcome.memory, doctorHost.agentDir);
     const report = formatDoctor({ core, safety: true, memory, setup: { mode, settings, steps, ok: outcome.ok, timedOut: outcome.timedOut } });
-    return commandResult(report, outcome.ok ? 0 : 1);
+    return commandResult(withLeftovers(report), outcome.ok ? 0 : 1);
   }
 
   async function catalog(tokens) {

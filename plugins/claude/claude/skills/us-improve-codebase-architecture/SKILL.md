@@ -5,7 +5,7 @@ description: Use when the user asks to "improve the architecture", "find refacto
 
 # Improve codebase architecture
 
-Load `/useful-skills:us-write-concisely` before preparing findings. This skill begins as a read-only architecture investigation. It surfaces candidates and does not authorize refactoring, code changes, documentation changes, publication, or a new workflow run.
+Load `/harness-useful-skills:us-write-concisely` before preparing findings. This skill begins as a read-only architecture investigation. It surfaces candidates and does not authorize refactoring, code changes, documentation changes, publication, or a new workflow run.
 
 ## Inputs and scope
 
@@ -44,13 +44,13 @@ End with one top recommendation and why it has the best evidence-to-risk ratio. 
 
 ## Authorization and selected change
 
-A report, a top recommendation, and a user's interest in a candidate are not by themselves authorization to edit. Ask which candidate, if any, the user wants to explore and whether they authorize a bounded change. For a selected, authorized candidate, use enabled owned stages directly rather than recursively starting `/useful-skills:us-run-workflow`:
+A report, a top recommendation, and a user's interest in a candidate are not by themselves authorization to edit. Ask which candidate, if any, the user wants to explore and whether they authorize a bounded change. For a selected, authorized candidate, use enabled owned stages directly rather than recursively starting `/harness-useful-skills:us-run-workflow`:
 
-1. Inspect current source, callers, tests, and conventions. When automatic `research` is enabled, load `/useful-skills:us-research`; enabled backend/graph memory actions during inspection follow `/useful-skills:us-manage-memory` independently.
-2. Load `/useful-skills:us-grill-me` and ask before planning whenever the selected candidate leaves a user-owned choice; do not invent questions an evidence-backed selection already settles.
-3. When automatic `plan` is enabled, load `/useful-skills:us-plan` to produce one actionable plan and obtain explicit approval before edits. Otherwise a bounded user request can authorize implementation without a mandatory planner or separate plan approval; preserve any independent approval requirement.
-4. Once authorized, load `/useful-skills:us-implement`. Preserve established contracts and consumer behavior; migrate affected callers together, maintain meaningful tests, and avoid unrelated cleanup.
-5. Obtain fresh correctness review through `/useful-skills:us-review` only if `review` is enabled and security review through `/useful-skills:us-check-security` only if `security_review` is enabled. After verified work and enabled reviews, use `/useful-skills:us-manage-memory` only for enabled backend/graph actions.
+1. Inspect current source, callers, tests, and conventions. When automatic `research` is enabled, load `/harness-useful-skills:us-research`; enabled backend/graph memory actions during inspection follow `/harness-useful-skills:us-manage-memory` independently.
+2. Load `/harness-useful-skills:us-grill-me` and ask before planning whenever the selected candidate leaves a user-owned choice; do not invent questions an evidence-backed selection already settles.
+3. When automatic `plan` is enabled, load `/harness-useful-skills:us-plan` to produce one actionable plan and obtain explicit approval before edits. Otherwise a bounded user request can authorize implementation without a mandatory planner or separate plan approval; preserve any independent approval requirement.
+4. Once authorized, load `/harness-useful-skills:us-implement`. Preserve established contracts and consumer behavior; migrate affected callers together, maintain meaningful tests, and avoid unrelated cleanup.
+5. Obtain fresh correctness review through `/harness-useful-skills:us-review` only if `review` is enabled and security review through `/harness-useful-skills:us-check-security` only if `security_review` is enabled. After verified work and enabled reviews, use `/harness-useful-skills:us-manage-memory` only for enabled backend/graph actions.
 
 The selected change remains bounded by its authorization. A material interface, behavior, dependency, or scope change returns to the user (and to planning when enabled); it never becomes an architectural workaround. Do not automatically edit domain documents, `CONTEXT.md`, ADRs, or any architecture record. Propose such an edit separately only when the user authorizes it.
 

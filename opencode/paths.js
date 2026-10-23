@@ -7,6 +7,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { LEGACY_OPENCODE_RUNTIME } from "../legacy-names.js";
+import { DATA_DIRECTORY, PLUGIN_NAME } from "../names.js";
 import { isPlainRelativePath } from "../path-boundary.js";
 
 /** The runtime tree this module runs from: the parent of `opencode/` (the checkout root, or an installed runtime tree). */
@@ -37,7 +39,7 @@ export function opencodeConfigDir(environment = process.env) {
 }
 
 export function defaultDataDir(environment = process.env) {
-  return path.join(xdgBase(environment, "XDG_DATA_HOME", path.join(".local", "share")), "opencode", "useful-skills");
+  return path.join(xdgBase(environment, "XDG_DATA_HOME", path.join(".local", "share")), "opencode", DATA_DIRECTORY);
 }
 
 /** The install root for a scope, without resolving links or creating anything. */
@@ -54,7 +56,17 @@ export function scopeRootFor({ scope = "user", cwd = process.cwd(), environment 
 }
 
 export function installRecordPath(scopeRoot) {
-  return path.join(scopeRoot, "plugins", "useful-skills", INSTALL_RECORD);
+  return path.join(scopeRoot, "plugins", PLUGIN_NAME, INSTALL_RECORD);
+}
+
+/** The install record the plugin wrote under its earlier name, which an install or uninstall still has to clean up. */
+export function legacyInstallRecordPath(scopeRoot) {
+  return path.join(scopeRoot, "plugins", LEGACY_OPENCODE_RUNTIME, INSTALL_RECORD);
+}
+
+/** The data directory the plugin used under its earlier name (`defaultDataDir` for the current one). */
+export function legacyDataDir(environment = process.env) {
+  return path.join(path.dirname(defaultDataDir(environment)), LEGACY_OPENCODE_RUNTIME);
 }
 
 /**
@@ -188,7 +200,7 @@ export function readInstallRecord(file) {
 }
 
 /**
- * The install that owns the runtime tree at `runtimeRoot` (`<scopeRoot>/plugins/useful-skills`), or null when
+ * The install that owns the runtime tree at `runtimeRoot` (`<scopeRoot>/plugins/harness-useful-skills`), or null when
  * this runtime is not an installed tree (such as a checkout) or has no record. Throws on an untrustworthy record.
  */
 export function runtimeInstall(runtimeRoot = RUNTIME_ROOT) {
@@ -200,7 +212,7 @@ export function runtimeInstall(runtimeRoot = RUNTIME_ROOT) {
   }
 
   const pluginsDir = path.dirname(root);
-  if (path.basename(root) !== "useful-skills" || path.basename(pluginsDir) !== "plugins") {
+  if (path.basename(root) !== PLUGIN_NAME || path.basename(pluginsDir) !== "plugins") {
     return null;
   }
 
@@ -252,7 +264,7 @@ function packageVersion(file) {
     return undefined;
   }
 
-  return isRecord(manifest) && manifest.name === "useful-skills-opencode" && typeof manifest.version === "string" ? manifest.version : undefined;
+  return isRecord(manifest) && manifest.name === `${PLUGIN_NAME}-opencode` && typeof manifest.version === "string" ? manifest.version : undefined;
 }
 
 /**

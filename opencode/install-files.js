@@ -2,10 +2,11 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, rmdirSync } from "node:fs";
 import path from "node:path";
 import { ROLE_AGENTS, writeAtomic } from "../model-roles.js";
+import { DATA_DIRECTORY, PLUGIN_NAME } from "../names.js";
 import { INSTALL_RECORD, directoryProblem, installRecordPath, lstatOrNull, scopeRootFor, toAbsolute, writeTargetProblem } from "./paths.js";
 
-const ENTRY_FILE = "useful-skills.js";
-const RUNTIME_DIRECTORY = "useful-skills";
+const ENTRY_FILE = `${PLUGIN_NAME}.js`;
+const RUNTIME_DIRECTORY = PLUGIN_NAME;
 const STABLE_VERSION = /^\d+\.\d+\.\d+$/;
 /** Runtime-tree folders that OpenCode only discovers from the scope root, so they are installed there too. */
 const DISCOVERED = Object.freeze([["opencode/skills", "skills"], ["opencode/commands", "commands"]]);
@@ -108,7 +109,7 @@ export function leftNote(scopeRoot, rel, { state, detail }) {
 }
 
 /** OpenCode's generated agents and models file: the role sync writes them, so they must not be symlinks either. */
-const openCodeGuarded = (scopeRoot) => [...agentFiles(scopeRoot), path.join(scopeRoot, "useful-skills", "models.yml")].map((target) => path.relative(scopeRoot, target).split(path.sep).join("/"));
+const openCodeGuarded = (scopeRoot) => [...agentFiles(scopeRoot), path.join(scopeRoot, DATA_DIRECTORY, "models.yml")].map((target) => path.relative(scopeRoot, target).split(path.sep).join("/"));
 
 /**
  * Decide, before touching anything, what installing `bundle` over a previous install (`previous`: rel -> sha256) does.

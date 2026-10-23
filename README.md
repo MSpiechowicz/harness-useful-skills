@@ -38,6 +38,31 @@ These commands and `./useful-skills install` below require a published release o
 
 Restart OMP after installation or update. Ordinary startup adds discovery and, when enabled for the current repository in the active profile, narrowly scoped session-local workflow-stage guidance. Use `--scope project` from the project directory for a project installation, or prefix both commands with `omp --profile NAME` for an isolated profile. Installation scope is separate from the repository-local workflow master and six profile-wide stage preferences. The marketplace and plugin are both named `harness-useful-skills`; the OMP plugin ID is `harness-useful-skills@harness-useful-skills`. OMP does not import this plugin's Claude Code MCP server: its manifest declares empty `mcpServers`. Claude Code loads its own separate MCP tools when installed there.
 
+### Upgrading from 0.3.x: one name everywhere
+
+Releases after 0.3.13 (a breaking change) give every host the same name, `harness-useful-skills`. Install it as described below on top of an older install. The old names stop working, so update anything that mentions them (permission rules, prompts, scripts):
+
+| What | Before | Now |
+| --- | --- | --- |
+| Claude marketplace and plugin ID | `useful-skills@useful-skills-local` | `harness-useful-skills@harness-useful-skills` |
+| Codex plugin ID | `useful-skills@harness-useful-skills` | `harness-useful-skills@harness-useful-skills` |
+| MCP server (Claude, OpenCode, Codex) | `useful_skills` | `harness-useful-skills` |
+| Claude tools | `mcp__plugin_useful-skills_useful_skills__*` | `mcp__plugin_harness-useful-skills_harness-useful-skills__*` |
+| OpenCode tools | `useful_skills_memory_status` and so on | `harness-useful-skills_memory_status` and so on |
+| Claude skills and agents | `/useful-skills:us-*`, `useful-skills:planner` | `/harness-useful-skills:us-*`, `harness-useful-skills:planner` |
+| Claude data and settings | `~/.claude/useful-skills/` | `~/.claude/harness-useful-skills/` |
+| Generated Claude agents | `~/.claude/agents/useful-skills-*.md` | `~/.claude/agents/harness-useful-skills-*.md` |
+| OpenCode | `plugins/useful-skills.js`, `plugins/useful-skills/`, `useful-skills/models.yml` | `plugins/harness-useful-skills.js`, `plugins/harness-useful-skills/`, `harness-useful-skills/models.yml` |
+| Codex | `$CODEX_HOME/useful-skills/` | `$CODEX_HOME/harness-useful-skills/` |
+
+The role agents `us-*`, the skill names `us-*`, the `/useful-skills` command, and the `./useful-skills` script keep their names. The old files are cleaned up only when they are safe to remove:
+
+- **OpenCode and Codex:** re-run the installer (`install.sh`, `install.ps1`, or `./useful-skills install --host ...`). It removes the old plugin files, the `useful_skills` MCP entry and (Codex) the old plugin only while they are still what the old install wrote, keeps any file you edited and says so, and moves the data folders to the new names. Nothing is lost: a file is deleted from the old place only after an identical copy exists in the new one, and a `models.yml` you edited in both places stays in both. `uninstall` removes both the old and the new names. `doctor --host ...` reports whatever is left of an old install. The in-app `update install` of an old OpenCode runtime cannot install this release (the release no longer ships the old file names): run the install script once instead.
+- **Claude Code:** install the new plugin (`claude plugin install harness-useful-skills@harness-useful-skills`) and remove the old one (`claude plugin uninstall useful-skills@useful-skills-local`), because Claude keeps them as two separate plugins and both would load. On its first session the new plugin moves `~/.claude/useful-skills/` (role models, saved settings) to `~/.claude/harness-useful-skills/`, replaces the generated agents `~/.claude/agents/useful-skills-*.md` with `harness-useful-skills-*.md` (only files Harness Skills generated), and copies the saved memory out of the old plugin's data folder. `/useful-skills doctor` lists a still-installed old plugin.
+- **OMP:** the plugin ID did not change. The first session moves `<agentDir>/useful-skills/` (workflow settings, saved memory) to `<agentDir>/harness-useful-skills/`.
+
+The downloaded Graphify environment (`dependencies/`) is not moved, because it holds absolute paths. It is installed again the next time a build needs it.
+
 ### Remove or migrate an OMP installation
 
 Uninstall each historic ID that is installed in the relevant scope; check `omp plugin list --json` if unsure. These commands remove installed plugins, not their marketplace registration:
@@ -65,19 +90,19 @@ The Claude Code adapter requires Node.js **22+** and a marketplace installation.
 
 ```bash
 claude plugin marketplace add /absolute/path/to/harness-useful-skills --scope user
-claude plugin install useful-skills@useful-skills-local --scope user
+claude plugin install harness-useful-skills@harness-useful-skills --scope user
 ```
 
 Or add the same repository as a GitHub marketplace:
 
 ```bash
 claude plugin marketplace add MSpiechowicz/harness-useful-skills
-claude plugin install useful-skills@useful-skills-local --scope user
+claude plugin install harness-useful-skills@harness-useful-skills --scope user
 ```
 
-The Claude plugin ID remains `useful-skills@useful-skills-local` in either case. Install through the marketplace, **not** `claude --plugin-dir .`: that loads the repository-root OMP `skills/` instead of the marketplace's selected Claude skills. Restart Claude Code after installation. The OMP installation, commands, and profile behavior above remain unchanged.
+The Claude plugin ID is `harness-useful-skills@harness-useful-skills` in either case. Install through the marketplace, **not** `claude --plugin-dir .`: that loads the repository-root OMP `skills/` instead of the marketplace's selected Claude skills. Restart Claude Code after installation. The OMP installation, commands, and profile behavior above remain unchanged.
 
-Claude exposes 21 namespaced skills (for example, `/useful-skills:us-run-workflow`) and seven native agents: `planner`, `scout`, `frontend`, `backend`, `general-purpose`, `reviewer`, and `security-reviewer`. All declare `model: inherit`; per-role models come from a Claude-owned config file instead (see [Claude Code model roles](#claude-code-model-roles)). Permissions and stronger host rules remain authoritative. Plugin `userConfig` has seven default-`true` booleans: `workflow`, `research`, `plan`, `review`, `security_review`, `backend_memory`, and `graphify_memory`. Configure them in Claude Code's `/plugin` configure flow or at install time with repeatable `--config key=false` flags (for example, `--config workflow=false`). Disabling `workflow` suppresses automatic stages without changing the other saved values. A **direct** `/useful-skills:us-ignore-workflow` invocation bypasses package-mandatory stages for one request only; quoted or copied text is not an opt-out. With a recent Claude Code that supports mods, `/useful-skills` is also available: without arguments it opens a menu (**Settings**, **Status**, **Browse**, **Help**); with arguments it runs the commands in [Management](#management). Saved settings mirror OMP's layout under the Claude config directory (`$CLAUDE_CONFIG_DIR` or `~/.claude`): the per-repository workflow master is `useful-skills/workflow-settings/repositories/<sha256(scopeRoot)>/workflow.json` (same repository scope rules as OMP) and the six profile-wide stage switches are `useful-skills/workflow-settings/<stage>.json`, all private. For each setting a saved file wins, then the `/plugin` option, then enabled; an unreadable or unsafe saved file makes that setting unknown with no fallback. `/plugin` options remain fallbacks, and the only control on Claude Code versions without mods.
+Claude exposes 21 namespaced skills (for example, `/harness-useful-skills:us-run-workflow`) and seven native agents: `planner`, `scout`, `frontend`, `backend`, `general-purpose`, `reviewer`, and `security-reviewer`. All declare `model: inherit`; per-role models come from a Claude-owned config file instead (see [Claude Code model roles](#claude-code-model-roles)). Permissions and stronger host rules remain authoritative. Plugin `userConfig` has seven default-`true` booleans: `workflow`, `research`, `plan`, `review`, `security_review`, `backend_memory`, and `graphify_memory`. Configure them in Claude Code's `/plugin` configure flow or at install time with repeatable `--config key=false` flags (for example, `--config workflow=false`). Disabling `workflow` suppresses automatic stages without changing the other saved values. A **direct** `/harness-useful-skills:us-ignore-workflow` invocation bypasses package-mandatory stages for one request only; quoted or copied text is not an opt-out. With a recent Claude Code that supports mods, `/useful-skills` is also available: without arguments it opens a menu (**Settings**, **Status**, **Browse**, **Help**); with arguments it runs the commands in [Management](#management). Saved settings mirror OMP's layout under the Claude config directory (`$CLAUDE_CONFIG_DIR` or `~/.claude`): the per-repository workflow master is `useful-skills/workflow-settings/repositories/<sha256(scopeRoot)>/workflow.json` (same repository scope rules as OMP) and the six profile-wide stage switches are `useful-skills/workflow-settings/<stage>.json`, all private. For each setting a saved file wins, then the `/plugin` option, then enabled; an unreadable or unsafe saved file makes that setting unknown with no fallback. `/plugin` options remain fallbacks, and the only control on Claude Code versions without mods.
 
 The Claude plugin adds a **separate** local stdio MCP server with five tools: `memory_status`, `memory_search`, `memory_save`, `graph_build`, and `graph_query`. Facts are project-scoped private files under Claude plugin data, searched by literal text; they are **not** OMP's native Mnemopi facts and are not shared with them. Graphify is the shared code-relationship implementation, with lazy managed setup on explicit graph actions rather than at startup. Do not save credentials, personal data, transcripts, or tool dumps; secret detection is only a backstop. A Bash pre-tool guard denies recognized dangerous commands, and successful tool responses can be redacted by `PostToolUse`; failed third-party tool responses (`PostToolUseFailure`) cannot receive equivalent redaction. These protections are not a sandbox or a substitute for Claude's permissions, user approval, or publication controls.
 
@@ -89,7 +114,7 @@ OMP's updater and release process do **not** update the Claude or OpenCode insta
 
 ### OpenCode
 
-The OpenCode adapter supports OpenCode v1.x (plugin API V1, tested on 1.19.3) and OpenCode v2.x (plugin API V2, tested on 2.1.2) and needs Node.js **22+** on `PATH`: the plugin itself runs under OpenCode's own runtime, but settings, memory, and doctor run as Node subprocesses. One installed `plugins/useful-skills.js` serves both: its default export carries the V1 `server` function and the V2 `setup` function, and each OpenCode reads the one it knows ([OpenCode V2](#opencode-v2)).
+The OpenCode adapter supports OpenCode v1.x (plugin API V1, tested on 1.19.3) and OpenCode v2.x (plugin API V2, tested on 2.1.2) and needs Node.js **22+** on `PATH`: the plugin itself runs under OpenCode's own runtime, but settings, memory, and doctor run as Node subprocesses. One installed `plugins/harness-useful-skills.js` serves both: its default export carries the V1 `server` function and the V2 `setup` function, and each OpenCode reads the one it knows ([OpenCode V2](#opencode-v2)).
 
 One-line install of the latest release into your user config (macOS and Linux, needs `curl`, `tar`, `gzip`, and Node.js 22+):
 
@@ -125,23 +150,23 @@ Restart OpenCode afterwards. The default scope is `user`. Omitting `--host`, or 
 
 What it writes, all under the scope directory (`<config>/opencode` for `user`, where `<config>` is `$XDG_CONFIG_HOME` if absolute, else `~/.config`; `<cwd>/.opencode` for `project`):
 
-- `plugins/useful-skills.js`, `plugins/useful-skills/**`, and `plugins/useful-skills/install-record.json` (version, scope, paths, and a SHA-256 for every owned file)
+- `plugins/harness-useful-skills.js`, `plugins/harness-useful-skills/**`, and `plugins/harness-useful-skills/install-record.json` (version, scope, paths, and a SHA-256 for every owned file)
 - `skills/us-*` (21 skills), `commands/useful-skills.md`, and `commands/us-ignore-workflow.md`
 - `agents/us-<agent>.md`, generated from the bundled templates with a `# Generated by Useful Skills` marker (see [OpenCode model roles](#opencode-model-roles))
-- `useful-skills/models.yml` in the scope directory
-- an `mcp.useful_skills` entry in `opencode.json` (below)
+- `harness-useful-skills/models.yml` in the scope directory
+- an `mcp.harness-useful-skills` entry in `opencode.json` (below)
 
-Outside the scope directory, the plugin keeps data at `${XDG_DATA_HOME:-~/.local/share}/opencode/useful-skills` (mode `0700`) and workflow settings at `${XDG_CONFIG_HOME:-~/.config}/opencode/useful-skills/workflow-settings/` for **both** scopes, in the same layout as OMP and Claude Code. `OPENCODE_CONFIG_DIR` is not an install target.
+Outside the scope directory, the plugin keeps data at `${XDG_DATA_HOME:-~/.local/share}/opencode/harness-useful-skills` (mode `0700`) and workflow settings at `${XDG_CONFIG_HOME:-~/.config}/opencode/harness-useful-skills/workflow-settings/` for **both** scopes, in the same layout as OMP and Claude Code. `OPENCODE_CONFIG_DIR` is not an install target.
 
-**Config edit.** The installer adds or updates only `mcp.useful_skills` (a local server running `node` on the installed `mcp-server.js`, `enabled`, `timeout` 600000) in the scope's `opencode.json`, or in a comment-free `opencode.jsonc` when that is the file present. It never clobbers other keys and reports a different existing `mcp.useful_skills` before replacing it. It refuses to edit a config that contains comments, does not parse, is not an object, has a non-object `mcp`, or is a symlink: it then prints the snippet to add yourself and exits 0 with "Action required".
+**Config edit.** The installer adds or updates only `mcp.harness-useful-skills` (a local server running `node` on the installed `mcp-server.js`, `enabled`, `timeout` 600000) in the scope's `opencode.json`, or in a comment-free `opencode.jsonc` when that is the file present. It never clobbers other keys and reports a different existing `mcp.harness-useful-skills` before replacing it. It refuses to edit a config that contains comments, does not parse, is not an object, has a non-object `mcp`, or is a symlink: it then prints the snippet to add yourself and exits 0 with "Action required".
 
 **Ownership.** The installer never overwrites a file it does not own or one you edited since installing, and refuses symlinked targets. Project scope writes `<cwd>/.opencode/` and its `opencode.json` with machine-specific absolute paths; add them to `.gitignore` instead of committing them.
 
 **Update.** `./useful-skills update check|install --host opencode` (or `/useful-skills update check|install` in chat) downloads the latest stable GitHub release tarball over HTTPS, verifies it (no links, no absolute or `..` paths, matching versions) and runs its installer for the recorded scope. Nothing changes on any failure. It updates the installed copy, never the checkout, and works from the first release that contains the OpenCode adapter. On OpenCode 1.x the plugin also makes one quiet check at startup and shows a toast when a newer release exists.
 
-**Uninstall.** `./useful-skills uninstall --host opencode [--scope user|project]` removes only owned files that still match their recorded hash, marker-owned agents, and the `mcp.useful_skills` entry if it is unchanged. It keeps data, settings, and `models.yml`, and prints their paths. `./useful-skills doctor --host opencode` reports the installation from the terminal.
+**Uninstall.** `./useful-skills uninstall --host opencode [--scope user|project]` removes only owned files that still match their recorded hash, marker-owned agents, and the `mcp.harness-useful-skills` entry if it is unchanged. It keeps data, settings, and `models.yml`, and prints their paths. `./useful-skills doctor --host opencode` reports the installation from the terminal.
 
-OpenCode exposes the 21 skills by their plain `us-*` names through its `skill` tool and as `/us-*` slash commands. Workers are the seven `us-*` agents below, dispatched with the `task` tool. The memory MCP server adds `useful_skills_memory_status`, `useful_skills_memory_search`, `useful_skills_memory_save`, `useful_skills_graph_build`, and `useful_skills_graph_query`: project-scoped private facts under the OpenCode data directory searched by literal text, plus Graphify as in Claude Code. They are not shared with OMP or Claude Code facts. A Bash pre-tool guard that denies recognized dangerous commands is always on, as in Claude Code, and successful tool output is redacted for common secret patterns.
+OpenCode exposes the 21 skills by their plain `us-*` names through its `skill` tool and as `/us-*` slash commands. Workers are the seven `us-*` agents below, dispatched with the `task` tool. The memory MCP server adds `harness-useful-skills_memory_status`, `harness-useful-skills_memory_search`, `harness-useful-skills_memory_save`, `harness-useful-skills_graph_build`, and `harness-useful-skills_graph_query`: project-scoped private facts under the OpenCode data directory searched by literal text, plus Graphify as in Claude Code. They are not shared with OMP or Claude Code facts. A Bash pre-tool guard that denies recognized dangerous commands is always on, as in Claude Code, and successful tool output is redacted for common secret patterns.
 
 Limits:
 
@@ -150,14 +175,14 @@ Limits:
 - On OpenCode 1.x, workflow guidance uses `experimental.chat.system.transform`, which OpenCode may change.
 - Like the other hosts, the Bash guard does not stop a model from running the bundled `command.js` or editing settings files through tools; the restriction that settings change only from commands you type applies to the plugin's command path, not to everything a model can do.
 - On OpenCode 1.x, workflow context is added to every LLM call in a session, including OpenCode's title and compaction calls: plugin API V1 cannot tell them apart from chat turns. OpenCode 2.x has separate hooks, so only the agent's own requests get it.
-- Startup runs `sync-agents` (it writes `useful-skills/models.yml` and the generated agents) and one read-only update check, which may call `gh auth token` to raise the GitHub rate limit; both fail quietly.
+- Startup runs `sync-agents` (it writes `harness-useful-skills/models.yml` and the generated agents) and one read-only update check, which may call `gh auth token` to raise the GitHub rate limit; both fail quietly.
 - The installer re-serializes `opencode.json` as 2-space JSON, so exotic numeric values and duplicate keys normalize.
 - Long `/useful-skills` commands (`doctor`, `graph test`, `update install`) have a 10-minute budget (60 seconds for the others), and their subprocesses are stopped when OpenCode quits.
 - These protections are not a sandbox or a substitute for OpenCode's permissions.
 
 #### OpenCode V2
 
-OpenCode 2.x loads `plugins/useful-skills.js` as a plugin definition (`export default { id, setup }`) and rejects a file with only named exports. OpenCode 1.x reads the same default export and calls its `server` function, so the installed entry exports one object with `id`, `server` (V1), and `setup` (V2), and the installer is the same for both. The runtime directory `plugins/useful-skills/` is ignored by the V2 loader because it has no `index` or `server` module.
+OpenCode 2.x loads `plugins/harness-useful-skills.js` as a plugin definition (`export default { id, setup }`) and rejects a file with only named exports. OpenCode 1.x reads the same default export and calls its `server` function, so the installed entry exports one object with `id`, `server` (V1), and `setup` (V2), and the installer is the same for both. The runtime directory `plugins/harness-useful-skills/` is ignored by the V2 loader because it has no `index` or `server` module.
 
 `opencode/v2.js` maps the V2 Promise plugin API onto the same session logic as V1, with these differences:
 
@@ -174,14 +199,14 @@ OpenCode 2.x has no command hook. The plugin registers `useful-skills` and `us-i
 
 ### Codex
 
-The Codex adapter needs Node.js **22+** and the `codex` CLI. Installing only the plugin gives you the 21 skills, as `useful-skills:us-*`, but no agents and no memory tools:
+The Codex adapter needs Node.js **22+** and the `codex` CLI. Installing only the plugin gives you the 21 skills, as `harness-useful-skills:us-*`, but no agents and no memory tools:
 
 ```bash
 codex plugin marketplace add MSpiechowicz/harness-useful-skills
-codex plugin add useful-skills@harness-useful-skills
+codex plugin add harness-useful-skills@harness-useful-skills
 ```
 
-The marketplace is `harness-useful-skills`, the plugin is `useful-skills`, and the plugin ID is `useful-skills@harness-useful-skills`. The repository has a Codex catalog at `.agents/plugins/marketplace.json`, so Codex reads it instead of falling back to `.claude-plugin/marketplace.json`; Claude Code and OMP are unaffected.
+The marketplace and the plugin are both called `harness-useful-skills`, so the plugin ID is `harness-useful-skills@harness-useful-skills`. The repository has a Codex catalog at `.agents/plugins/marketplace.json`, so Codex reads it instead of falling back to `.claude-plugin/marketplace.json`; Claude Code and OMP are unaffected.
 
 For the full install (macOS and Linux, needs `curl`, `tar`, `gzip`, Node.js 22+, and `codex`):
 
@@ -205,19 +230,20 @@ The install script verifies the release tarball as described for [OpenCode](#ope
 
 - adds the marketplace (from GitHub at `--ref v<version>`, or from the checkout with `--local`) and the `useful-skills` plugin. Without `--local`, it first checks with `git ls-remote` that the release tag exists and stops before writing anything if it does not (use `--local` for an unreleased checkout); without `git` or a network it notes that and continues;
 - writes seven agents to `$CODEX_HOME/agents/us-<role>.toml`: `us-planner`, `us-scout`, `us-frontend`, `us-backend`, `us-general-purpose`, `us-reviewer`, and `us-security-reviewer`;
-- copies the memory runtime to `$CODEX_HOME/useful-skills/runtime/` and creates the private data directory `$CODEX_HOME/useful-skills/data`;
-- registers the MCP server `useful_skills` with `codex mcp add`, exposing `memory_status`, `memory_search`, `memory_save`, `graph_build`, and `graph_query`;
-- writes `$CODEX_HOME/useful-skills/install-record.json`.
+- copies the memory runtime to `$CODEX_HOME/harness-useful-skills/runtime/` and creates the private data directory `$CODEX_HOME/harness-useful-skills/data`;
+- registers the MCP server `harness-useful-skills` with `codex mcp add`, exposing `memory_status`, `memory_search`, `memory_save`, `graph_build`, and `graph_query`;
+- creates `$CODEX_HOME/harness-useful-skills/models.yml` when it is missing and writes its roles into the agents (see [Codex model roles](#codex-model-roles));
+- writes `$CODEX_HOME/harness-useful-skills/install-record.json`.
 
-Restart Codex afterwards. The installer never edits `config.toml`. The memory server is registered by the installer, not shipped in the plugin, because Codex does not expand `${PLUGIN_ROOT}` in a plugin's `.mcp.json` and gives plugin servers no workspace. Memory has the same contract as in Claude Code and OpenCode (see [Agent-invoked memory](#agent-invoked-memory)); a long `graph_build` may need `tool_timeout_sec` under `[mcp_servers.useful_skills]` in your `config.toml`, which you set yourself.
+Restart Codex afterwards. The installer never edits `config.toml`. The memory server is registered by the installer, not shipped in the plugin, because Codex does not expand `${PLUGIN_ROOT}` in a plugin's `.mcp.json` and gives plugin servers no workspace. Memory has the same contract as in Claude Code and OpenCode (see [Agent-invoked memory](#agent-invoked-memory)); a long `graph_build` may need `tool_timeout_sec` under `[mcp_servers.harness-useful-skills]` in your `config.toml`, which you set yourself.
 
-**Uninstall, doctor, update.** `./useful-skills uninstall --host codex` removes only unmodified owned files, the MCP entry if unchanged, the plugin if the installer added it, and the marketplace if the installer added it. It keeps the data directory. `./useful-skills doctor --host codex` prints a read-only health summary, including a plugin left at an older version by an interrupted upgrade. To update, re-run the installer. On Windows the installer runs `codex.exe` directly; an npm `codex.cmd` shim runs through `cmd.exe`, and the installer refuses when a path it passes contains `"`, `%`, `!`, `^`, `&`, `|`, `<` or `>`.
+**Uninstall, doctor, update.** `./useful-skills uninstall --host codex` removes only unmodified owned files, the MCP entry if unchanged, the plugin if the installer added it, and the marketplace if the installer added it. It keeps the data directory and `models.yml`. `./useful-skills doctor --host codex` prints a read-only health summary, including a plugin left at an older version by an interrupted upgrade. To update, re-run the installer. On Windows the installer runs `codex.exe` directly; an npm `codex.cmd` shim runs through `cmd.exe`, and the installer refuses when a path it passes contains `"`, `%`, `!`, `^`, `&`, `|`, `<` or `>`.
 
 Limits:
 
-- Workflow stages are static guidance and always enabled. Codex has no hooks, settings files, `/useful-skills` command, or model-role file. To skip the workflow for one request, invoke `$us-ignore-workflow` directly.
+- Workflow stages are static guidance and always enabled. Codex has no hooks, settings files, or `/useful-skills` command. To skip the workflow for one request, invoke `$us-ignore-workflow` directly.
 - Read-only agents (such as `us-scout` and the reviewers) are read-only by instruction only: Codex subagents inherit the parent's sandbox, so the sandbox, not the agent file, is the enforcement.
-- Useful Skills does not configure a model or reasoning effort per agent; Codex's own settings apply.
+- Models are per agent only through `models.yml`; a role set to `inherit` (the default) uses Codex's own model and reasoning effort.
 - Plugin-only installs have no `us-*` agents, so `us-run-workflow` reports the missing agent types.
 
 ## Skill-led development
@@ -260,9 +286,9 @@ These are prompt instructions, **not enforced stage transitions**. They cannot g
 
 For a persistent development fast lane, run `/useful-skills workflow disabled` **from the intended repository**; `/useful-skills workflow enabled` restores that repository's master in the active OMP profile. The choice survives sessions/restarts without affecting other repositories. The nearest canonical Git checkout root is the scope: root, subdirectories, and symlink aliases share; separate checkouts and linked worktrees isolate, as do nested checkouts. Outside Git, canonical cwd is the scope, so distinct non-Git directories are separate. Moving a checkout changes its path-derived identity; no relocation migration is performed.
 
-The master is stored privately at `<agentDir>/useful-skills/workflow-settings/repositories/<sha256(scopeRoot)>/workflow.json`; six stage files remain in `<agentDir>/useful-skills/workflow-settings/`. Reads create nothing. Storage retains private directories/files, bounded no-follow reads, and atomic writes. Identity discovery inspects filesystem Git markers without executing project code/hooks or using Graphify. Unreadable/unsafe identity makes only the master unknown while independently readable profile stages remain visible; unknown automatic stages do not run. Status exposes canonical scope, master file, profile stage directory, saved/effective selections, and scoped errors.
+The master is stored privately at `<agentDir>/harness-useful-skills/workflow-settings/repositories/<sha256(scopeRoot)>/workflow.json`; six stage files remain in `<agentDir>/harness-useful-skills/workflow-settings/`. Reads create nothing. Storage retains private directories/files, bounded no-follow reads, and atomic writes. Identity discovery inspects filesystem Git markers without executing project code/hooks or using Graphify. Unreadable/unsafe identity makes only the master unknown while independently readable profile stages remain visible; unknown automatic stages do not run. Status exposes canonical scope, master file, profile stage directory, saved/effective selections, and scoped errors.
 
-**Legacy master:** the old profile-level `<agentDir>/useful-skills/workflow-settings/workflow.json` is untouched and ignored, with no fallback, copying, or automatic migration. A missing new repository master defaults enabled. To retain an old disabled choice, enter the intended repository and reapply `/useful-skills workflow disabled`.
+**Legacy master:** the old profile-level `<agentDir>/harness-useful-skills/workflow-settings/workflow.json` is untouched and ignored, with no fallback, copying, or automatic migration. A missing new repository master defaults enabled. To retain an old disabled choice, enter the intended repository and reapply `/useful-skills workflow disabled`.
 
 Alternatively, directly invoke native `/skill:us-ignore-workflow` for one request without changing saved settings. Quoted/copied invocations are not selection. The disabled-master/direct-ignore fast lane still inspects current code/callers, implements and exercises the changed path, and reports evidence, but skips package-mandatory stages. It is distinct from enabled focused repair and does not waive stronger safety/permissions, independent authorization, explicit audits, or publication controls.
 
@@ -379,7 +405,7 @@ After installation/restart the package advertises native agents and defaults to 
 
 ### Claude Code model roles
 
-Claude Code does not read OMP's `config.yml`. Its role models live in a Claude-owned file, `~/.claude/useful-skills/models.yml` (under `$CLAUDE_CONFIG_DIR` when set). The plugin's `SessionStart` hook creates it with these defaults the first time Claude Code starts after installation:
+Claude Code does not read OMP's `config.yml`. Its role models live in a Claude-owned file, `~/.claude/harness-useful-skills/models.yml` (under `$CLAUDE_CONFIG_DIR` when set). The plugin's `SessionStart` hook creates it with these defaults the first time Claude Code starts after installation:
 
 ```yaml
 modelRoles:
@@ -395,13 +421,35 @@ modelRoles:
 
 A selector is `<model>[:<effort>]`: a Claude model ID or alias (`opus`, `sonnet`, `haiku`, `fable`, `inherit`) and an optional effort (`low`, `medium`, `high`, `xhigh`, `max`). An OMP-style `anthropic/` prefix is accepted, so the same values work in OMP and Claude Code. A missing role uses `default`. `default` does not change the main session model; choose that with Claude's `/model`.
 
-Claude Code cannot apply plugin options to plugin agent frontmatter, and the `Agent` tool accepts only model aliases without effort. So on each session start the hook generates user-level agents `us-planner`, `us-scout`, `us-frontend`, `us-backend`, `us-general-purpose`, `us-reviewer`, and `us-security-reviewer` in `~/.claude/agents/useful-skills-*.md`. Each one copies the bundled agent's instructions and tools and sets the configured `model` and `effort`. The hook tells the session to dispatch them in place of the `useful-skills:*` agents. Role mapping matches OMP: `scout` ← `research`, `planner` ← `plan`, `general-purpose` ← `implementation`, `reviewer` ← `review`, `security-reviewer` ← `security`.
+Claude Code cannot apply plugin options to plugin agent frontmatter, and the `Agent` tool accepts only model aliases without effort. So on each session start the hook generates user-level agents `us-planner`, `us-scout`, `us-frontend`, `us-backend`, `us-general-purpose`, `us-reviewer`, and `us-security-reviewer` in `~/.claude/agents/harness-useful-skills-*.md`. Each one copies the bundled agent's instructions and tools and sets the configured `model` and `effort`. The hook tells the session to dispatch them in place of the `harness-useful-skills:*` agents. Role mapping matches OMP: `scout` ← `research`, `planner` ← `plan`, `general-purpose` ← `implementation`, `reviewer` ← `review`, `security-reviewer` ← `security`.
 
-Claude Code loads agents at startup, so edits to `models.yml` take effect in the **next** session; the first session after installation still uses the inherited-model plugin agents. An invalid file is reported and leaves existing generated agents unchanged. A file at one of those paths that Harness Skills did not generate is never overwritten; that role falls back to its plugin agent. Uninstalling the plugin does not remove the generated files; delete `~/.claude/agents/useful-skills-*.md` and `~/.claude/useful-skills/` yourself.
+Claude Code loads agents at startup, so edits to `models.yml` take effect in the **next** session; the first session after installation still uses the inherited-model plugin agents. An invalid file is reported and leaves existing generated agents unchanged. A file at one of those paths that Harness Skills did not generate is never overwritten; that role falls back to its plugin agent. Uninstalling the plugin does not remove the generated files; delete `~/.claude/agents/harness-useful-skills-*.md` and `~/.claude/harness-useful-skills/` yourself.
+
+### Codex model roles
+
+Codex has no session hook, so its role models are written into the agent files when you ask. They live in `$CODEX_HOME/harness-useful-skills/models.yml` (`~/.codex/harness-useful-skills/models.yml` by default), which has the same schema as the Claude and OpenCode files. The installer creates it with comments and every role set to `inherit`, and never rewrites an existing one:
+
+```yaml
+modelRoles:
+  default: inherit
+  review: gpt-5.5:high
+  security: gpt-5.5:xhigh
+```
+
+A selector is `<model>[:<effort>]`, `inherit`, or `inherit:<effort>` (change only the effort). The suffix is an effort only when it is one of `none`, `minimal`, `low`, `medium`, `high`, or `xhigh`; anything else stays part of the model. Roles are `research`, `frontend`, `backend`, `implementation`, `review`, `security`, `plan`, and `default`, which applies to a role whose row is removed. Roles map to agents as in the OMP table: `us-scout` ← `research`, `us-planner` ← `plan`, `us-general-purpose` ← `implementation`, `us-reviewer` ← `review`, `us-security-reviewer` ← `security`.
+
+The installer writes `model` and `model_reasoning_effort` into `$CODEX_HOME/agents/us-<role>.toml` (a role that inherits gets neither line). After editing `models.yml`, apply it without reinstalling:
+
+```bash
+./useful-skills models apply --host codex
+node "$CODEX_HOME/harness-useful-skills/runtime/codex/apply-models.js" [--json]
+```
+
+The second form runs from the installed runtime, needs no checkout and no `codex` command. An invalid file is reported and no agent changes (the installer refuses instead, before writing anything). An agent file that was edited since the install, or is not a Harness Skills file, is left alone and reported. Codex loads agents at startup, so changes apply to the **next** session.
 
 ### OpenCode model roles
 
-OpenCode reads no OMP or Claude config for this. Role models live in `<scope>/useful-skills/models.yml` (`~/.config/opencode/useful-skills/models.yml` for the user scope). The installer creates it with comments and every role set to `inherit`, so each role inherits the session model and is one value to replace. An untouched file from an earlier release (an empty `modelRoles:`) is upgraded to this one, an edited file is never rewritten. `default` applies only to a role whose row is removed:
+OpenCode reads no OMP or Claude config for this. Role models live in `<scope>/harness-useful-skills/models.yml` (`~/.config/opencode/harness-useful-skills/models.yml` for the user scope). The installer creates it with comments and every role set to `inherit`, so each role inherits the session model and is one value to replace. An untouched file from an earlier release (an empty `modelRoles:`) is upgraded to this one, an edited file is never rewritten. `default` applies only to a role whose row is removed:
 
 ```yaml
 modelRoles:
@@ -429,7 +477,7 @@ Some hosts require parent-only planning or prohibit delegating a single work pac
 
 ## Management
 
-These management commands run in OMP. OpenCode supports the same `/useful-skills` subcommands as OMP and Claude Code (details below). Claude Code supports them as `/useful-skills ...` (needs a Claude Code version with mods) with these differences: `update` prints `claude plugin update useful-skills@useful-skills-local` followed by `/reload-plugins` guidance instead of checking or installing, and `graph` points to the `graph_build`/`graph_query` MCP tools instead of running `graph test`. `doctor` also prepares memory instead of only reporting (see below). `status` shows saved and effective values with their source (`file`, `option`, `default`, or `error`); `status --json` is also available. `help` lists the commands.
+These management commands run in OMP. OpenCode supports the same `/useful-skills` subcommands as OMP and Claude Code (details below). Claude Code supports them as `/useful-skills ...` (needs a Claude Code version with mods) with these differences: `update` prints `claude plugin update harness-useful-skills@harness-useful-skills` followed by `/reload-plugins` guidance instead of checking or installing, and `graph` points to the `graph_build`/`graph_query` MCP tools instead of running `graph test`. `doctor` also prepares memory instead of only reporting (see below). `status` shows saved and effective values with their source (`file`, `option`, `default`, or `error`); `status --json` is also available. `help` lists the commands.
 
 ```text
 /useful-skills list [query]
@@ -545,13 +593,13 @@ Managed setup uses OS-provided tools with no manual setup beyond updating Harnes
 Memory lives outside the checkout:
 
 ```text
-<agentDir>/useful-skills/dependencies/<lockHash>/
-<agentDir>/useful-skills/memory/<sha256(realpath(workspace))>/
+<agentDir>/harness-useful-skills/dependencies/<lockHash>/
+<agentDir>/harness-useful-skills/memory/<sha256(realpath(workspace))>/
 ```
 
 The tool returns actual graph, snapshot, and fallback `notes.md` paths. Fresh code-only extraction replaces a graph only after successful validation, preserving the previous graph on failure. Builds are limited to 120 seconds; queries to 10 seconds, 4,096 input characters, and 8 KiB returned text. Generated/credential paths and outside-root symlinks are excluded; unsupported inputs are not claimed as covered. Isolated Python imports, a trusted cwd, and a minimal environment reduce project interference; they are **not** a same-user filesystem/network sandbox.
 
-Every build, whether from OMP's `us_memory` or `graph test`, Claude's `graph_build`, OpenCode's `useful_skills_graph_build`, or doctor, first applies a workspace scope guard, before creating storage, installing dependencies, or starting Graphify:
+Every build, whether from OMP's `us_memory` or `graph test`, Claude's `graph_build`, OpenCode's `harness-useful-skills_graph_build`, or doctor, first applies a workspace scope guard, before creating storage, installing dependencies, or starting Graphify:
 
 - The workspace must not be `/`, and must not be or contain a protected home directory: `$HOME`, the account's password-database home, or a caller-supplied home. Containment is checked by canonical path and by device/inode identity against each home, its ancestors, and `/`, which also catches them behind a bind mount. An empty, relative, or unavailable `$HOME`, or a workspace whose identity cannot be read, refuses the build.
 - On Linux, `/proc/self/mountinfo` is required: it is read (bounded to 4 MiB) and matched by mount-point path. A missing (for example, masked `/proc`), unreadable, oversized, or malformed mount table refuses the build, and so does a table that lists no mount at or above the workspace (for example, a masked `/proc` or a chroot); platforms without one (such as macOS) skip this check. A mount anywhere inside the workspace refuses the build. Every mount entry at or above the workspace, including entries hidden beneath a deeper or stacked mount, has its backing checked:
@@ -607,7 +655,7 @@ The linked PR uses `Closes #N` when it fully resolves the issue and targets the 
 
 Historic installations cannot migrate through `update install`; follow [Remove or migrate an OMP installation](#remove-or-migrate-an-omp-installation) to remove them and install the current ID manually. Updating this source tree or publishing a release does not change anyone's installed plugins or registered marketplace. For a source checkout, changing its Git remote to the new repository URL is optional and user-managed. The OMP updater does **not** update Claude, OpenCode, or Codex installations.
 
-The existing single-plugin release transaction is unchanged apart from its version files: CI checks precede the atomic package/marketplace/Claude-manifest version commit and branch/tag push by `release.py`. The release bumps `package.json`, the marketplace entry, `.claude-plugin/plugin.json`, `plugins/claude/.claude-plugin/plugin.json`, `opencode/package.json`, `plugins/opencode/useful-skills/package.json`, `codex/plugin.json`, and `plugins/codex/.codex-plugin/plugin.json`, and fails before creating any ref if a Claude, OpenCode, or Codex manifest version differs from `package.json`. No publication is performed merely by implementing a plan. Python 3.10+ is needed for release-development checks, not normal plugin installation.
+The existing single-plugin release transaction is unchanged apart from its version files: CI checks precede the atomic package/marketplace/Claude-manifest version commit and branch/tag push by `release.py`. The release bumps `package.json`, the marketplace entry, `.claude-plugin/plugin.json`, `plugins/claude/.claude-plugin/plugin.json`, `opencode/package.json`, `plugins/opencode/harness-useful-skills/package.json`, `codex/plugin.json`, and `plugins/codex/.codex-plugin/plugin.json`, and fails before creating any ref if a Claude, OpenCode, or Codex manifest version differs from `package.json`. No publication is performed merely by implementing a plan. Python 3.10+ is needed for release-development checks, not normal plugin installation.
 
 ## Development and verification
 

@@ -3,6 +3,9 @@ import { constants } from "node:fs";
 import { lstat, mkdir, open, realpath, rename, rm } from "node:fs/promises";
 import path from "node:path";
 
+import { migrateDataDirectory } from "./data-migration.js";
+import { DATA_DIRECTORY } from "./names.js";
+
 export const STAGES = Object.freeze([
   "research", "plan", "review", "security-review", "backend-memory", "graphify-memory",
 ]);
@@ -141,11 +144,13 @@ async function profileDirectory(agentDir) {
     throw new Error("Agent profile must be a real directory.");
   }
 
+  // Settings, models and memory saved under the name used before the rename move to the current name.
+  migrateDataDirectory(profile);
   return profile;
 }
 
 function settingDirectory(profile) {
-  return path.join(profile, "useful-skills", "workflow-settings");
+  return path.join(profile, DATA_DIRECTORY, "workflow-settings");
 }
 
 function validateKey(key) {
@@ -331,7 +336,7 @@ export async function writeWorkflowSetting({ agentDir, cwd, key, enabled } = {})
 
   const profile = await profileDirectory(agentDir);
   const root = key === "workflow" ? await scopeRoot(cwd) : undefined;
-  let directory = await privateChild(await privateChild(profile, "useful-skills"), "workflow-settings");
+  let directory = await privateChild(await privateChild(profile, DATA_DIRECTORY), "workflow-settings");
   if (root) {
     directory = await privateChild(await privateChild(directory, "repositories"), path.basename(repositoryDirectory(directory, root)));
   }

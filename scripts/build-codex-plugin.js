@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds the two Codex bundles:
 //   plugins/codex: the Codex plugin (manifest + skills) that a Codex marketplace installs.
-//   plugins/codex-runtime/useful-skills: the files the installer copies to <CODEX_HOME>/useful-skills (memory server + agent files).
+//   plugins/codex-runtime/harness-useful-skills: the files the installer copies to <CODEX_HOME>/harness-useful-skills (memory server + agent files).
 // plugins/codex/README.md is hand-written; the generator never touches it.
 import { readdirSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
@@ -10,7 +10,7 @@ import { collectOutput, readSource, syncBundle } from './bundle-core.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PLUGIN = 'plugins/codex';
-const RUNTIME = 'plugins/codex-runtime/useful-skills';
+const RUNTIME = 'plugins/codex-runtime/harness-useful-skills';
 const check = process.argv[2] === '--check';
 if (process.argv.length > 3 || (process.argv[2] && !check)) {
   throw new Error('Usage: node scripts/build-codex-plugin.js [--check]');
@@ -27,10 +27,14 @@ const LICENSES = [
 ];
 
 // The runtime file closure of codex/mcp-server.js; assertImportClosure below keeps this list honest.
-// Nothing from claude/, opencode/ or omp/ belongs here.
+// Nothing from claude/ or omp/ belongs here, and from opencode/ only the install helpers apply-models.js shares with the installer.
 const RUNTIME_FILES = [
   'codex/mcp-server.js', 'codex/host-context.js',
+  // The model roles: apply-models.js runs from the installed runtime (Codex has no session hook), and shares the installer's file helpers.
+  'codex/apply-models.js', 'codex/models.js', 'codex/paths.js', 'codex/agents.js',
+  'opencode/paths.js', 'opencode/install-files.js', 'model-roles.js', 'entrypoint.js',
   'mcp-memory-server.js', 'command-core.js', 'host-roots.js', 'local-facts.js', 'memory.js',
+  'names.js', 'legacy-names.js', 'data-migration.js',
   'workflow-policy.js', 'workflow-settings.js', 'doctor.js', 'resources.js', 'process.js', 'path-boundary.js',
   'graphify.js', 'graph-safety.js', 'graph-storage.js', 'graph-validation.js',
   'graph-import-provenance.js', 'graph-import-provenance.py', 'graph-placeholder-imports.js',
@@ -103,7 +107,7 @@ function pluginOutput() {
 
 function runtimeOutput() {
   const generated = RUNTIME_FILES.map(source => ({ path: source, content: readSource(root, source) }));
-  generated.push({ path: 'package.json', content: `${JSON.stringify({ name: 'useful-skills-codex-runtime', private: true, type: 'module' }, null, 2)}\n` });
+  generated.push({ path: 'package.json', content: `${JSON.stringify({ name: 'harness-useful-skills-codex-runtime', private: true, type: 'module' }, null, 2)}\n` });
   const files = collectOutput({ root, output: RUNTIME, generated });
   assertImportClosure(files);
   return files;

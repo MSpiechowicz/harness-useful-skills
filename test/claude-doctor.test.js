@@ -9,8 +9,8 @@ import { workspaceMemoryPaths } from "../graphify.js";
 import { assertNoWrites, factsDirectory, fixture, SECRET } from "./helpers/claude-doctor-fixture.js";
 
 test("the plugin data directory name follows Claude's plugin@marketplace sanitizing rule", () => {
-  assert.equal(pluginDataName("useful-skills@useful-skills-local"), "useful-skills-useful-skills-local");
-  assert.equal(pluginDataName("useful-skills@inline"), "useful-skills-inline");
+  assert.equal(pluginDataName("harness-useful-skills@harness-useful-skills"), "harness-useful-skills-harness-useful-skills");
+  assert.equal(pluginDataName("harness-useful-skills@inline"), "harness-useful-skills-inline");
 });
 
 test("first doctor run creates facts, installs dependencies, and builds the graph; a second run reuses them", async t => {
@@ -152,11 +152,11 @@ test("doctor reports saved settings with their sources and writes no settings fi
 
   const saved = await f.run(["stage", "review", "disabled"], { project: f.repo });
   assert.equal(saved.exitCode, 0, saved.text);
-  const settingsFiles = await readdir(path.join(f.configDir, "useful-skills"), { recursive: true });
+  const settingsFiles = await readdir(path.join(f.configDir, "harness-useful-skills"), { recursive: true });
 
   const file = await f.run(["doctor"]);
   assert.match(file.text, /\n {2}Review: disabled \(file\)\n/);
-  assert.deepEqual(await readdir(path.join(f.configDir, "useful-skills"), { recursive: true }), settingsFiles);
+  assert.deepEqual(await readdir(path.join(f.configDir, "harness-useful-skills"), { recursive: true }), settingsFiles);
 });
 
 test("doctor usage accepts only --check", async t => {

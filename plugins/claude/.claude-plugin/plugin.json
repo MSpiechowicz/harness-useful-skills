@@ -1,5 +1,5 @@
 {
-  "name": "useful-skills",
+  "name": "harness-useful-skills",
   "displayName": "Useful Skills",
   "version": "0.3.13",
   "description": "Claude Code engineering workflows, safety reviews, and local memory tools",
@@ -55,7 +55,7 @@
     "./claude/skills/us-check-security/"
   ],
   "mcpServers": {
-    "useful_skills": {
+    "harness-useful-skills": {
       "command": "node",
       "args": [
         "${CLAUDE_PLUGIN_ROOT}/claude/mcp-server.js"

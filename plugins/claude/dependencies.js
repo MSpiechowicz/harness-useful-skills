@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { archiveEntries, platformKey, validateManifest } from "./dependency-policy.js";
 import { download, throwIfAborted } from "./dependency-transport.js";
+import { DATA_DIRECTORY } from "./names.js";
 import { isPathWithin } from "./path-boundary.js";
 import { minimalEnvironment, runProcess } from "./process.js";
 import { acquireSetupLock } from "./setup-lock.js";
@@ -28,7 +29,7 @@ function requiredAgentDir(agentDir) {
 }
 
 function dependencyDirectory(agentDir) {
-  return path.join(requiredAgentDir(agentDir), "useful-skills", "dependencies");
+  return path.join(requiredAgentDir(agentDir), DATA_DIRECTORY, "dependencies");
 }
 
 function environment(root) {
@@ -129,7 +130,7 @@ async function storageDirectory(agentDir, create) {
   }
 
   const resolvedProfile = await realpath(profile);
-  return privateDirectory(await privateDirectory(resolvedProfile, "useful-skills", create), "dependencies", create);
+  return privateDirectory(await privateDirectory(resolvedProfile, DATA_DIRECTORY, create), "dependencies", create);
 }
 
 async function readMarker(root) {

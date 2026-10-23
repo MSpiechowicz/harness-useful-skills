@@ -26,7 +26,7 @@ const HELP = [
   "/useful-skills update install — install the latest release into the recorded scope; restart OpenCode afterwards.",
   "/useful-skills help — show this help.",
   "/us-ignore-workflow <request> — use the fast lane for that one request without changing saved settings.",
-  "Memory: the `useful_skills_memory_status`, `useful_skills_memory_search`, `useful_skills_memory_save`, `useful_skills_graph_build`, and `useful_skills_graph_query` tools.",
+  "Memory: the `harness-useful-skills_memory_status`, `harness-useful-skills_memory_search`, `harness-useful-skills_memory_save`, `harness-useful-skills_graph_build`, and `harness-useful-skills_graph_query` tools.",
   "A saved setting wins; without one, the setting is enabled.",
   "",
   "Terminal commands (from a Useful Skills checkout):",

@@ -4,7 +4,7 @@ import { writeAtomic } from "../model-roles.js";
 import { leftNote, ownedState, pruneEmptyDirectories, recordText, removeOwned } from "../opencode/install-files.js";
 import { directoryProblem, lstatOrNull, printableText } from "../opencode/paths.js";
 import { CodexMissingError, codexClient, sameMcp, sameSource } from "./codex-cli.js";
-import { MARKETPLACE_NAME, PLUGIN_ID, RECORD_REL, atHome, codexHomeFor, readCodexRecord } from "./paths.js";
+import { LEGACY_LAYOUT, MODELS_REL, PLUGIN_ID, RECORD_REL, atHome, codexHomeFor, readCodexRecord, readLegacyRecord } from "./paths.js";
 
 /** Remove the recorded files that are still byte-identical to what was installed; list the rest. */
 function removeFiles(codexHome, record) {
@@ -22,7 +22,7 @@ function removeFiles(codexHome, record) {
 }
 
 /** Unregister the MCP server, the plugin and the marketplace as recorded, saving the record after each step. */
-function unregister(client, record, save) {
+function unregister(client, record, save, pluginId = PLUGIN_ID) {
   const lines = [];
   if (record.mcp) {
     const live = client.getMcp(record.mcp.name);
@@ -44,7 +44,7 @@ function unregister(client, record, save) {
     record.pluginId = null;
     save();
   } else {
-    lines.push(`Left plugin ${PLUGIN_ID} alone: this install did not add it.`);
+    lines.push(`Left plugin ${pluginId} alone: this install did not add it.`);
   }
 
   const marketplace = record.marketplace;
@@ -66,8 +66,9 @@ function unregister(client, record, save) {
 }
 
 /**
- * Remove a Codex install: the MCP server if it is still what was registered, the plugin, the marketplace if this
- * installer added it, then the unmodified recorded files and the record. Modified files and the data directory are kept.
+ * Remove a Codex install under the current name and any left from before the rename: the MCP server if it is still
+ * what was registered, the plugin, the marketplace if this installer added it, then the unmodified recorded files and
+ * the record. Modified files, the data directory and the models file are kept.
  * Resolves to `{message}`; throws without removing files when a Codex command fails.
  */
 export function uninstallCodex({ environment = process.env } = {}) {
@@ -83,8 +84,15 @@ export function uninstallCodex({ environment = process.env } = {}) {
   } catch (error) {
     throw new Error(printableText(`${error.message} Nothing was removed; move ${recordFile} away if it is not from this installer.`));
   }
-  if (!record) {
-    return { message: printableText(`Useful Skills is not installed for Codex: no install record at ${recordFile}. Nothing was removed.`) };
+
+  const legacy = readLegacyRecord(codexHome);
+  const installs = [
+    record && { record, recordFile, pluginId: PLUGIN_ID },
+    legacy.record && { record: legacy.record, recordFile: atHome(codexHome, LEGACY_LAYOUT.recordRel), pluginId: LEGACY_LAYOUT.pluginId },
+  ].filter(Boolean);
+  if (installs.length === 0) {
+    const note = legacy.problem ? ` The record of the earlier install was not used (${legacy.problem}).` : "";
+    return { message: printableText(`Useful Skills is not installed for Codex: no install record at ${recordFile}. Nothing was removed.${note}`) };
   }
 
   const client = codexClient({ environment, codexHome });
@@ -95,25 +103,36 @@ export function uninstallCodex({ environment = process.env } = {}) {
     throw error;
   }
 
-  let lines;
-  try {
-    lines = unregister(client, record, () => writeAtomic(recordFile, recordText(record)));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(printableText(`${message}\nThe uninstall stopped before removing files. ${recordFile} records what is still in place; fix the cause and run \`./useful-skills uninstall --host codex\` again.`));
+  const lines = [];
+  for (const install of installs) {
+    try {
+      lines.push(...unregister(client, install.record, () => writeAtomic(install.recordFile, recordText(install.record)), install.pluginId));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(printableText(`${message}\nThe uninstall stopped before removing files. ${install.recordFile} records what is still in place; fix the cause and run \`./useful-skills uninstall --host codex\` again.`));
+    }
   }
 
-  const files = removeFiles(codexHome, record);
-  rmSync(recordFile);
-  pruneEmptyDirectories(codexHome, recordFile);
+  const removed = { removed: 0, left: [] };
+  for (const install of installs) {
+    const files = removeFiles(codexHome, install.record);
+    removed.removed += files.removed;
+    removed.left.push(...files.left);
+    rmSync(install.recordFile);
+    pruneEmptyDirectories(codexHome, install.recordFile);
+  }
 
-  const kept = lstatOrNull(record.dataDir) ? [`Kept the data directory ${record.dataDir} (project memory); delete it yourself if you no longer need it.`] : [];
+  const keep = [...new Set(installs.map(({ record: each }) => each.dataDir))].filter((dataDir) => lstatOrNull(dataDir));
+  const kept = keep.map((dataDir) => `Kept the data directory ${dataDir} (project memory); delete it yourself if you no longer need it.`);
+  const models = lstatOrNull(atHome(codexHome, MODELS_REL)) ? [`Kept the model roles file ${atHome(codexHome, MODELS_REL)}.`] : [];
+  const versions = installs.map(({ record: each }) => each.version).join(" and ");
   return {
     message: printableText([
-      `Uninstalled Useful Skills ${record.version} from Codex in ${codexHome}: ${files.removed} files removed.`,
+      `Uninstalled Useful Skills ${versions} from Codex in ${codexHome}: ${removed.removed} files removed.`,
       ...lines,
-      ...(files.left.length > 0 ? ["Left in place for you to review or delete:", ...files.left.map((item) => `  ${item}`)] : []),
+      ...(removed.left.length > 0 ? ["Left in place for you to review or delete:", ...removed.left.map((item) => `  ${item}`)] : []),
       ...kept,
+      ...models,
       "Restart Codex.",
     ].join("\n")),
   };

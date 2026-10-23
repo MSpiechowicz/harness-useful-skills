@@ -106,7 +106,7 @@ test("a user-owned agent file is never overwritten and an invalid config changes
 });
 
 test("the sync refuses to write through a symlinked agents or models directory", async t => {
-  for (const linked of ["agents", "useful-skills"]) {
+  for (const linked of ["agents", "harness-useful-skills"]) {
     const root = await scopeRoot(t);
     const outside = path.join(path.dirname(root), "outside");
     await mkdir(outside);

@@ -4,7 +4,9 @@ import path from "node:path";
 import { ownedState } from "../opencode/install-files.js";
 import { directoryProblem, lstatOrNull, printableText } from "../opencode/paths.js";
 import { CODEX_MISSING, codexClient, marketplaceRef, sameMcp } from "./codex-cli.js";
-import { AGENT_RELS, INSTALL_COMMAND, MARKETPLACE_NAME, PLUGIN_ID, RECORD_REL, TIMEOUT_NOTE, atHome, codexHomeFor, mcpEntryFor, readCodexRecord } from "./paths.js";
+import { LEGACY_DATA_DIRECTORY } from "../legacy-names.js";
+import { describeSelection, readCodexModels, selectionFor } from "./models.js";
+import { AGENT_RELS, INSTALL_COMMAND, LEGACY_LAYOUT, MARKETPLACE_NAME, PLUGIN_ID, RECORD_REL, TIMEOUT_NOTE, atHome, codexHomeFor, mcpEntryFor, readCodexRecord, readLegacyRecord } from "./paths.js";
 
 const reason = (error) => (error instanceof Error ? error.message : String(error));
 
@@ -79,6 +81,38 @@ function mcpLine(codexHome, mcp, record) {
   return `MCP server ${name}: ${state}${mcp.value.enabled === false ? " (disabled)" : ""}.`;
 }
 
+/** One line for the models file, then one per role agent that does not inherit. */
+function modelLines(codexHome) {
+  const models = readCodexModels(codexHome);
+  if (models.error) return [`Model roles: ${models.configFile} cannot be used (${models.error}); agents are installed without models.`];
+
+  const lines = [`Model roles: ${models.configFile}${models.exists ? "" : " (not created yet; every role inherits)"}.`];
+  for (const rel of AGENT_RELS) {
+    const role = path.basename(rel, ".toml").slice("us-".length);
+    const selection = selectionFor(role, models.roles);
+    if (selection.model || selection.effort) lines.push(`  us-${role}: ${describeSelection(selection)}.`);
+  }
+  return lines;
+}
+
+/** What an install from before the rename left: its record, its plugin and MCP server in Codex, and its folder. */
+function legacyLines(codexHome, client) {
+  const lines = [];
+  const legacy = readLegacyRecord(codexHome);
+  if (legacy.record) lines.push(`Earlier install: Useful Skills ${legacy.record.version} is still recorded at ${atHome(codexHome, LEGACY_LAYOUT.recordRel)}; run \`${INSTALL_COMMAND}\` to replace it.`);
+  if (legacy.problem) lines.push(`Earlier install: its record cannot be used (${legacy.problem}).`);
+
+  if (client) {
+    const plugin = attempt(() => client.listPlugins().find((item) => item.pluginId === LEGACY_LAYOUT.pluginId && item.installed));
+    if (plugin.value) lines.push(`Earlier install: plugin ${LEGACY_LAYOUT.pluginId} is still installed; run \`${INSTALL_COMMAND}\` to replace it.`);
+    const mcp = attempt(() => client.getMcp(LEGACY_LAYOUT.mcpName));
+    if (mcp.value) lines.push(`Earlier install: MCP server ${LEGACY_LAYOUT.mcpName} is still registered; run \`${INSTALL_COMMAND}\` to replace it.`);
+  }
+
+  if (lstatOrNull(atHome(codexHome, LEGACY_DATA_DIRECTORY))) lines.push(`Earlier install: ${atHome(codexHome, LEGACY_DATA_DIRECTORY)} still exists.`);
+  return lines;
+}
+
 function dataLine(dataDir) {
   const stat = lstatOrNull(dataDir);
   const state = !stat ? "missing" : stat.isDirectory() ? `present, mode ${(stat.mode & 0o777).toString(8)}` : "not a directory";
@@ -127,6 +161,8 @@ function reportLines(environment, lines) {
   else lines.push("Plugin, marketplace and MCP server: not checked without the codex command.");
 
   lines.push(dataLine(record.value?.dataDir ?? mcpEntryFor(codexHome).env.USEFUL_SKILLS_DATA));
+  lines.push(...modelLines(codexHome));
+  lines.push(...legacyLines(codexHome, version.value ? codexClient({ environment, codexHome }) : undefined));
 }
 
 /** Read-only health summary of the Codex install: `{text}`. Never throws; a damaged install is reported. */

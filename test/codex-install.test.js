@@ -24,7 +24,7 @@ function setup(t, packageOptions) {
   t.after(box.cleanup);
   writePackage(box.packageRoot, packageOptions);
   const install = (options = {}) => installCodex({ environment: box.environment, packageRoot: box.packageRoot, ...options });
-  const record = () => JSON.parse(readFileSync(box.at("useful-skills", "install-record.json"), "utf8"));
+  const record = () => JSON.parse(readFileSync(box.at("harness-useful-skills", "install-record.json"), "utf8"));
   return { ...box, install, record };
 }
 
@@ -45,19 +45,19 @@ test("a fresh install copies the runtime and agents, records them, and registers
 
   assert.match(result.message, /Installed Useful Skills 0\.3\.11 for Codex/);
   assert.match(result.message, /Restart Codex/);
-  assert.ok(existsSync(box.at("useful-skills", "runtime", "codex", "mcp-server.js")));
-  assert.ok(existsSync(box.at("useful-skills", "runtime", "package.json")));
+  assert.ok(existsSync(box.at("harness-useful-skills", "runtime", "codex", "mcp-server.js")));
+  assert.ok(existsSync(box.at("harness-useful-skills", "runtime", "package.json")));
   for (const role of AGENT_ROLES) {
     assert.equal(readFileSync(box.at("agents", `us-${role}.toml`), "utf8").split("\n")[0], AGENT_MARKER);
   }
-  assert.equal(statSync(box.at("useful-skills", "data")).mode & 0o777, 0o700);
+  assert.equal(statSync(box.at("harness-useful-skills", "data")).mode & 0o777, 0o700);
 
-  const server = box.at("useful-skills", "runtime", "codex", "mcp-server.js");
-  const dataDir = box.at("useful-skills", "data");
+  const server = box.at("harness-useful-skills", "runtime", "codex", "mcp-server.js");
+  const dataDir = box.at("harness-useful-skills", "data");
   assert.deepEqual(changes(box.calls()), [
     "plugin marketplace add MSpiechowicz/harness-useful-skills --ref v0.3.11",
-    "plugin add useful-skills@harness-useful-skills --json",
-    `mcp add useful_skills --env USEFUL_SKILLS_DATA=${dataDir} -- node ${server}`,
+    "plugin add harness-useful-skills@harness-useful-skills --json",
+    `mcp add harness-useful-skills --env USEFUL_SKILLS_DATA=${dataDir} -- node ${server}`,
   ]);
   assert.deepEqual(box.calls()[0], ["--version"]);
 
@@ -67,11 +67,11 @@ test("a fresh install copies the runtime and agents, records them, and registers
   assert.equal(record.codexHome, box.codexHome);
   assert.equal(record.dataDir, dataDir);
   assert.deepEqual(record.marketplace, { name: "harness-useful-skills", source: "MSpiechowicz/harness-useful-skills", ref: "v0.3.11", addedByInstaller: true });
-  assert.equal(record.pluginId, "useful-skills@harness-useful-skills");
+  assert.equal(record.pluginId, "harness-useful-skills@harness-useful-skills");
   assert.equal(record.pluginVersion, "0.3.11");
-  assert.deepEqual(record.mcp, { name: "useful_skills", command: "node", args: [server], env: { USEFUL_SKILLS_DATA: dataDir } });
+  assert.deepEqual(record.mcp, { name: "harness-useful-skills", command: "node", args: [server], env: { USEFUL_SKILLS_DATA: dataDir } });
   assert.match(record.files["agents/us-planner.toml"], /^[0-9a-f]{64}$/);
-  assert.match(record.files["useful-skills/runtime/codex/mcp-server.js"], /^[0-9a-f]{64}$/);
+  assert.match(record.files["harness-useful-skills/runtime/codex/mcp-server.js"], /^[0-9a-f]{64}$/);
   assert.equal(Object.keys(record.files).length, 7 + 11);
 });
 
@@ -94,7 +94,7 @@ test("--local refuses a package root whose marketplace has another name", async 
 test("installing again changes no file and only re-runs the idempotent plugin add", async (t) => {
   const box = setup(t);
   await box.install();
-  const watched = [box.at("useful-skills", "install-record.json"), box.at("agents", "us-scout.toml"), box.at("useful-skills", "runtime", "memory.js")];
+  const watched = [box.at("harness-useful-skills", "install-record.json"), box.at("agents", "us-scout.toml"), box.at("harness-useful-skills", "runtime", "memory.js")];
   const before = watched.map((file) => ({ ino: lstatSync(file).ino, mtime: lstatSync(file).mtimeMs }));
   const tree = listTree(box.codexHome);
   box.clearCalls();
@@ -102,8 +102,8 @@ test("installing again changes no file and only re-runs the idempotent plugin ad
   const result = await box.install();
 
   assert.match(result.message, /files already up to date/);
-  assert.match(result.message, /MCP server useful_skills is already registered/);
-  assert.deepEqual(changes(box.calls()), ["plugin add useful-skills@harness-useful-skills --json"]);
+  assert.match(result.message, /MCP server harness-useful-skills is already registered/);
+  assert.deepEqual(changes(box.calls()), ["plugin add harness-useful-skills@harness-useful-skills --json"]);
   assert.deepEqual(watched.map((file) => ({ ino: lstatSync(file).ino, mtime: lstatSync(file).mtimeMs })), before);
   assert.deepEqual(listTree(box.codexHome), tree);
 });
@@ -121,13 +121,13 @@ test("an upgrade replaces the marketplace at the new ref and prunes owned files 
   assert.deepEqual(changes(box.calls()), [
     "plugin marketplace remove harness-useful-skills",
     "plugin marketplace add MSpiechowicz/harness-useful-skills --ref v0.3.12",
-    "plugin add useful-skills@harness-useful-skills --json",
+    "plugin add harness-useful-skills@harness-useful-skills --json",
   ]);
-  assert.equal(existsSync(box.at("useful-skills", "runtime", "memory.js")), false);
-  assert.ok(existsSync(box.at("useful-skills", "runtime", "graph.js")));
+  assert.equal(existsSync(box.at("harness-useful-skills", "runtime", "memory.js")), false);
+  assert.ok(existsSync(box.at("harness-useful-skills", "runtime", "graph.js")));
   assert.equal(box.record().version, "0.3.12");
   assert.equal(box.record().marketplace.ref, "v0.3.12");
-  assert.equal(box.record().files["useful-skills/runtime/memory.js"], undefined);
+  assert.equal(box.record().files["harness-useful-skills/runtime/memory.js"], undefined);
   assert.equal(box.state().plugins[0].version, "0.3.12");
 });
 
@@ -173,10 +173,10 @@ test("a marketplace of the same name from another source is refused before any w
   await assertRefused(box, /marketplace named harness-useful-skills from https:\/\/github\.com\/someone\/fork\.git, which Useful Skills did not add/);
 });
 
-test("an MCP server named useful_skills that Useful Skills did not register is refused before any write", async (t) => {
+test("an MCP server named harness-useful-skills that Useful Skills did not register is refused before any write", async (t) => {
   const box = setup(t);
-  box.setState({ marketplaces: [], plugins: [], mcp: { useful_skills: { command: "python", args: ["server.py"], env: {}, enabled: true } } });
-  await assertRefused(box, /MCP server named useful_skills \(python server\.py\) that Useful Skills did not register/);
+  box.setState({ marketplaces: [], plugins: [], mcp: { "harness-useful-skills": { command: "python", args: ["server.py"], env: {}, enabled: true } } });
+  await assertRefused(box, /MCP server named harness-useful-skills \(python server\.py\) that Useful Skills did not register/);
 });
 
 test("an agent file the user wrote is refused before any write; one carrying the marker is replaced", async (t) => {
@@ -199,7 +199,7 @@ test("a symlinked target directory or an edited installed file is refused before
 
   const other = setup(t);
   await other.install();
-  writeFileSync(other.at("useful-skills", "runtime", "memory.js"), "// mine\n");
+  writeFileSync(other.at("harness-useful-skills", "runtime", "memory.js"), "// mine\n");
   other.clearCalls();
   await assertRefused(other, /memory\.js: modified since it was installed/);
 });
@@ -207,7 +207,7 @@ test("a symlinked target directory or an edited installed file is refused before
 test("a failure at plugin add leaves a truthful record, and running again completes the install", async (t) => {
   const box = setup(t);
   await assert.rejects(box.install({ environment: { ...box.environment, FAKE_CODEX_FAIL: "plugin add" } }), (error) => {
-    assert.match(error.message, /`codex plugin add useful-skills@harness-useful-skills --json` failed \(exit 1\): Error: injected failure/);
+    assert.match(error.message, /`codex plugin add harness-useful-skills@harness-useful-skills --json` failed \(exit 1\): Error: injected failure/);
     assert.match(error.message, /stopped while installing the plugin\. Done: 18 files in place, marketplace ready\./);
     assert.match(error.message, /\.\/useful-skills install --host codex` \(or the install script\) again/);
     return true;
@@ -222,15 +222,15 @@ test("a failure at plugin add leaves a truthful record, and running again comple
 
   await box.install();
 
-  assert.deepEqual(changes(box.calls()).map((line) => line.split(" --env")[0]), ["plugin add useful-skills@harness-useful-skills --json", "mcp add useful_skills"]);
-  assert.equal(box.record().pluginId, "useful-skills@harness-useful-skills");
+  assert.deepEqual(changes(box.calls()).map((line) => line.split(" --env")[0]), ["plugin add harness-useful-skills@harness-useful-skills --json", "mcp add harness-useful-skills"]);
+  assert.equal(box.record().pluginId, "harness-useful-skills@harness-useful-skills");
   assert.equal(box.record().marketplace.addedByInstaller, true);
   assert.ok(box.record().mcp);
 });
 
 test("a release source that provides another marketplace is removed again and reported", async (t) => {
   const box = setup(t);
-  await assert.rejects(box.install({ environment: { ...box.environment, FAKE_CODEX_GIT_NAME: "useful-skills-local" } }), /MSpiechowicz\/harness-useful-skills at v0\.3\.11 does not provide the harness-useful-skills marketplace \(it provides useful-skills-local, which was removed again\)/);
+  await assert.rejects(box.install({ environment: { ...box.environment, FAKE_CODEX_GIT_NAME: "another-marketplace" } }), /MSpiechowicz\/harness-useful-skills at v0\.3\.11 does not provide the harness-useful-skills marketplace \(it provides another-marketplace, which was removed again\)/);
   assert.deepEqual(box.state().marketplaces, []);
   assert.equal(box.record().marketplace, null);
 });
@@ -249,7 +249,7 @@ test("CODEX_HOME must be absolute and printable; a missing one is created", asyn
 
   const fresh = path.join(box.root, "new-home");
   await box.install({ environment: { ...box.environment, CODEX_HOME: fresh } });
-  assert.ok(existsSync(path.join(fresh, "useful-skills", "install-record.json")));
+  assert.ok(existsSync(path.join(fresh, "harness-useful-skills", "install-record.json")));
   assert.ok(existsSync(path.join(box.root, "home")) && !existsSync(path.join(box.root, "home", ".codex")));
 });
 
@@ -265,12 +265,12 @@ test("doctor reports a missing codex, an empty home, a full install, a marketpla
   assert.match(empty, /Codex CLI: codex-cli 0\.154\.0/);
   assert.match(empty, /Install record: none at /);
   assert.match(empty, /Agents: none of the 7/);
-  assert.match(empty, /Plugin useful-skills@harness-useful-skills: not installed\./);
-  assert.match(empty, /MCP server useful_skills: not registered\./);
-  assert.match(empty, /tool_timeout_sec under \[mcp_servers\.useful_skills\]/);
+  assert.match(empty, /Plugin harness-useful-skills@harness-useful-skills: not installed\./);
+  assert.match(empty, /MCP server harness-useful-skills: not registered\./);
+  assert.match(empty, /tool_timeout_sec under \[mcp_servers\.harness-useful-skills\]/);
   assert.match(doctor({ ...box.environment, CODEX_HOME: path.join(box.root, "absent") }), /\(missing\); Useful Skills is not installed\./);
 
-  box.setState({ marketplaces: [{ name: "harness-useful-skills", sourceType: "git", source: "https://github.com/MSpiechowicz/harness-useful-skills.git", ref: null }], plugins: [{ pluginId: "useful-skills@harness-useful-skills", version: "0.3.11", enabled: true }], mcp: {} });
+  box.setState({ marketplaces: [{ name: "harness-useful-skills", sourceType: "git", source: "https://github.com/MSpiechowicz/harness-useful-skills.git", ref: null }], plugins: [{ pluginId: "harness-useful-skills@harness-useful-skills", version: "0.3.11", enabled: true }], mcp: {} });
   assert.match(doctor(), /skills only; memory tools and agents unavailable; run `\.\/useful-skills install --host codex`/);
 
   box.setState({ marketplaces: [], plugins: [], mcp: {} });
@@ -282,11 +282,11 @@ test("doctor reports a missing codex, an empty home, a full install, a marketpla
   assert.match(full, /Agents: 6 of 7 ok .*\n {2}us-scout\.toml: modified/);
   assert.match(full, /installed, enabled, version 0\.3\.11 \(matches the install record\)/);
   assert.match(full, /Marketplace harness-useful-skills: added from https:\/\/github\.com\/MSpiechowicz\/harness-useful-skills\.git at v0\.3\.11\./);
-  assert.match(full, /MCP server useful_skills: registered as installed\./);
+  assert.match(full, /MCP server harness-useful-skills: registered as installed\./);
   assert.match(full, /Data directory: .* \(present, mode 700\)\./);
   assert.doesNotMatch(full, /skills only/);
 
-  writeFileSync(box.at("useful-skills", "install-record.json"), "{");
+  writeFileSync(box.at("harness-useful-skills", "install-record.json"), "{");
   assert.match(doctor(), /Install record: cannot be used \(The Codex install record is not valid JSON\.\)/);
   await assert.rejects(box.install(), /not valid JSON/);
 });
@@ -328,7 +328,7 @@ test("the CLI installs the repository's own bundle with --local, and doctor read
   const doctor = await cli(["doctor", "--host", "codex"], box.environment);
   assert.equal(doctor.code, 0);
   assert.match(doctor.stdout, /Agents: 7 of 7 ok/);
-  assert.match(doctor.stdout, /MCP server useful_skills: registered as installed\./);
+  assert.match(doctor.stdout, /MCP server harness-useful-skills: registered as installed\./);
 });
 
 test("a default install checks the release tag with git first and refuses a missing tag before any write", async (t) => {
@@ -363,15 +363,15 @@ test("an offline or missing git only adds a note, and --local skips the tag chec
 test("with the record lost, identical files are adopted, and differing runtime files name the directory to move away", async (t) => {
   const box = setup(t);
   await box.install();
-  rmSync(box.at("useful-skills", "install-record.json"));
+  rmSync(box.at("harness-useful-skills", "install-record.json"));
 
   await box.install();
   assert.equal(Object.keys(box.record().files).length, 18);
 
-  rmSync(box.at("useful-skills", "install-record.json"));
+  rmSync(box.at("harness-useful-skills", "install-record.json"));
   writePackage(box.packageRoot, { version: "0.3.12" });
   box.clearCalls();
-  await assertRefused(box, new RegExp(`${box.at("useful-skills", "runtime").replaceAll("/", "\\/")} holds runtime files the install record does not list .* move that directory away`));
+  await assertRefused(box, new RegExp(`${box.at("harness-useful-skills", "runtime").replaceAll("/", "\\/")} holds runtime files the install record does not list .* move that directory away`));
 });
 
 test("after a partial upgrade the record keeps the old plugin version and doctor reports the plugin as stale", async (t) => {
@@ -392,7 +392,7 @@ test("after a partial upgrade the record keeps the old plugin version and doctor
 
   // A record from before pluginVersion existed: the plugin version is unknown, and the live plugin is compared with record.version.
   const { pluginVersion: _unused, ...older } = box.record();
-  writeFileSync(box.at("useful-skills", "install-record.json"), JSON.stringify(older));
+  writeFileSync(box.at("harness-useful-skills", "install-record.json"), JSON.stringify(older));
   const olderDoctor = inspectCodexInstall({ environment: box.environment }).text;
   assert.match(olderDoctor, /Install record: Useful Skills 0\.3\.12\.\n/);
   assert.doesNotMatch(olderDoctor, /did not finish/);
@@ -421,12 +421,12 @@ test("Windows: codex.exe anywhere on PATH wins and runs directly; POSIX always r
 test("Windows: a codex.cmd shim runs through cmd.exe with quoted arguments, or is refused for cmd metacharacters", () => {
   const exists = (file) => file === "C:\\Users\\me\\AppData\\Roaming\\npm\\codex.cmd";
   const environment = { PATH: "C:\\Users\\me\\AppData\\Roaming\\npm", ComSpec: "C:\\Windows\\System32\\cmd.exe" };
-  const invocation = codexInvocation(["mcp", "add", "useful_skills", "--env", "USEFUL_SKILLS_DATA=C:\\Users\\me\\.codex (x)\\data", "--", "node", "C:\\dir\\", ""], { platform: "win32", environment, exists });
+  const invocation = codexInvocation(["mcp", "add", "harness-useful-skills", "--env", "USEFUL_SKILLS_DATA=C:\\Users\\me\\.codex (x)\\data", "--", "node", "C:\\dir\\", ""], { platform: "win32", environment, exists });
 
   assert.equal(invocation.command, "C:\\Windows\\System32\\cmd.exe");
   assert.equal(invocation.verbatim, true);
   assert.deepEqual(invocation.args.slice(0, 3), ["/d", "/s", "/c"]);
-  assert.equal(invocation.args[3], '""C:\\Users\\me\\AppData\\Roaming\\npm\\codex.cmd" "mcp" "add" "useful_skills" "--env" "USEFUL_SKILLS_DATA=C:\\Users\\me\\.codex (x)\\data" "--" "node" "C:\\dir\\\\" """');
+  assert.equal(invocation.args[3], '""C:\\Users\\me\\AppData\\Roaming\\npm\\codex.cmd" "mcp" "add" "harness-useful-skills" "--env" "USEFUL_SKILLS_DATA=C:\\Users\\me\\.codex (x)\\data" "--" "node" "C:\\dir\\\\" """');
   const shellFor = (variables) => codexInvocation(["--version"], { platform: "win32", environment: { PATH: environment.PATH, ...variables }, exists }).command;
   assert.equal(shellFor({ COMSPEC: "relative.exe", systemroot: "C:\\Windows" }), "C:\\Windows\\System32\\cmd.exe");
   assert.equal(shellFor({ SystemRoot: "D:\\Win" }), "D:\\Win\\System32\\cmd.exe");
@@ -445,7 +445,7 @@ test("CODEX_HOME defaults to the home directory, and the install record is read 
 
   const box = setup(t);
   await box.install();
-  const file = box.at("useful-skills", "install-record.json");
+  const file = box.at("harness-useful-skills", "install-record.json");
   const good = box.record();
   const variants = [
     { schema: 2 },
@@ -453,7 +453,7 @@ test("CODEX_HOME defaults to the home directory, and the install record is read 
     { codexHome: "relative" },
     { dataDir: null },
     { marketplace: { name: "m", source: "s", ref: 1, addedByInstaller: true } },
-    { mcp: { name: "useful_skills", command: "node", args: [1], env: {} } },
+    { mcp: { name: "harness-useful-skills", command: "node", args: [1], env: {} } },
     { pluginId: 7 },
     { pluginVersion: 7 },
     { files: [] },

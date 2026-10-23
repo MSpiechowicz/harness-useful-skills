@@ -17,7 +17,7 @@ async function fixture(t) {
   await Promise.all([agentDir, otherProfile, cwd].map(directory => mkdir(directory)));
   const options = { agentDir, cwd };
   return { root, agentDir, otherProfile, cwd, options,
-    directory: path.join(agentDir, "useful-skills", "workflow-settings") };
+    directory: path.join(agentDir, "harness-useful-skills", "workflow-settings") };
 }
 
 test("reads defaults without creating state and persists repository master and profile stages", async t => {
@@ -118,7 +118,7 @@ test("symlinked profile or managed ancestor cannot redirect read or write", asyn
   await symlink(f.agentDir, linkProfile);
   await assert.rejects(readWorkflowSettings({ agentDir: linkProfile, cwd: f.cwd }), /symbolic links/i);
   await assert.rejects(writeWorkflowSetting({ agentDir: linkProfile, key: "plan", enabled: false }), /symbolic links/i);
-  const managed = path.join(f.agentDir, "useful-skills");
+  const managed = path.join(f.agentDir, "harness-useful-skills");
   await symlink(outside, managed);
   const unsafe = await readWorkflowSettings(f.options);
   assert.deepEqual(Object.keys(unsafe.errors), keys);

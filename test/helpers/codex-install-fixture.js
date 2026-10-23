@@ -59,7 +59,7 @@ if (key === "plugin marketplace list") {
 } else if (args[0] === "plugin" && args[1] === "add") {
   const [name, market] = args[2].split("@");
   const m = state.marketplaces.find((item) => item.name === market);
-  if (!m || name !== "useful-skills") fail("plugin " + name + " was not found in marketplace " + market);
+  if (!m || name !== "harness-useful-skills") fail("plugin " + name + " was not found in marketplace " + market);
   const version = m.sourceType === "local" ? readJson(path.join(m.source, "plugins/codex/.codex-plugin/plugin.json")).version : (m.ref || "v0.0.0").replace(/^v/, "");
   state.plugins = state.plugins.filter((p) => p.pluginId !== args[2]).concat([{ pluginId: args[2], version, enabled: true }]);
   save();
@@ -141,12 +141,12 @@ export function createCodexSandbox() {
  */
 export function writePackage(packageRoot, { version = "0.3.11", marketplace = "harness-useful-skills", files = {} } = {}) {
   rmSync(packageRoot, { recursive: true, force: true });
-  const runtime = path.join(packageRoot, "plugins", "codex-runtime", "useful-skills");
+  const runtime = path.join(packageRoot, "plugins", "codex-runtime", "harness-useful-skills");
   mkdirSync(path.join(runtime, "codex"), { recursive: true });
   cpSync(REAL_AGENTS, path.join(runtime, "codex", "agents"), { recursive: true });
 
   const content = {
-    "package.json": `${JSON.stringify({ name: "useful-skills-codex-runtime", private: true, type: "module" })}\n`,
+    "package.json": `${JSON.stringify({ name: "harness-useful-skills-codex-runtime", private: true, type: "module" })}\n`,
     "codex/mcp-server.js": `// mcp ${version}\n`,
     "codex/host-context.js": "export {};\n",
     "memory.js": `// memory ${version}\n`,
@@ -161,7 +161,7 @@ export function writePackage(packageRoot, { version = "0.3.11", marketplace = "h
 
   const manifest = path.join(packageRoot, "plugins", "codex", ".codex-plugin", "plugin.json");
   mkdirSync(path.dirname(manifest), { recursive: true });
-  writeFileSync(manifest, `${JSON.stringify({ name: "useful-skills", version })}\n`);
+  writeFileSync(manifest, `${JSON.stringify({ name: "harness-useful-skills", version })}\n`);
   const market = path.join(packageRoot, ".agents", "plugins", "marketplace.json");
   mkdirSync(path.dirname(market), { recursive: true });
   writeFileSync(market, `${JSON.stringify({ name: marketplace, plugins: [] })}\n`);

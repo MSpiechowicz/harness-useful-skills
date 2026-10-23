@@ -82,7 +82,7 @@ test("sync-agents is a no-op outside an install and regenerates the recorded ins
   assert.equal(await hookCli(f, ["sync-agents"]), "", "a checkout runtime has no install record");
 
   const scopeRoot = f.configDir;
-  const runtimeRoot = path.join(scopeRoot, "plugins", "useful-skills");
+  const runtimeRoot = path.join(scopeRoot, "plugins", "harness-useful-skills");
   await mkdir(runtimeRoot, { recursive: true });
   await writeFile(installRecordPath(scopeRoot), JSON.stringify({
     schema: 1, version: "1.0.0", scope: "user", scopeRoot, dataDir: path.join(f.root, "data"), configFile: null, mcpEntry: null, files: {},

@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, realpath, rename, rm } from "node:fs/promises";
 import path from "node:path";
 
+import { migrateDataDirectory } from "./data-migration.js";
 import { dependencyStatus, ensureDependencies } from "./dependencies.js";
 import { errorMessage, truncateUtf8 } from "./graph-safety.js";
 import { activeSnapshot, checkExistingManagedPath, existingDirectory, MAX_GRAPH_BYTES, prepareRuntime, prepareStorage, PRIVATE_MODE, stagedGraphContents, writeAtomic } from "./graph-storage.js";
@@ -10,6 +11,7 @@ import { graphValidationError, importRelations, isExternalImportReference, isSou
 import { inspectDynamicImportWitnesses, repairMissingExternalImportEdges } from "./graph-import-provenance.js";
 import { dropGeneratedImportTargets, dropSveltePackageImports, dropUnresolvablePlaceholderImports } from "./graph-placeholder-imports.js";
 import { assertWorkspaceUnchanged, pinWorkspace, scopeSystem, sourceScopeError, workspaceMountBlocker, workspaceScopeBlocker } from "./graph-scope.js";
+import { DATA_DIRECTORY } from "./names.js";
 import { isPathWithin } from "./path-boundary.js";
 import { runProcess } from "./process.js";
 
@@ -100,8 +102,11 @@ export async function workspaceMemoryPaths({ cwd, agentDir }) {
   await existingDirectory(workspace, "Workspace directory");
   await existingDirectory(profile, "Agent profile directory");
 
+  // Memory saved under the name used before the rename moves to the current name before the first read.
+  migrateDataDirectory(profile);
+
   const workspaceHash = createHash("sha256").update(workspace).digest("hex");
-  const directory = path.join(profile, "useful-skills", "memory", workspaceHash);
+  const directory = path.join(profile, DATA_DIRECTORY, "memory", workspaceHash);
   if (isPathWithin(workspace, directory)) {
     throw new Error("Managed memory storage must be outside the workspace.");
   }

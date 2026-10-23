@@ -29,9 +29,9 @@ const token = async () => null;
 
 async function writeRecord({ scopeRoot, scope, home }, version) {
   const record = { schema: 1, version, scope, scopeRoot, dataDir: path.join(home, "data"), configFile: null, mcpEntry: null, files: {} };
-  const runtimeRoot = path.join(scopeRoot, "plugins", "useful-skills");
+  const runtimeRoot = path.join(scopeRoot, "plugins", "harness-useful-skills");
   await writeFile(path.join(runtimeRoot, "install-record.json"), JSON.stringify(record));
-  await writeFile(path.join(runtimeRoot, "package.json"), JSON.stringify({ name: "useful-skills-opencode", version }));
+  await writeFile(path.join(runtimeRoot, "package.json"), JSON.stringify({ name: "harness-useful-skills-opencode", version }));
 }
 
 /** An installed OpenCode runtime tree with its install record, in a private HOME. */
@@ -39,7 +39,7 @@ async function installedCopy({ scope = "user", version = "1.0.0" } = {}) {
   const home = await mkdtemp(path.join(base, "home-"));
   const environment = { HOME: home, XDG_CONFIG_HOME: path.join(home, "config"), XDG_DATA_HOME: path.join(home, "share"), PATH: process.env.PATH };
   const scopeRoot = scope === "user" ? path.join(home, "config", "opencode") : path.join(home, "project", ".opencode");
-  const runtimeRoot = path.join(scopeRoot, "plugins", "useful-skills");
+  const runtimeRoot = path.join(scopeRoot, "plugins", "harness-useful-skills");
   await mkdir(runtimeRoot, { recursive: true });
 
   const copy = { home, environment, scope, scopeRoot, runtimeRoot };
@@ -68,10 +68,10 @@ async function releaseArchive(version, { change = async () => {}, tarArgs = [], 
   const work = await mkdtemp(path.join(base, "release-"));
   const top = `harness-useful-skills-${version}`;
   const root = path.join(work, top);
-  await mkdir(path.join(root, "plugins", "opencode", "useful-skills"), { recursive: true });
+  await mkdir(path.join(root, "plugins", "opencode", "harness-useful-skills"), { recursive: true });
   await writeFile(path.join(root, "package.json"), JSON.stringify({ name: "harness-useful-skills", version }));
-  await writeFile(path.join(root, "plugins", "opencode", "useful-skills", "package.json"), JSON.stringify({ name: "useful-skills-opencode", version }));
-  await writeFile(path.join(root, "plugins", "opencode", "useful-skills.js"), "export {};\n");
+  await writeFile(path.join(root, "plugins", "opencode", "harness-useful-skills", "package.json"), JSON.stringify({ name: "harness-useful-skills-opencode", version }));
+  await writeFile(path.join(root, "plugins", "opencode", "harness-useful-skills.js"), "export {};\n");
   await writeFile(path.join(root, "useful-skills"), FIXTURE_INSTALLER);
   await change(root, work);
 
@@ -214,8 +214,8 @@ const unsafeArchives = {
   "an absolute path": [{ tarArgs: ["-P", "--transform", "s,^harness-useful-skills-1.0.1/package.json$,/tmp/escape.json,"] }, /unsafe entry name "\/tmp\/escape\.json"/],
   "a second top-level entry": [{ change: (_root, work) => writeFile(path.join(work, "extra.txt"), "x"), members: ["harness-useful-skills-1.0.1", "extra.txt"] }, /exactly one top-level directory/],
   "a mismatched root version": [{ change: root => writeFile(path.join(root, "package.json"), JSON.stringify({ version: "1.0.0" })) }, /package\.json has version 1\.0\.0, expected 1\.0\.1/],
-  "a mismatched bundle version": [{ change: root => writeFile(path.join(root, "plugins", "opencode", "useful-skills", "package.json"), JSON.stringify({ version: "1.0.2" })) }, /useful-skills\/package\.json has version 1\.0\.2/],
-  "no OpenCode bundle entry": [{ change: root => rm(path.join(root, "plugins", "opencode", "useful-skills.js")) }, /has no plugins\/opencode\/useful-skills\.js/],
+  "a mismatched bundle version": [{ change: root => writeFile(path.join(root, "plugins", "opencode", "harness-useful-skills", "package.json"), JSON.stringify({ version: "1.0.2" })) }, /useful-skills\/package\.json has version 1\.0\.2/],
+  "no OpenCode bundle entry": [{ change: root => rm(path.join(root, "plugins", "opencode", "harness-useful-skills.js")) }, /has no plugins\/opencode\/harness-useful-skills\.js/],
   "no release launcher": [{ change: root => rm(path.join(root, "useful-skills")) }, /has no useful-skills;/],
 };
 

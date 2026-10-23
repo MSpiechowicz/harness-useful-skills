@@ -31,4 +31,4 @@ A compact decision record: facts inspected, questions asked, answers, recommenda
 
 ## Failure behavior
 
-Never fabricate an answer or start implementation while a user-owned choice is open; if the user does not answer, keep it open as an explicit plan risk. Clarification is not plan approval; `/useful-skills:us-plan` requests that separately.
+Never fabricate an answer or start implementation while a user-owned choice is open; if the user does not answer, keep it open as an explicit plan risk. Clarification is not plan approval; `/harness-useful-skills:us-plan` requests that separately.

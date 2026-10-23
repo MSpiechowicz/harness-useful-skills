@@ -5,7 +5,7 @@ description: Use only when the user explicitly asks to "audit performance", "pro
 
 # Performance audit
 
-Load `/useful-skills:us-write-concisely` before preparing context or findings. This skill is read-only by default and does not authorize application changes, production load, profiler installation, or infrastructure changes.
+Load `/harness-useful-skills:us-write-concisely` before preparing context or findings. This skill is read-only by default and does not authorize application changes, production load, profiler installation, or infrastructure changes.
 
 ## Establish a baseline
 
@@ -21,4 +21,4 @@ Trace actual entry points and callers before looking for generic optimizations. 
 
 For every finding, state the location/symbol, workload, measurement or profile evidence, likely cause, user-visible consequence, simplest behavior-preserving recommendation, tradeoffs, and reproducible validation scenario. Separate measured findings from hypotheses and state what would confirm the latter.
 
-Include a baseline table with the actual environment, workload, results, and limitations. Do not promise a speedup without a controlled before/after comparison. If implementation is later authorized, use `/useful-skills:us-run-workflow` and repeat the same measurement after functional verification. Leave a permanent benchmark only when requested or when it protects a demonstrated regression.
+Include a baseline table with the actual environment, workload, results, and limitations. Do not promise a speedup without a controlled before/after comparison. If implementation is later authorized, use `/harness-useful-skills:us-run-workflow` and repeat the same measurement after functional verification. Leave a permanent benchmark only when requested or when it protects a demonstrated regression.

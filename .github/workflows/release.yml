@@ -80,5 +80,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SOURCE_SHA: ${{ github.sha }}
-          BUMP: ${{ inputs.bump || 'patch' }}
+          # A pushed commit with a BREAKING CHANGE footer is a minor release while the version is 0.x.
+          BUMP: ${{ inputs.bump || (contains(github.event.head_commit.message, 'BREAKING CHANGE') && 'minor') || 'patch' }}
         run: python release.py --source "$SOURCE_SHA" --bump "$BUMP" --push --github-release

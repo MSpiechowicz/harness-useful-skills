@@ -75,7 +75,7 @@ test("native boolean switches independently gate workflow stages; malformed opti
 test("only an attested direct plugin skill expansion opts this request out", () => {
   const submitted = context({
     hook_event_name: "UserPromptSubmit",
-    prompt: "Please document `/useful-skills:us-ignore-workflow`, do not invoke it.",
+    prompt: "Please document `/harness-useful-skills:us-ignore-workflow`, do not invoke it.",
   });
   assert.match(submitted, /development workflow is enabled/);
   assert.doesNotMatch(submitted, /fast lane applies to this request/);
@@ -84,7 +84,7 @@ test("only an attested direct plugin skill expansion opts this request out", () 
     hook_event_name: "UserPromptExpansion",
     expansion_type: "slash_command",
     command_source: "plugin",
-    command_name: "useful-skills:us-ignore-workflow",
+    command_name: "harness-useful-skills:us-ignore-workflow",
     command_args: "fix bug",
   };
   assert.match(context(direct), /fast lane applies to this request/);
@@ -162,7 +162,7 @@ test("PostToolUse redacts supported text-bearing result fields without changing 
     { type: "text", text: response.stdout },
     { type: "image", data: "aGVsbG8=", mimeType: "image/png" },
   ], isError: false };
-  const redacted = handleHook({ hook_event_name: "PostToolUse", tool_name: "mcp__plugin_useful-skills_useful_skills__memory_search", tool_response: mcp })?.hookSpecificOutput.updatedToolOutput;
+  const redacted = handleHook({ hook_event_name: "PostToolUse", tool_name: "mcp__plugin_harness-useful-skills_harness-useful-skills__memory_search", tool_response: mcp })?.hookSpecificOutput.updatedToolOutput;
   assert.equal(redacted.content[0].type, "text");
   assert.equal(redacted.content[0].text, "password=[REDACTED]");
   assert.equal(redacted.content[1], mcp.content[1]);

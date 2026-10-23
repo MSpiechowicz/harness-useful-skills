@@ -3,6 +3,7 @@ import { realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { formatDoctor } from "./doctor.js";
+import { PLUGIN_NAME } from "./names.js";
 import { installPlugin, PACKAGE_ROOT, runUpdate, UpdateError } from "./updater.js";
 import { formatResources, listResources, parseCatalogArguments, resourceInventory, safetyEnabled } from "./resources.js";
 const USAGE = `Usage:
@@ -18,11 +19,13 @@ const USAGE = `Usage:
   ./useful-skills update --host codex
   ./useful-skills uninstall --host codex
   ./useful-skills doctor --host codex
+  ./useful-skills models apply --host codex
 
 Requires Node.js 22+ and OMP with marketplace support.
 --host omp is the default; --host opencode installs into OpenCode instead (restart OpenCode afterwards).
 --host codex installs into Codex (CODEX_HOME, default ~/.codex) and needs the codex command on PATH;
 --local adds this directory as the marketplace instead of the GitHub release (restart Codex afterwards).
+models apply --host codex writes the roles of $CODEX_HOME/harness-useful-skills/models.yml into the Codex agents (the installer does it too).
 Owned us-* skills are selected by description or /skill:us-<name>.
 No startup workflow.
 Development uses one plan approval; publication requires an explicit request.
@@ -75,7 +78,7 @@ function parseOptions(argv, allowed) {
 }
 
 /** Commands that accept `--host`; `list` and `help` are host-agnostic. */
-const HOSTED_COMMANDS = new Set(["install", "update", "uninstall", "doctor"]);
+const HOSTED_COMMANDS = new Set(["install", "update", "uninstall", "doctor", "models"]);
 const OMP_UNINSTALL = "uninstall needs --host opencode or --host codex; for OMP run `omp plugin uninstall harness-useful-skills@harness-useful-skills`.";
 const HOSTS = new Set(["omp", "opencode", "codex"]);
 const CODEX_UPDATE = "Useful Skills for Codex updates by installing again: re-run install.sh (or install.ps1) with HARNESS_SKILLS_HOST=codex, or run `./useful-skills install --host codex` from an updated checkout.";
@@ -127,7 +130,7 @@ function openCodeOperation(command, argv) {
 /** Check or install an update for the runtime installed in `scope`, never for this checkout. */
 async function openCodeUpdate({ action, scope }, context) {
   const { runtimeInstall, scopeRootFor } = await import("./opencode/paths.js");
-  const runtimeRoot = path.join(scopeRootFor({ scope, ...context }), "plugins", "useful-skills");
+  const runtimeRoot = path.join(scopeRootFor({ scope, ...context }), "plugins", PLUGIN_NAME);
   if (!runtimeInstall(runtimeRoot)) {
     const flag = scope === "project" ? " --scope project" : "";
     throw new Error(`Useful Skills is not installed for OpenCode in ${scope} scope; run ./useful-skills install --host opencode${flag} first.`);
@@ -181,6 +184,18 @@ async function openCodeCommand(command, argv) {
   }
 }
 
+/** Validate `models apply`: only Codex needs it, because Claude and OpenCode apply their model roles when a session starts. */
+function modelsOperation(host, argv) {
+  if (host !== "codex") {
+    throw new UpdateError("models apply is for --host codex; Claude Code and OpenCode apply their model roles when a session starts.");
+  }
+
+  if (argv.length !== 1 || argv[0] !== "apply") {
+    throw new UpdateError("Expected models apply --host codex.");
+  }
+  return { command: "models" };
+}
+
 /** Validate a Codex command line, returning the operation to run; argument errors throw before anything runs. */
 function codexOperation(command, argv) {
   for (const option of ["--profile", "--scope"]) {
@@ -214,6 +229,11 @@ function codexOperation(command, argv) {
 }
 
 async function runCodex({ command, local }) {
+  if (command === "models") {
+    const { applyCodexModels, formatApplied } = await import("./codex/apply-models.js");
+    return formatApplied(await applyCodexModels({ environment: process.env }));
+  }
+
   if (command === "install") {
     const { installCodex } = await import("./codex/install.js");
     return (await installCodex({ environment: process.env, packageRoot: PACKAGE_ROOT, local })).message;
@@ -234,7 +254,7 @@ async function runCodex({ command, local }) {
 
 /** Like openCodeCommand: argument errors exit 2 with usage, a failed operation exits 1 with its reason. */
 async function codexCommand(command, argv) {
-  const operation = codexOperation(command, argv);
+  const operation = command === "models" ? modelsOperation("codex", argv) : codexOperation(command, argv);
   const { printableText } = await import("./opencode/paths.js");
   try {
     console.log(printableText(await runCodex(operation)));
@@ -260,6 +280,9 @@ export async function main(argv = process.argv.slice(2)) {
 
     if (HOSTED_COMMANDS.has(argv[0])) {
       const { host, rest } = splitHost(argv.slice(1));
+      if (argv[0] === "models" && host !== "codex") {
+        modelsOperation(host, rest);
+      }
       if (host === "opencode") {
         return await openCodeCommand(argv[0], rest);
       }

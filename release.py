@@ -18,7 +18,7 @@ CLAUDE_MANIFEST = ".claude-plugin/plugin.json"
 CLAUDE_BUNDLE_MANIFEST = "plugins/claude/.claude-plugin/plugin.json"
 CLAUDE_MANIFESTS = (CLAUDE_MANIFEST, CLAUDE_BUNDLE_MANIFEST)
 OPENCODE_MANIFEST = "opencode/package.json"
-OPENCODE_BUNDLE_MANIFEST = "plugins/opencode/useful-skills/package.json"
+OPENCODE_BUNDLE_MANIFEST = "plugins/opencode/harness-useful-skills/package.json"
 OPENCODE_MANIFESTS = (OPENCODE_MANIFEST, OPENCODE_BUNDLE_MANIFEST)
 CODEX_MANIFEST = "codex/plugin.json"
 CODEX_BUNDLE_MANIFEST = "plugins/codex/.codex-plugin/plugin.json"
@@ -63,7 +63,7 @@ def catalog_for(repo, source, current_version, version):
     catalog = json.loads(git(repo, "show", f"{source}:{CATALOG}"))
     plugins = [plugin for plugin in catalog["plugins"] if plugin["name"] == PLUGIN]
     if len(plugins) != 1:
-        raise ValueError("Marketplace must contain exactly one useful-skills plugin")
+        raise ValueError("Marketplace must contain exactly one harness-useful-skills plugin")
 
     plugin = plugins[0]
     if plugin["version"] != current_version or plugin["source"]["ref"] != f"v{current_version}":

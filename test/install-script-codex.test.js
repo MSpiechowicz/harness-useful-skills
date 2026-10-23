@@ -20,6 +20,13 @@ test("HARNESS_SKILLS_HOST=codex runs the release installer for Codex without a s
   assert.deepEqual(outcome.leftovers, []);
 });
 
+test("a Codex release from before the names were unified still installs", { skip }, async () => {
+  const { archive } = await buildRelease({ codex: true, earlier: true });
+  const outcome = await runInstaller({ archive, bin: await codexStubBin(), env: CODEX });
+  assert.equal(outcome.status, 0, outcome.stderr);
+  assert.deepEqual(outcome.recorded.argv.slice(1), ["install", "--host", "codex"]);
+});
+
 test("an unset, empty or opencode host keeps the OpenCode installer arguments", { skip }, async () => {
   const { archive } = await buildRelease({ codex: true });
   for (const env of [VERSION, { ...VERSION, HARNESS_SKILLS_HOST: "" }, { ...VERSION, HARNESS_SKILLS_HOST: "opencode" }]) {
@@ -70,7 +77,7 @@ test("a release without the Codex adapter is refused and runs nothing", { skip }
 test("each missing Codex file is refused with the no-adapter message", { skip }, async () => {
   for (const file of [
     ["plugins", "codex", ".codex-plugin", "plugin.json"],
-    ["plugins", "codex-runtime", "useful-skills", "codex", "mcp-server.js"],
+    ["plugins", "codex-runtime", "harness-useful-skills", "codex", "mcp-server.js"],
     [".agents", "plugins", "marketplace.json"],
   ]) {
     const { archive } = await buildRelease({ codex: true, extra: (root) => rm(path.join(root, ...file)) });

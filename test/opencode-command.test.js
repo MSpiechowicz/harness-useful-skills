@@ -62,7 +62,7 @@ test("direct runs accept the plugin's single argument string like split argument
   assert.deepEqual(await direct(f, ["stage", "plan", "disabled"]), joined);
 
   const status = JSON.parse((await direct(f, ["status --json"])).text);
-  assert.equal(status.directory, path.join(f.configDir, "useful-skills", "workflow-settings"));
+  assert.equal(status.directory, path.join(f.configDir, "harness-useful-skills", "workflow-settings"));
   assert.deepEqual(status.stages.plan, { saved: "disabled", effective: "disabled", source: "file" });
   assert.deepEqual(status.workflow, { saved: "enabled", effective: "enabled", source: "default" });
 
@@ -76,14 +76,14 @@ test("a missing OpenCode config dir reads as default settings and is created on 
   await rm(f.base.XDG_CONFIG_HOME, { recursive: true, force: true });
 
   const before = JSON.parse((await f.run(["status --json"])).text);
-  assert.equal(before.directory, path.join(f.configDir, "useful-skills", "workflow-settings"));
+  assert.equal(before.directory, path.join(f.configDir, "harness-useful-skills", "workflow-settings"));
   assert.equal(before.scopeRoot, f.repo);
   assert.deepEqual(before.workflow, { saved: "enabled", effective: "enabled", source: "default" });
   assert.deepEqual(before.stages.review, { saved: "enabled", effective: "enabled", source: "default" });
   await assert.rejects(stat(f.base.XDG_CONFIG_HOME), { code: "ENOENT" }, "reading creates nothing");
 
   assert.deepEqual(await f.run(["workflow disabled"]), { text: `Useful Skills workflow disabled for this repository/workspace (${f.repo}).`, exitCode: 0 });
-  assert.equal((await stat(path.join(f.configDir, "useful-skills"))).mode & 0o777, 0o700);
+  assert.equal((await stat(path.join(f.configDir, "harness-useful-skills"))).mode & 0o777, 0o700);
   assert.deepEqual(await f.run(["stage", "plan", "disabled"]), { text: "Useful Skills plan disabled for this OpenCode profile.", exitCode: 0 });
 
   const after = JSON.parse((await f.run(["status --json"])).text);
@@ -173,7 +173,7 @@ test("graph test and doctor explain a missing install instead of guessing a data
 test("doctor sets up OpenCode memory in the recorded data dir and appends install status", async t => {
   const f = await fixture(t);
   const scopeRoot = f.configDir;
-  const runtimeRoot = path.join(scopeRoot, "plugins", "useful-skills");
+  const runtimeRoot = path.join(scopeRoot, "plugins", "harness-useful-skills");
   await mkdir(runtimeRoot, { recursive: true });
   await writeFile(installRecordPath(scopeRoot), JSON.stringify({
     schema: 1, version: "1.0.0", scope: "user", scopeRoot, dataDir: f.dataDir, configFile: null, mcpEntry: null, files: {},

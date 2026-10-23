@@ -61,23 +61,27 @@ export function tar(args, cwd) {
   assert.equal(result.status, 0, result.stderr);
 }
 
-/** A release tarball: one top-level directory holding a minimal OpenCode release, plus the Codex files when `codex` is set. */
-export async function buildRelease({ version = "1.2.3", manifestVersion = version, top = `harness-useful-skills-${version}`, codex = false, extra } = {}) {
+/**
+ * A release tarball: one top-level directory holding a minimal OpenCode release, plus the Codex files when `codex` is set.
+ * `earlier` lays the bundles out as releases before the names were unified did (`useful-skills` folders and files).
+ */
+export async function buildRelease({ version = "1.2.3", manifestVersion = version, top = `harness-useful-skills-${version}`, codex = false, earlier = false, extra } = {}) {
   const work = await directory("release");
   const root = path.join(work, "tree", top);
-  await mkdir(path.join(root, "plugins", "opencode", "useful-skills"), { recursive: true });
-  await writeFile(path.join(root, "package.json"), JSON.stringify({ name: "useful-skills", version: manifestVersion }));
-  await writeFile(path.join(root, "plugins", "opencode", "useful-skills", "package.json"), JSON.stringify({ version: manifestVersion }));
-  await writeFile(path.join(root, "plugins", "opencode", "useful-skills.js"), "export {};\n");
+  const bundle = earlier ? "useful-skills" : "harness-useful-skills";
+  await mkdir(path.join(root, "plugins", "opencode", bundle), { recursive: true });
+  await writeFile(path.join(root, "package.json"), JSON.stringify({ name: "harness-useful-skills", version: manifestVersion }));
+  await writeFile(path.join(root, "plugins", "opencode", bundle, "package.json"), JSON.stringify({ version: manifestVersion }));
+  await writeFile(path.join(root, "plugins", "opencode", `${bundle}.js`), "export {};\n");
   await writeFile(path.join(root, "useful-skills"), INSTALLER);
   await chmod(path.join(root, "useful-skills"), 0o755);
   if (codex) {
     const manifest = path.join(root, "plugins", "codex", ".codex-plugin");
-    const runtime = path.join(root, "plugins", "codex-runtime", "useful-skills", "codex");
+    const runtime = path.join(root, "plugins", "codex-runtime", bundle, "codex");
     await mkdir(manifest, { recursive: true });
     await mkdir(runtime, { recursive: true });
     await mkdir(path.join(root, ".agents", "plugins"), { recursive: true });
-    await writeFile(path.join(manifest, "plugin.json"), JSON.stringify({ name: "useful-skills", version: manifestVersion }));
+    await writeFile(path.join(manifest, "plugin.json"), JSON.stringify({ name: bundle, version: manifestVersion }));
     await writeFile(path.join(runtime, "mcp-server.js"), "export {};\n");
     await writeFile(path.join(root, ".agents", "plugins", "marketplace.json"), JSON.stringify({ name: "harness-useful-skills" }));
   }

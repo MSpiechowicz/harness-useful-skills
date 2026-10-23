@@ -12,8 +12,9 @@
 # needs the `codex` command on your PATH. What lands where:
 #   - the plugin, through the Codex marketplace `harness-useful-skills`
 #   - the agents, in $CODEX_HOME/agents/us-*.toml
-#   - the runtime, in $CODEX_HOME/useful-skills/
-#   - the MCP server `useful_skills`, registered with `codex mcp add`
+#   - the runtime, in $CODEX_HOME/harness-useful-skills/
+#   - the MCP server `harness-useful-skills`, registered with `codex mcp add`
+#   - the model roles file $CODEX_HOME/harness-useful-skills/models.yml, which sets `model` and `model_reasoning_effort` of the agents
 # Restart Codex afterwards. Releases up to v0.3.12 have no Codex adapter: the installer refuses them before running
 # anything, so use a newer release.
 #
@@ -57,18 +58,29 @@
     throw "Unexpected HARNESS_SKILLS_HOST: $Shown (expected opencode or codex)"
   }
   # Files a release must ship for its installer to set up the chosen host, and the manifests that carry its version.
+  # Where a file moved when the names were unified, the entry lists the current path and the earlier one joined by `|`,
+  # so a pinned earlier release still installs.
   if ($HostName -ceq "codex") {
     $HostLabel = "Codex"
-    $RequiredFiles = @("useful-skills", "plugins/codex/.codex-plugin/plugin.json", "plugins/codex-runtime/useful-skills/codex/mcp-server.js", ".agents/plugins/marketplace.json")
+    $RequiredFiles = @("useful-skills", "plugins/codex/.codex-plugin/plugin.json", "plugins/codex-runtime/harness-useful-skills/codex/mcp-server.js|plugins/codex-runtime/useful-skills/codex/mcp-server.js", ".agents/plugins/marketplace.json")
     $VersionedManifests = @("package.json", "plugins/codex/.codex-plugin/plugin.json")
   } else {
     $HostLabel = "OpenCode"
-    $RequiredFiles = @("useful-skills", "plugins/opencode/useful-skills.js")
-    $VersionedManifests = @("package.json", "plugins/opencode/useful-skills/package.json")
+    $RequiredFiles = @("useful-skills", "plugins/opencode/harness-useful-skills.js|plugins/opencode/useful-skills.js")
+    $VersionedManifests = @("package.json", "plugins/opencode/harness-useful-skills/package.json|plugins/opencode/useful-skills/package.json")
   }
   $VersionHint = "Set HARNESS_SKILLS_VERSION to a release tag (for example v0.3.7) and run this again."
   # The Windows tar. A GNU tar earlier on PATH (Git for Windows) reads C:\ paths as remote hosts.
   $TarExe = Join-Path $env:SystemRoot "System32\tar.exe"
+
+  # The first of the `|`-separated paths in $Entry that the release ships as a file, else the first path.
+  function Get-ShippedPath([string]$Root, [string]$Entry) {
+    $Paths = $Entry -split '\|'
+    foreach ($Path in $Paths) {
+      if (Test-Path -LiteralPath (Join-Path $Root $Path) -PathType Leaf) { return $Path }
+    }
+    return $Paths[0]
+  }
 
   function Write-Step([string]$Message) { Write-Host "==> $Message" -ForegroundColor Cyan }
 
@@ -271,13 +283,15 @@
 
     # The release must ship the bundle and installer of the chosen host and be exactly the announced version. The files are
     # checked first, so a release from before the Codex adapter gets the clear message instead of a version mismatch.
-    foreach ($File in $RequiredFiles) {
+    foreach ($Entry in $RequiredFiles) {
+      $File = Get-ShippedPath $Root $Entry
       if (-not (Test-Path -LiteralPath (Join-Path $Root $File) -PathType Leaf)) {
         if ($HostName -ceq "codex") { throw "This release ($Tag) has no Codex adapter (missing $File); use a newer release." }
         throw "The release archive has no $File, so it cannot install the $HostLabel plugin."
       }
     }
-    foreach ($Manifest in $VersionedManifests) {
+    foreach ($Entry in $VersionedManifests) {
+      $Manifest = Get-ShippedPath $Root $Entry
       $Found = Get-ManifestVersion (Join-Path $Root $Manifest)
       if ($Found -ne $VersionNumber) {
         # Only a plain version is echoed: the value comes from the archive and could carry terminal escapes.

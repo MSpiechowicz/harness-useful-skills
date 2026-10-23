@@ -11,7 +11,7 @@ test("unresolvable plugin data directories are not checked and nothing is writte
   const outside = await fixture(t);
   const elsewhere = path.join(outside.root, "elsewhere");
   await mkdir(path.join(elsewhere, ".claude-plugin"), { recursive: true });
-  await writeFile(path.join(elsewhere, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "useful-skills" }));
+  await writeFile(path.join(elsewhere, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "harness-useful-skills" }));
 
   const wrongName = await fixture(t);
   await writeFile(path.join(wrongName.packageRoot, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "other" }));
@@ -64,7 +64,7 @@ test("claudePluginDataDir resolves the data directory for an installed plugin", 
   assert.match(noManifest.reason, /Cannot read the installed plugin manifest/);
 
   const realManifest = path.join(f.root, "plugin.json");
-  await writeFile(realManifest, JSON.stringify({ name: "useful-skills" }));
+  await writeFile(realManifest, JSON.stringify({ name: "harness-useful-skills" }));
   await symlink(realManifest, path.join(f.packageRoot, ".claude-plugin", "plugin.json"));
   const linkedManifest = await claudePluginDataDir({ environment: { CLAUDE_CONFIG_DIR: f.configDir }, packageRoot: f.packageRoot });
   assert.deepEqual(linkedManifest, { reason: "Plugin manifest must not be a symbolic link." });
@@ -76,7 +76,7 @@ test("a directory marketplace install resolves its data directory and runs docto
 
   const located = await claudePluginDataDir({ environment: { CLAUDE_CONFIG_DIR: f.configDir }, packageRoot: pluginRepo });
   assert.deepEqual(located, { dataDir: f.dataDir });
-  assert.equal(path.basename(located.dataDir), "useful-skills-useful-skills-local");
+  assert.equal(path.basename(located.dataDir), "harness-useful-skills-harness-useful-skills");
 
   const setup = await f.run(["doctor"], { packageRoot: pluginRepo });
   assert.equal(setup.exitCode, 0, setup.text);
@@ -94,7 +94,7 @@ test("directory marketplace installs that cannot be matched exactly are not chec
   const elsewhereRepo = await directoryMarketplace(elsewhere, { source: "../other-plugin" });
 
   const ambiguous = await fixture(t);
-  const ambiguousRepo = await directoryMarketplace(ambiguous, { marketplaces: ["useful-skills-local", "useful-skills-copy"] });
+  const ambiguousRepo = await directoryMarketplace(ambiguous, { marketplaces: ["harness-useful-skills", "useful-skills-copy"] });
 
   const malformed = await fixture(t);
   const malformedRepo = await directoryMarketplace(malformed);

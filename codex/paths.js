@@ -7,28 +7,47 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { LEGACY_CODEX_PLUGIN_ID, LEGACY_DATA_DIRECTORY, LEGACY_MCP_SERVER_NAME } from "../legacy-names.js";
+import { DATA_DIRECTORY, MARKETPLACE_NAME as MARKETPLACE, MCP_SERVER_NAME, PLUGIN_ID as CURRENT_PLUGIN_ID } from "../names.js";
 import { isPlainRelativePath } from "../path-boundary.js";
-import { isPrintable } from "../opencode/paths.js";
+import { directoryProblem, isPrintable } from "../opencode/paths.js";
 import { AGENT_ROLES } from "./agents.js";
 
 /** The package this module runs from: a checkout or an extracted release, holding `plugins/codex*` and `.agents/plugins`. */
 export const PACKAGE_ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
-export const MARKETPLACE_NAME = "harness-useful-skills";
-export const PLUGIN_ID = `useful-skills@${MARKETPLACE_NAME}`;
-export const MCP_NAME = "useful_skills";
+export const MARKETPLACE_NAME = MARKETPLACE;
+export const PLUGIN_ID = CURRENT_PLUGIN_ID;
+export const MCP_NAME = MCP_SERVER_NAME;
 export const GITHUB_SOURCE = "MSpiechowicz/harness-useful-skills";
 
 /** CODEX_HOME-relative locations; the record lists files with the same `/`-separated paths. */
-export const RUNTIME_DIR = "useful-skills/runtime";
-export const RECORD_REL = "useful-skills/install-record.json";
-export const DATA_REL = "useful-skills/data";
+export const RUNTIME_DIR = `${DATA_DIRECTORY}/runtime`;
+export const RECORD_REL = `${DATA_DIRECTORY}/install-record.json`;
+export const DATA_REL = `${DATA_DIRECTORY}/data`;
+export const MODELS_REL = `${DATA_DIRECTORY}/models.yml`;
 export const MCP_SERVER_REL = `${RUNTIME_DIR}/codex/mcp-server.js`;
+
+/** Where the install from before the rename put things, and the names it registered with Codex. */
+export const LEGACY_LAYOUT = Object.freeze({
+  runtimeDir: `${LEGACY_DATA_DIRECTORY}/runtime`,
+  recordRel: `${LEGACY_DATA_DIRECTORY}/install-record.json`,
+  dataRel: `${LEGACY_DATA_DIRECTORY}/data`,
+  pluginId: LEGACY_CODEX_PLUGIN_ID,
+  mcpName: LEGACY_MCP_SERVER_NAME,
+});
+export const CURRENT_LAYOUT = Object.freeze({
+  runtimeDir: RUNTIME_DIR,
+  recordRel: RECORD_REL,
+  dataRel: DATA_REL,
+  pluginId: PLUGIN_ID,
+  mcpName: MCP_NAME,
+});
 export const agentRel = (role) => `agents/us-${role}.toml`;
 export const AGENT_RELS = Object.freeze(AGENT_ROLES.map(agentRel));
 
 export const INSTALL_COMMAND = "./useful-skills install --host codex";
-export const TIMEOUT_NOTE = "Long graph builds can exceed Codex's MCP tool timeout; raise tool_timeout_sec under [mcp_servers.useful_skills] in config.toml if they do (the installer never edits config.toml).";
+export const TIMEOUT_NOTE = `Long graph builds can exceed Codex's MCP tool timeout; raise tool_timeout_sec under [mcp_servers.${MCP_NAME}] in config.toml if they do (the installer never edits config.toml).`;
 
 const RECORD_MAX_BYTES = 1024 * 1024;
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -57,8 +76,8 @@ export function codexHomeFor(environment = process.env) {
 export const atHome = (codexHome, rel) => path.join(codexHome, ...rel.split("/"));
 
 /** The MCP server registration for an install in `codexHome`, as recorded and as `codex mcp get` reports it. */
-export function mcpEntryFor(codexHome) {
-  return { name: MCP_NAME, command: "node", args: [atHome(codexHome, MCP_SERVER_REL)], env: { USEFUL_SKILLS_DATA: atHome(codexHome, DATA_REL) } };
+export function mcpEntryFor(codexHome, layout = CURRENT_LAYOUT) {
+  return { name: layout.mcpName, command: "node", args: [atHome(codexHome, `${layout.runtimeDir}/codex/mcp-server.js`)], env: { USEFUL_SKILLS_DATA: atHome(codexHome, layout.dataRel) } };
 }
 
 function isRecord(value) {
@@ -74,16 +93,16 @@ function validMarketplace(entry) {
 }
 
 /** The recorded MCP server must be exactly the one this installer registers for `codexHome`. */
-function validMcp(entry, codexHome) {
+function validMcp(entry, codexHome, layout) {
   if (entry === null) return true;
   if (!isRecord(entry) || !Array.isArray(entry.args) || !isStringMap(entry.env)) return false;
-  const expected = mcpEntryFor(codexHome);
+  const expected = mcpEntryFor(codexHome, layout);
   return entry.name === expected.name && entry.command === expected.command && JSON.stringify(entry.args) === JSON.stringify(expected.args)
     && JSON.stringify(entry.env) === JSON.stringify(expected.env);
 }
 
 /** Only the runtime tree and the seven agent files can be owned; anything else in CODEX_HOME (auth, config, sessions) never is. */
-const ownableFile = (rel) => isPlainRelativePath(rel) && (rel.startsWith(`${RUNTIME_DIR}/`) || AGENT_RELS.includes(rel));
+const ownableFile = (rel, layout) => isPlainRelativePath(rel) && (rel.startsWith(`${layout.runtimeDir}/`) || AGENT_RELS.includes(rel));
 
 function sameDirectory(a, b) {
   if (a === b) return true;
@@ -98,25 +117,26 @@ function sameDirectory(a, b) {
  * Whether `record` is one this installer could have written for `codexHome`. A crafted record must not steer install
  * or uninstall at files, plugins, marketplaces or MCP servers outside what Useful Skills owns.
  */
-function validRecord(record, codexHome) {
+function validRecord(record, codexHome, layout) {
   if (!isRecord(record) || record.schema !== 1 || typeof record.version !== "string" || !STABLE_VERSION.test(record.version)) return false;
   if (!isString(record.codexHome) || !path.isAbsolute(record.codexHome) || !sameDirectory(record.codexHome, codexHome)) return false;
-  if (record.dataDir !== atHome(record.codexHome, DATA_REL)) return false;
-  if (!validMarketplace(record.marketplace) || !validMcp(record.mcp, record.codexHome)) return false;
-  if (record.pluginId !== null && record.pluginId !== PLUGIN_ID) return false;
+  if (record.dataDir !== atHome(record.codexHome, layout.dataRel)) return false;
+  if (!validMarketplace(record.marketplace) || !validMcp(record.mcp, record.codexHome, layout)) return false;
+  if (record.pluginId !== null && record.pluginId !== layout.pluginId) return false;
   if (record.pluginVersion !== undefined && record.pluginVersion !== null && !isString(record.pluginVersion)) return false;
   if (!isRecord(record.files)) return false;
 
   // Status and uninstall print the record, so a crafted one must not smuggle terminal escapes in.
   if (!isPrintable(record)) return false;
-  return Object.entries(record.files).every(([file, digest]) => ownableFile(file) && typeof digest === "string" && SHA256.test(digest));
+  return Object.entries(record.files).every(([file, digest]) => ownableFile(file, layout) && typeof digest === "string" && SHA256.test(digest));
 }
 
 /**
  * Read the Codex install record of `codexHome` without following a symbolic link or blocking on a FIFO. Returns null
  * when the file does not exist and throws when it is not a small regular file holding a valid record for that home.
+ * `layout` says whose record it is: the current one, or LEGACY_LAYOUT for an install from before the rename.
  */
-export function readCodexRecord(file, codexHome) {
+export function readCodexRecord(file, codexHome, layout = CURRENT_LAYOUT) {
   let descriptor;
   try {
     descriptor = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
@@ -142,6 +162,22 @@ export function readCodexRecord(file, codexHome) {
     throw new Error("The Codex install record is not valid JSON.");
   }
 
-  if (!validRecord(record, codexHome)) throw new Error("The Codex install record has an unexpected format.");
+  if (!validRecord(record, codexHome, layout)) throw new Error("The Codex install record has an unexpected format.");
   return record;
+}
+
+/**
+ * The record of an install from before the rename, as `{ record }`, `{}` when there is none, or `{ problem }` when it
+ * cannot be used. Installing, uninstalling and doctor treat a problem as something to report, never as a reason to stop.
+ */
+export function readLegacyRecord(codexHome) {
+  const blocked = directoryProblem(codexHome, LEGACY_LAYOUT.recordRel);
+  if (blocked) return { problem: blocked };
+
+  try {
+    const record = readCodexRecord(atHome(codexHome, LEGACY_LAYOUT.recordRel), codexHome, LEGACY_LAYOUT);
+    return record ? { record } : {};
+  } catch (error) {
+    return { problem: error.message };
+  }
 }

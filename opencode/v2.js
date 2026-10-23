@@ -4,6 +4,7 @@
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { PLUGIN_NAME } from "../names.js";
 import { createRunScope } from "./node-runner.js";
 import { createSession } from "./session.js";
 import { createCommands } from "./v2-commands.js";
@@ -106,4 +107,4 @@ async function setup(ctx) {
   };
 }
 
-export default { id: "useful-skills", setup };
+export default { id: PLUGIN_NAME, setup };

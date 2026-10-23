@@ -43,7 +43,7 @@ test("graph status derives an uncreated external path", async (t) => {
   const paths = await workspaceMemoryPaths({ cwd: workspace, agentDir });
   const status = await graphStatus({ cwd: workspace, agentDir });
 
-  assert.match(paths.directory, /useful-skills[\\/]memory[\\/][a-f0-9]{64}$/);
+  assert.match(paths.directory, /harness-useful-skills[\\/]memory[\\/][a-f0-9]{64}$/);
   assert.equal(paths.graph, undefined);
   assert.equal(status.ok, true);
   assert.equal(status.available, false);

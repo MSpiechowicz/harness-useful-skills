@@ -1,8 +1,9 @@
 import { lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { isGeneratedAgent } from "../model-roles.js";
-import { CONFIG_CANDIDATES, planMcpUpsert, readConfigFile } from "./config-file.js";
+import { CONFIG_CANDIDATES, MCP_NAME, planMcpUpsert, readConfigFile } from "./config-file.js";
 import { agentFiles, checkedRecordPath, ownedState, resolveScopeRoot } from "./install-files.js";
+import { legacyLeftovers } from "./legacy.js";
 import { printableText, readInstallRecord } from "./paths.js";
 
 function fileCounts(scopeRoot, record) {
@@ -20,14 +21,14 @@ function configLines(scopeRoot, entry) {
       const text = readConfigFile(file);
       if (text === undefined) continue;
       const plan = planMcpUpsert(text, entry);
-      if (plan.action === "unchanged") lines.push(`MCP config: ${file} has mcp.useful_skills, as installed.`);
-      else if (plan.action === "update" && plan.previous !== undefined) lines.push(`MCP config: ${file} has a different mcp.useful_skills than the install wrote.`);
-      else if (plan.action === "refuse" && text.includes("useful_skills")) lines.push(`MCP config: ${file} cannot be inspected (${plan.reason}).`);
+      if (plan.action === "unchanged") lines.push(`MCP config: ${file} has mcp.${MCP_NAME}, as installed.`);
+      else if (plan.action === "update" && plan.previous !== undefined) lines.push(`MCP config: ${file} has a different mcp.${MCP_NAME} than the install wrote.`);
+      else if (plan.action === "refuse" && text.includes(MCP_NAME)) lines.push(`MCP config: ${file} cannot be inspected (${plan.reason}).`);
     } catch (error) {
       lines.push(`MCP config: ${file} cannot be read (${error.message}).`);
     }
   }
-  return lines.length > 0 ? lines : [`MCP config: no mcp.useful_skills in ${CONFIG_CANDIDATES.map((name) => path.join(scopeRoot, name)).join(" or ")}.`];
+  return lines.length > 0 ? lines : [`MCP config: no mcp.${MCP_NAME} in ${CONFIG_CANDIDATES.map((name) => path.join(scopeRoot, name)).join(" or ")}.`];
 }
 
 function agentLine(scopeRoot) {
@@ -42,13 +43,16 @@ export function inspectOpenCodeInstall({ scope = "user", cwd = process.cwd(), en
   const header = `OpenCode install (${scope} scope)`;
   if (!scopeRoot) return { text: printableText(`${header}: not installed (${scope} scope directory does not exist).`) };
 
+  const leftovers = legacyLeftovers({ scopeRoot, environment });
+  const report = (...lines) => ({ text: printableText([...lines, ...leftovers].join("\n")) });
+
   let record;
   try {
     record = readInstallRecord(checkedRecordPath(scopeRoot));
   } catch (error) {
-    return { text: printableText(`${header}: the install record cannot be used (${error.message}).`) };
+    return report(`${header}: the install record cannot be used (${error.message}).`);
   }
-  if (!record) return { text: printableText(`${header}: not installed (no install record in ${scopeRoot}).`) };
+  if (!record) return report(`${header}: not installed (no install record in ${scopeRoot}).`);
 
   const counts = fileCounts(scopeRoot, record);
   const data = lstatSync(record.dataDir, { throwIfNoEntry: false });
@@ -60,5 +64,5 @@ export function inspectOpenCodeInstall({ scope = "user", cwd = process.cwd(), en
     ...(record.mcpEntry ? configLines(scopeRoot, record.mcpEntry) : ["MCP config: the install did not record an entry."]),
     `Data directory: ${record.dataDir} (${dataState}).`,
   ];
-  return { text: printableText(lines.join("\n")) };
+  return report(...lines);
 }

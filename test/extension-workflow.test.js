@@ -233,7 +233,7 @@ test("Left returns through parent menus without writing until a mode is selected
   f.selectResponses.push("Profile Workflow Stages", "Review (enabled)", LEFT, "Plan (enabled)", "Disabled");
   await handler("", f.ctx);
   assert.deepEqual(f.selectResponses, []);
-  assert.deepEqual(await readdir(path.join(f.agentDir, "useful-skills", "workflow-settings")), ["plan.json"]);
+  assert.deepEqual(await readdir(path.join(f.agentDir, "harness-useful-skills", "workflow-settings")), ["plan.json"]);
   const snapshot = await settings(f);
   assert.equal(snapshot.values.plan, false);
   assert.equal(snapshot.values.review, true);

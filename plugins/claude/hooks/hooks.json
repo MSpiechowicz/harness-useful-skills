@@ -24,7 +24,7 @@
     ],
     "UserPromptExpansion": [
       {
-        "matcher": "useful-skills:us-ignore-workflow",
+        "matcher": "harness-useful-skills:us-ignore-workflow",
         "hooks": [
           {
             "type": "command",

@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { migrateDataDirectory } from "../data-migration.js";
 import { GENERATED_MARKER, ROLE_AGENTS, ROLES, readOptional, syncRoleAgents, writeAtomic } from "../model-roles.js";
+import { DATA_DIRECTORY } from "../names.js";
 import { RUNTIME_ROOT, writeTargetProblem } from "./paths.js";
 
 /** OpenCode reasoning variants; any other `:suffix` is part of the model ID (such as `ollama/llama3:8b`). */
@@ -41,7 +43,7 @@ const LEGACY_DEFAULT_CONFIG = [
 ].join("\n");
 
 export function modelsConfigPath(scopeRoot) {
-  return path.join(scopeRoot, "useful-skills", "models.yml");
+  return path.join(scopeRoot, DATA_DIRECTORY, "models.yml");
 }
 
 export function generatedAgentName(agent) {
@@ -113,7 +115,7 @@ export function renderOpenCodeAgent(agent, selection, { templatesDir, configFile
  * installer's rules: no symlinked or non-directory component under the scope root, and no non-regular target file.
  */
 function blockedWrite(scopeRoot) {
-  const targets = [path.join("useful-skills", "models.yml"), ...Object.keys(ROLE_AGENTS).map(agent => path.join("agents", `${generatedAgentName(agent)}.md`))];
+  const targets = [path.join(DATA_DIRECTORY, "models.yml"), ...Object.keys(ROLE_AGENTS).map(agent => path.join("agents", `${generatedAgentName(agent)}.md`))];
   for (const target of targets) {
     const problem = writeTargetProblem(scopeRoot, target.split(path.sep).join("/"));
     if (problem) return problem;
@@ -133,6 +135,9 @@ export function syncOpenCodeAgents({ scopeRoot, templatesDir = path.join(RUNTIME
   if (blocked) {
     return { configFile, created: false, blocked, agents: {} };
   }
+
+  // A models file saved under the name used before the rename moves first, so the checks below see it.
+  migrateDataDirectory(scopeRoot);
 
   // Only a byte-for-byte copy of the old default is replaced: an edited file stays as the user wrote it.
   if (readOptional(configFile) === LEGACY_DEFAULT_CONFIG) {

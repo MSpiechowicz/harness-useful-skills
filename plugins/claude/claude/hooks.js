@@ -6,9 +6,9 @@ import { fastLaneContext, workflowContext } from "./context.js";
 import { claudeConfigDir, modelRoutingContext, syncRoleAgents } from "./models.js";
 import { readClaudeSettings, readClaudeWorkflow } from "./settings.js";
 
-const IGNORE_SKILL = "useful-skills:us-ignore-workflow";
+const IGNORE_SKILL = "harness-useful-skills:us-ignore-workflow";
 const MAX_INPUT_BYTES = 8 * 1024 * 1024;
-const MODELS_UNAVAILABLE = "Useful Skills could not read or write its Claude model-role configuration. Dispatch the `useful-skills:<agent>` subagents named by the skills; they inherit the session model.";
+const MODELS_UNAVAILABLE = "Useful Skills could not read or write its Claude model-role configuration. Dispatch the `harness-useful-skills:<agent>` subagents named by the skills; they inherit the session model.";
 
 function additionalContext(event, text) {
   return { hookSpecificOutput: { hookEventName: event, additionalContext: text } };

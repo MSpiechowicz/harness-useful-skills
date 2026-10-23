@@ -18,20 +18,20 @@ async function installed(t, options = {}) {
   await installCodex({ environment: box.environment, packageRoot: box.packageRoot });
   box.clearCalls();
   const uninstall = (environment = box.environment) => uninstallCodex({ environment }).message;
-  return { ...box, uninstall, recordFile: box.at("useful-skills", "install-record.json") };
+  return { ...box, uninstall, recordFile: box.at("harness-useful-skills", "install-record.json") };
 }
 
 test("uninstall unregisters everything it added, removes its files and record, and keeps the data directory", async (t) => {
   const box = await installed(t);
-  writeFileSync(path.join(box.at("useful-skills", "data"), "memory.db"), "notes");
+  writeFileSync(path.join(box.at("harness-useful-skills", "data"), "memory.db"), "notes");
 
   const message = box.uninstall();
 
   assert.match(message, /Uninstalled Useful Skills 0\.3\.11 from Codex .*: 18 files removed\./);
-  assert.match(message, /Removed MCP server useful_skills\.\nRemoved plugin useful-skills@harness-useful-skills\.\nRemoved marketplace harness-useful-skills\./);
-  assert.match(message, /Kept the data directory .*useful-skills\/data/);
-  assert.deepEqual(changes(box.calls()), ["mcp remove useful_skills", "plugin remove useful-skills@harness-useful-skills", "plugin marketplace remove harness-useful-skills"]);
-  assert.deepEqual(listTree(box.codexHome), ["useful-skills", "useful-skills/data", "useful-skills/data/memory.db"]);
+  assert.match(message, /Removed MCP server harness-useful-skills\.\nRemoved plugin harness-useful-skills@harness-useful-skills\.\nRemoved marketplace harness-useful-skills\./);
+  assert.match(message, /Kept the data directory .*harness-useful-skills\/data/);
+  assert.deepEqual(changes(box.calls()), ["mcp remove harness-useful-skills", "plugin remove harness-useful-skills@harness-useful-skills", "plugin marketplace remove harness-useful-skills"]);
+  assert.deepEqual(listTree(box.codexHome), ["harness-useful-skills", "harness-useful-skills/data", "harness-useful-skills/data/memory.db", "harness-useful-skills/models.yml"]);
   assert.deepEqual(box.state(), { marketplaces: [], plugins: [], mcp: {} });
 
   assert.match(box.uninstall(), /not installed for Codex: no install record at .*Nothing was removed\./);
@@ -40,7 +40,7 @@ test("uninstall unregisters everything it added, removes its files and record, a
 test("uninstall keeps files edited since the install and says so", async (t) => {
   const box = await installed(t);
   writeFileSync(box.at("agents", "us-planner.toml"), "mine\n");
-  writeFileSync(box.at("useful-skills", "runtime", "memory.js"), "// mine\n");
+  writeFileSync(box.at("harness-useful-skills", "runtime", "memory.js"), "// mine\n");
 
   const message = box.uninstall();
 
@@ -55,16 +55,16 @@ test("uninstall leaves an MCP server that no longer matches and a marketplace it
   const sameSource = { name: "harness-useful-skills", sourceType: "git", source: "https://github.com/MSpiechowicz/harness-useful-skills.git", ref: "v0.3.11" };
   const box = await installed(t, { state: { marketplaces: [sameSource], plugins: [], mcp: {} } });
   const state = box.state();
-  state.mcp.useful_skills.args = ["/somewhere/else.js"];
+  state.mcp["harness-useful-skills"].args = ["/somewhere/else.js"];
   box.setState(state);
 
   const message = box.uninstall();
 
-  assert.match(message, /Left MCP server useful_skills alone: it is no longer what Useful Skills registered\./);
+  assert.match(message, /Left MCP server harness-useful-skills alone: it is no longer what Useful Skills registered\./);
   assert.match(message, /Kept marketplace harness-useful-skills: it was added before Useful Skills was installed\./);
-  assert.deepEqual(changes(box.calls()), ["plugin remove useful-skills@harness-useful-skills"]);
+  assert.deepEqual(changes(box.calls()), ["plugin remove harness-useful-skills@harness-useful-skills"]);
   assert.deepEqual(box.state().marketplaces, [sameSource]);
-  assert.ok(box.state().mcp.useful_skills);
+  assert.ok(box.state().mcp["harness-useful-skills"]);
 });
 
 test("uninstall reports Codex entries that are already gone or changed source", async (t) => {
@@ -73,7 +73,7 @@ test("uninstall reports Codex entries that are already gone or changed source", 
 
   const message = box.uninstall();
 
-  assert.match(message, /MCP server useful_skills was already gone\./);
+  assert.match(message, /MCP server harness-useful-skills was already gone\./);
   assert.match(message, /Left marketplace harness-useful-skills alone: it now comes from /);
   assert.equal(box.state().marketplaces.length, 1);
 });
@@ -81,13 +81,13 @@ test("uninstall reports Codex entries that are already gone or changed source", 
 test("a failing Codex command stops the uninstall before files are removed; running again finishes it", async (t) => {
   const box = await installed(t);
   assert.throws(() => box.uninstall({ ...box.environment, FAKE_CODEX_FAIL: "plugin remove" }), (error) => {
-    assert.match(error.message, /`codex plugin remove useful-skills@harness-useful-skills` failed \(exit 1\)/);
+    assert.match(error.message, /`codex plugin remove harness-useful-skills@harness-useful-skills` failed \(exit 1\)/);
     assert.match(error.message, /stopped before removing files/);
     return true;
   });
   const record = JSON.parse(readFileSync(box.recordFile, "utf8"));
   assert.equal(record.mcp, null, "the MCP server was removed and the record says so");
-  assert.equal(record.pluginId, "useful-skills@harness-useful-skills");
+  assert.equal(record.pluginId, "harness-useful-skills@harness-useful-skills");
   assert.ok(existsSync(box.at("agents", "us-planner.toml")));
 
   const message = box.uninstall();
@@ -109,8 +109,8 @@ test("uninstall refuses a record behind a symlinked directory and reports a miss
   assert.match(uninstallCodex({ environment: { ...box.environment, CODEX_HOME: path.join(box.root, "absent") } }).message, /no install record/);
 
   mkdirSync(path.join(box.root, "elsewhere"));
-  symlinkSync(path.join(box.root, "elsewhere"), box.at("useful-skills"));
-  assert.throws(() => uninstallCodex({ environment: box.environment }), /useful-skills is a symbolic link; Useful Skills will not read an install record through it\./);
+  symlinkSync(path.join(box.root, "elsewhere"), box.at("harness-useful-skills"));
+  assert.throws(() => uninstallCodex({ environment: box.environment }), /harness-useful-skills is a symbolic link; Useful Skills will not read an install record through it\./);
 });
 
 test("uninstall leaves a plugin alone when the install stopped before adding it", async (t) => {
@@ -119,13 +119,13 @@ test("uninstall leaves a plugin alone when the install stopped before adding it"
   writePackage(box.packageRoot);
   await assert.rejects(installCodex({ environment: { ...box.environment, FAKE_CODEX_FAIL: "plugin add" }, packageRoot: box.packageRoot }), /stopped while installing the plugin/);
   const state = box.state();
-  state.plugins.push({ pluginId: "useful-skills@harness-useful-skills", version: "0.3.11", enabled: true });
+  state.plugins.push({ pluginId: "harness-useful-skills@harness-useful-skills", version: "0.3.11", enabled: true });
   box.setState(state);
   box.clearCalls();
 
   const message = uninstallCodex({ environment: box.environment }).message;
 
-  assert.match(message, /Left plugin useful-skills@harness-useful-skills alone: this install did not add it\./);
+  assert.match(message, /Left plugin harness-useful-skills@harness-useful-skills alone: this install did not add it\./);
   assert.match(message, /Removed marketplace harness-useful-skills\./);
   assert.deepEqual(changes(box.calls()), ["plugin marketplace remove harness-useful-skills"]);
   assert.equal(box.state().plugins.length, 1);

@@ -22,7 +22,7 @@ async function installed(t) {
   const install = (options = {}) => installCodex({ environment: box.environment, packageRoot: box.packageRoot, ...options });
   await install();
   box.clearCalls();
-  const recordFile = box.at("useful-skills", "install-record.json");
+  const recordFile = box.at("harness-useful-skills", "install-record.json");
   return { ...box, install, recordFile, record: () => JSON.parse(readFileSync(recordFile, "utf8")) };
 }
 
@@ -50,7 +50,7 @@ test("install, uninstall and doctor refuse a crafted record and leave every file
     "another MCP server": { mcp: { ...good.mcp, name: "their_server" } },
     "an MCP server with another command": { mcp: { ...good.mcp, command: "python", args: ["server.py"] } },
     "another marketplace": { marketplace: { ...good.marketplace, name: "their-market" } },
-    "another Codex home": { codexHome: other, dataDir: path.join(other, "useful-skills", "data"), mcp: null },
+    "another Codex home": { codexHome: other, dataDir: path.join(other, "harness-useful-skills", "data"), mcp: null },
   };
 
   for (const [what, change] of Object.entries(crafted)) {
@@ -70,33 +70,33 @@ test("install, uninstall and doctor refuse a crafted record and leave every file
   }
 });
 
-test("a foreign useful_skills MCP server is not adopted through a record that names it", async (t) => {
+test("a foreign harness-useful-skills MCP server is not adopted through a record that names it", async (t) => {
   const box = await installed(t);
   const state = box.state();
-  state.mcp.useful_skills = { command: "python", args: ["server.py"], env: {}, enabled: true };
+  state.mcp["harness-useful-skills"] = { command: "python", args: ["server.py"], env: {}, enabled: true };
   box.setState(state);
-  writeFileSync(box.recordFile, JSON.stringify({ ...box.record(), mcp: { name: "useful_skills", command: "python", args: ["server.py"], env: {} } }));
+  writeFileSync(box.recordFile, JSON.stringify({ ...box.record(), mcp: { name: "harness-useful-skills", command: "python", args: ["server.py"], env: {} } }));
 
   await assert.rejects(box.install(), /unexpected format/);
   writeFileSync(box.recordFile, JSON.stringify({ ...box.record(), mcp: null }));
-  await assert.rejects(box.install(), /MCP server named useful_skills \(python server\.py\) that Useful Skills did not register/);
-  assert.equal(box.state().mcp.useful_skills.command, "python");
+  await assert.rejects(box.install(), /MCP server named harness-useful-skills \(python server\.py\) that Useful Skills did not register/);
+  assert.equal(box.state().mcp["harness-useful-skills"].command, "python");
 });
 
 test("a data directory that is a symlink or a file is refused before any write", async (t) => {
   const box = await installed(t);
-  const data = box.at("useful-skills", "data");
+  const data = box.at("harness-useful-skills", "data");
   rmSync(data, { recursive: true });
   mkdirSync(path.join(box.root, "elsewhere"));
   symlinkSync(path.join(box.root, "elsewhere"), data);
   const tree = listTree(box.codexHome);
 
-  await assert.rejects(box.install(), /^Error: Refusing to install; nothing was changed:\n {2}.*useful-skills\/data is a symbolic link; the data directory must be a real directory/);
+  await assert.rejects(box.install(), /^Error: Refusing to install; nothing was changed:\n {2}.*harness-useful-skills\/data is a symbolic link; the data directory must be a real directory/);
   assert.deepEqual(listTree(box.codexHome), tree);
 
   rmSync(data);
   writeFileSync(data, "not a directory");
-  await assert.rejects(box.install(), /useful-skills\/data is not a directory; the data directory must be a real directory/);
+  await assert.rejects(box.install(), /harness-useful-skills\/data is not a directory; the data directory must be a real directory/);
   assert.deepEqual(changes(box.calls()), []);
   assert.equal(readFileSync(data, "utf8"), "not a directory");
 });

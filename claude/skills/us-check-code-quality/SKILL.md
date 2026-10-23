@@ -5,7 +5,7 @@ description: Use only when the user explicitly asks for a "code quality audit", 
 
 # Code-quality audit
 
-Load `/useful-skills:us-write-concisely` before preparing context or findings. Audit actual architecture and language conventions, not personal formatting preferences. This audit does not authorize application-code refactoring.
+Load `/harness-useful-skills:us-write-concisely` before preparing context or findings. Audit actual architecture and language conventions, not personal formatting preferences. This audit does not authorize application-code refactoring.
 
 ## Inspect the repository
 

@@ -21,7 +21,7 @@ async function fixture(t) {
 
   return {
     root, configDir, repo, otherRepo,
-    stageDirectory: path.join(configDir, "useful-skills", "workflow-settings"),
+    stageDirectory: path.join(configDir, "harness-useful-skills", "workflow-settings"),
     environment: (options = {}) => ({ CLAUDE_CONFIG_DIR: configDir, ...options }),
     save: (key, enabled, cwd = repo) => writeWorkflowSetting({ agentDir: configDir, cwd, key, enabled }),
   };

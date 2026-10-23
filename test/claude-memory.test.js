@@ -111,7 +111,7 @@ test("stdio lifecycle, literal fact search, concurrent durable writes, restart a
   assert.equal((await isolated.call(3, "memory_status")).value.native.observation.active, true);
   await isolated.close();
 
-  const memory = path.join(data, "useful-skills", "memory");
+  const memory = path.join(data, "harness-useful-skills", "memory");
   const [projectHash] = await readdir(memory);
   const facts = path.join(memory, projectHash, "claude-facts");
   const files = await readdir(facts);
@@ -197,7 +197,7 @@ test("concurrent saves at the final storage slot cannot acknowledge an unsearcha
   assert.equal((await seed.call(2, "memory_save", { content: "Seed fact." })).isError, false);
   await seed.close();
 
-  const memory = path.join(data, "useful-skills", "memory");
+  const memory = path.join(data, "harness-useful-skills", "memory");
   const [hash] = await readdir(memory);
   const facts = path.join(memory, hash, "claude-facts");
   const source = path.join(facts, "00000.json");
@@ -263,7 +263,7 @@ test("workspace and data-root violations fail closed without writing into projec
   await valid.init();
   assert.equal((await valid.call(2, "memory_save", { content: "Use meters." })).isError, false);
   await valid.close();
-  const memory = path.join(data, "useful-skills", "memory");
+  const memory = path.join(data, "harness-useful-skills", "memory");
   const [hash] = await readdir(memory);
   const facts = path.join(memory, hash, "claude-facts");
   await rm(facts, { recursive: true });

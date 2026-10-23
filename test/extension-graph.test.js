@@ -17,7 +17,7 @@ test("explicit graph test reports observed storage and a bounded, redacted query
         if (args.action === "build") {
           await buildPending;
           return {
-            ok: true, active: { generation: "generation-41", graph: path.join(f.agentDir, "useful-skills/memory/graph.json") },
+            ok: true, active: { generation: "generation-41", graph: path.join(f.agentDir, "harness-useful-skills/memory/graph.json") },
             snapshot: { nodes: 13, edges: 5, sources: 2 },
           };
         }

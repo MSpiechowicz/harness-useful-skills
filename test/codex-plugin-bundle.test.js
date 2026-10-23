@@ -10,7 +10,7 @@ import { promisify } from "node:util";
 const execute = promisify(execFile);
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLUGIN = path.join(ROOT, "plugins", "codex");
-const RUNTIME = path.join(ROOT, "plugins", "codex-runtime", "useful-skills");
+const RUNTIME = path.join(ROOT, "plugins", "codex-runtime", "harness-useful-skills");
 const BUILD = path.join(ROOT, "scripts", "build-codex-plugin.js");
 // Matched against paths relative to either bundle.
 const FORBIDDEN = [
@@ -87,7 +87,7 @@ test("the manifest carries the package version and points at the skills folder",
   const bundled = JSON.parse(await readFile(path.join(PLUGIN, ".codex-plugin", "plugin.json"), "utf8"));
   assert.deepEqual(bundled, source);
   assert.equal(bundled.version, expected);
-  assert.equal(bundled.name, "useful-skills");
+  assert.equal(bundled.name, "harness-useful-skills");
   assert.equal(bundled.skills, "./skills/");
   assert.equal(bundled.license, "GPL-3.0-only");
   assert.equal("mcpServers" in bundled, false);
@@ -96,11 +96,13 @@ test("the manifest carries the package version and points at the skills folder",
 
 test("the runtime holds the memory server closure and the agents, with no other host", async () => {
   const files = await filesBelow(RUNTIME);
-  assert.deepEqual(files.filter(file => FORBIDDEN.some(pattern => pattern.test(file))), []);
+  // apply-models.js shares the installer's file helpers, which live in opencode/: nothing else from that host belongs here.
+  assert.deepEqual(files.filter(file => file.startsWith("opencode/")).sort(), ["opencode/install-files.js", "opencode/paths.js"]);
+  assert.deepEqual(files.filter(file => !file.startsWith("opencode/") && FORBIDDEN.some(pattern => pattern.test(file))), []);
   assert.deepEqual(files.filter(file => file.startsWith("codex/agents/")).sort(), AGENTS.map(name => `codex/agents/${name}.toml`));
   assert.ok(files.includes("codex/mcp-server.js"));
   assert.ok(!files.some(file => /^(skills|codex\/skills)(\/|$)/.test(file)));
-  assert.deepEqual(JSON.parse(await readFile(path.join(RUNTIME, "package.json"), "utf8")), { name: "useful-skills-codex-runtime", private: true, type: "module" });
+  assert.deepEqual(JSON.parse(await readFile(path.join(RUNTIME, "package.json"), "utf8")), { name: "harness-useful-skills-codex-runtime", private: true, type: "module" });
 });
 
 test("every relative import and URL in the runtime modules resolves inside the runtime", async () => {
@@ -154,7 +156,7 @@ test("the marketplace lists the plugin by its exact identifiers and the source p
     name: "harness-useful-skills",
     interface: { displayName: "Harness Skills" },
     plugins: [{
-      name: "useful-skills",
+      name: "harness-useful-skills",
       source: { source: "local", path: "./plugins/codex" },
       policy: { installation: "AVAILABLE", authentication: "ON_INSTALL" },
       category: "Developer Tools",

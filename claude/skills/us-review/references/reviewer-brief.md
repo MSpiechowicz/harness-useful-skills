@@ -1,6 +1,6 @@
 # Fresh correctness reviewer brief
 
-Load `/useful-skills:us-write-concisely` before responding. Review only; do not edit, run a workflow, publish, or ask another worker to fix findings.
+Load `/harness-useful-skills:us-write-concisely` before responding. Review only; do not edit, run a workflow, publish, or ask another worker to fix findings.
 
 ## Objective
 
@@ -18,9 +18,9 @@ Read only: `<Parent fills changed files plus required callers, tests, and config
 
 - Inspect the resulting source and actual consumer paths against authorized acceptance, not generic preferences.
 - Check behavioral boundaries, error paths, transitions, precedence, and whether verification proves the contract.
-- For a change to how a UI element looks or behaves, verify sibling coverage read-only, using the search and classification steps of `/useful-skills:us-keep-ui-consistent` without editing. A missing instance table is missing evidence. An unchanged same-pattern sibling in the same app or package without cited variant evidence is an acceptance failure; one the skill correctly sent to the user for a decision is not.
+- For a change to how a UI element looks or behaves, verify sibling coverage read-only, using the search and classification steps of `/harness-useful-skills:us-keep-ui-consistent` without editing. A missing instance table is missing evidence. An unchanged same-pattern sibling in the same app or package without cited variant evidence is an acceptance failure; one the skill correctly sent to the user for a decision is not.
 - Separate acceptance failures from risks, missing evidence, and minor suggestions.
-- Do not claim security review; the parent invokes `/useful-skills:us-check-security` separately when applicable and enabled in normal composition, selected and eligible for focused work, or independently required. This brief does not restart unselected stages.
+- Do not claim security review; the parent invokes `/harness-useful-skills:us-check-security` separately when applicable and enabled in normal composition, selected and eligible for focused work, or independently required. This brief does not restart unselected stages.
 
 ## Acceptance
 

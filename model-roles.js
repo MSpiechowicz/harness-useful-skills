@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { closeSync, constants, fchmodSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+import { migrateDataDirectory } from "./data-migration.js";
+
 const MAX_CONFIG_BYTES = 16 * 1024;
 const PRIVATE_DIRECTORY_MODE = 0o700;
 
@@ -74,7 +76,7 @@ export function readConfigText(file) {
 }
 
 /**
- * The workflow settings store requires `<configDir>/useful-skills` to be private, so create it
+ * The workflow settings store requires `<configDir>/harness-useful-skills` to be private, so create it
  * owner-only and tighten an existing real directory. Best effort: a symlink, non-directory, or
  * permission failure is left for the store to report instead of failing session start here.
  */
@@ -130,7 +132,8 @@ export function readOptional(file) {
  * Create the model config on first use and regenerate the host's role agents from it.
  * Never overwrites an agent file that Useful Skills did not generate (see isGeneratedAgent).
  *
- * - `configFile`: the models.yml path; its directory is made private.
+ * - `configFile`: the models.yml path, inside the host's data directory; that directory is made private, and a
+ *   data directory saved under the name used before the rename is moved to it first.
  * - `agentFile(agent)`: where the generated agent for a plugin agent name lives.
  * - `defaultConfig`: text written when `configFile` does not exist.
  * - `parseSelector(role, raw)`: the host's selector syntax (see parseModelsConfig).
@@ -141,6 +144,7 @@ export function readOptional(file) {
  * created, updated, ready, or conflict; an invalid config instead returns `{ configFile, created, error, agents: {} }`.
  */
 export function syncRoleAgents({ configFile, agentFile, defaultConfig, parseSelector, render, fallback }) {
+  migrateDataDirectory(path.dirname(path.dirname(configFile)));
   ensurePrivateDirectory(path.dirname(configFile));
 
   let created = false;

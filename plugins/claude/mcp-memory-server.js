@@ -111,7 +111,7 @@ export function startMemoryServer({ resolveContext, factsLabel }) {
       emit({ id, result: {
         protocolVersion: message.params.protocolVersion === "2024-11-05" ? "2024-11-05" : PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "useful-skills", version: "1.0.0" },
+        serverInfo: { name: "harness-useful-skills", version: "1.0.0" },
       } });
       return;
     }

@@ -27,7 +27,7 @@ async function fixture(t) {
   const environment = (options = {}) => ({ CLAUDE_CONFIG_DIR: configDir, ...options });
   return {
     root, configDir, repo, otherRepo,
-    stageDirectory: path.join(configDir, "useful-skills", "workflow-settings"),
+    stageDirectory: path.join(configDir, "harness-useful-skills", "workflow-settings"),
     environment,
     run: (argv, { cwd = repo, options } = {}) => runCommand(argv, { environment: environment(options), cwd }),
   };
@@ -110,7 +110,7 @@ test("workflow and stage writes create private files at the shared store paths, 
   for (const file of [reviewFile, json.workflowFile]) {
     assert.equal((await stat(file)).mode & 0o777, 0o600);
   }
-  for (const directory of [path.join(f.configDir, "useful-skills"), f.stageDirectory, path.dirname(json.workflowFile)]) {
+  for (const directory of [path.join(f.configDir, "harness-useful-skills"), f.stageDirectory, path.dirname(json.workflowFile)]) {
     assert.equal((await stat(directory)).mode & 0o777, 0o700);
   }
 
@@ -162,7 +162,7 @@ test("invalid setting commands fail with usage and status and write nothing", as
     assert.match(text, /Workflow: saved enabled, effective enabled, source default/);
   }
 
-  assert.deepEqual(await storedFiles(path.join(f.configDir, "useful-skills")), []);
+  assert.deepEqual(await storedFiles(path.join(f.configDir, "harness-useful-skills")), []);
 });
 
 test("a workflow write outside a resolvable workspace fails without a stack trace", async t => {
@@ -208,7 +208,7 @@ test("arguments are bounded and unknown commands show help with a failure", asyn
     const { text, exitCode } = await f.run(argv);
     assert.equal(exitCode, 0);
     assert.match(text, /^Useful Skills for Claude Code\n/);
-    assert.match(text, /\/useful-skills:us-ignore-workflow/);
+    assert.match(text, /\/harness-useful-skills:us-ignore-workflow/);
     assert.match(text, /memory_status/);
     assert.doesNotMatch(text, /library/i);
   }
@@ -219,7 +219,7 @@ test("list shows Claude skill invocations", async t => {
 
   const list = await f.run(["list", "memory"]);
   assert.equal(list.exitCode, 0);
-  assert.match(list.text, /\n {4}\/useful-skills:us-manage-memory(\n|$)/);
+  assert.match(list.text, /\n {4}\/harness-useful-skills:us-manage-memory(\n|$)/);
   assert.doesNotMatch(list.text, /\/skill:/);
 
   const split = await f.run(["list memory"]);
@@ -246,7 +246,7 @@ test("doctor, update, and graph commands give Claude guidance", async t => {
 
   for (const action of ["check", "install"]) {
     assert.deepEqual(await f.run(["update", action]), {
-      text: "Claude Code updates the plugin itself: use `/plugin` (Installed tab) or run `claude plugin update useful-skills@<marketplace>`, then `/reload-plugins`.",
+      text: "Claude Code updates the plugin itself: use `/plugin` (Installed tab) or run `claude plugin update harness-useful-skills@<marketplace>`, then `/reload-plugins`.",
       exitCode: 0,
     });
   }

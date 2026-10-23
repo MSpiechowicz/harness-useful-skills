@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Builds plugins/opencode: the OpenCode bundle. The installer copies it into an OpenCode scope as
-// <scope>/plugins/useful-skills.js (entry) plus <scope>/plugins/useful-skills/** (runtime tree, same relative layout as this repository).
+// <scope>/plugins/harness-useful-skills.js (entry) plus <scope>/plugins/harness-useful-skills/** (runtime tree, same relative layout as this repository).
 // plugins/opencode/README.md is hand-written; the generator never touches it.
 import { readdirSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
@@ -9,7 +9,7 @@ import { collectOutput, readSource, syncBundle, trackedFiles } from './bundle-co
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT = 'plugins/opencode';
-const RUNTIME = 'useful-skills';
+const RUNTIME = 'harness-useful-skills';
 const check = process.argv[2] === '--check';
 if (process.argv.length > 3 || (process.argv[2] && !check)) {
   throw new Error('Usage: node scripts/build-opencode-plugin.js [--check]');
@@ -17,7 +17,7 @@ if (process.argv.length > 3 || (process.argv[2] && !check)) {
 
 const PRESERVED = { files: ['README.md'], trees: [], required: ['README.md'] };
 // One default export serves both plugin APIs: OpenCode 1.x calls its `server`, OpenCode 2.x its `setup` (see opencode/entry.js).
-const ENTRY = 'export { default } from "./useful-skills/opencode/entry.js";\n';
+const ENTRY = `export { default } from "./${RUNTIME}/opencode/entry.js";\n`;
 
 // Every runtime file, as repository-relative paths. Skills are the only walked folder; nothing else is matched by pattern.
 // opencode/install.js and uninstall.js run only from a checkout and are deliberately absent; the closure check below
@@ -33,17 +33,18 @@ const FILES = [
   // Host-neutral modules shared with the other adapters.
   'workflow-context.js', 'tool-safety.js', 'command-core.js', 'model-roles.js',
   'doctor-setup.js', 'local-facts.js', 'host-roots.js', 'mcp-memory-server.js',
+  'names.js', 'legacy-names.js', 'data-migration.js',
   'entrypoint.js', 'graph-test.js', 'release-check.js',
   // OpenCode adapter.
   'opencode/entry.js', 'opencode/v1.js', 'opencode/v2.js', 'opencode/v2-commands.js', 'opencode/session.js', 'opencode/node-runner.js', 'opencode/context.js',
   'opencode/paths.js', 'opencode/settings.js', 'opencode/host-context.js', 'opencode/models.js',
   'opencode/command.js', 'opencode/hook-cli.js', 'opencode/mcp-server.js',
-  'opencode/install-status.js', 'opencode/install-files.js', 'opencode/config-file.js', 'opencode/updater.js',
+  'opencode/install-status.js', 'opencode/install-files.js', 'opencode/config-file.js', 'opencode/updater.js', 'opencode/legacy.js',
   'opencode/agents/backend.md', 'opencode/agents/frontend.md', 'opencode/agents/general-purpose.md',
   'opencode/agents/planner.md', 'opencode/agents/reviewer.md', 'opencode/agents/scout.md',
   'opencode/agents/security-reviewer.md',
   'opencode/commands/useful-skills.md', 'opencode/commands/us-ignore-workflow.md',
-  // The versioned manifest; becomes useful-skills/package.json (see expectedOutput).
+  // The versioned manifest; becomes harness-useful-skills/package.json (see expectedOutput).
   'opencode/package.json',
   // Pinned dependency metadata Graphify setup verifies.
   'dependencies/manifest.json', 'dependencies/graphify.lock',
@@ -91,7 +92,7 @@ function assertImportClosure(files) {
 
 function expectedOutput() {
   const runtime = [...FILES, ...skillFiles()].map(source => ({ path: bundlePath(source), content: readSource(root, source) }));
-  const files = collectOutput({ root, output: OUTPUT, generated: [{ path: 'useful-skills.js', content: ENTRY }, ...runtime] });
+  const files = collectOutput({ root, output: OUTPUT, generated: [{ path: `${RUNTIME}.js`, content: ENTRY }, ...runtime] });
   assertImportClosure(files);
   return files;
 }

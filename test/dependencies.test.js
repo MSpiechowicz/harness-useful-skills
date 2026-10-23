@@ -171,7 +171,7 @@ test("dependency status identifies a partial version directory without repairing
   const lock = await readFile(path.join(dependenciesRoot, "graphify.lock"));
   const agentDir = await mkdtemp(path.join(os.tmpdir(), "useful-skills-dependencies-"));
   t.after(() => rm(agentDir, { recursive: true, force: true }));
-  const versionRoot = path.join(agentDir, "useful-skills", "dependencies", dependencyLockHash(manifest, lock));
+  const versionRoot = path.join(agentDir, "harness-useful-skills", "dependencies", dependencyLockHash(manifest, lock));
   await mkdir(versionRoot, { recursive: true });
 
   const result = await dependencyStatus({ agentDir });
@@ -185,7 +185,7 @@ test("dependency status identifies a partial version directory without repairing
 test("offline reuse requires exact interpreter and package health before returning", async (t) => {
   const source = await fixture(t);
   const lockHash = dependencyLockHash(source.manifest, source.lock);
-  const versionRoot = path.join(source.agentDir, "useful-skills", "dependencies", lockHash);
+  const versionRoot = path.join(source.agentDir, "harness-useful-skills", "dependencies", lockHash);
   const python = path.join(versionRoot, "venv", "bin", "python");
   await mkdir(path.dirname(python), { recursive: true });
   await writeFile(python, "");
@@ -235,7 +235,7 @@ test("setup rejects redirects outside approved HTTPS release hosts", async (t) =
 
 test("the single setup deadline includes lock acquisition", async (t) => {
   const source = await fixture(t);
-  const lockDirectory = path.join(source.agentDir, "useful-skills", "dependencies");
+  const lockDirectory = path.join(source.agentDir, "harness-useful-skills", "dependencies");
   await mkdir(lockDirectory, { recursive: true });
   const lease = await acquireSetupLock(path.join(lockDirectory, ".setup.lock"), {});
   t.after(() => lease.release());

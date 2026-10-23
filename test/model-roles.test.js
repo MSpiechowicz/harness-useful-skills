@@ -17,7 +17,7 @@ function parseSelector(role, raw) {
 async function host(t, defaultConfig = "# roles\nmodelRoles:\n") {
   const root = await mkdtemp(path.join(os.tmpdir(), "model-roles-"));
   t.after(() => rm(root, { recursive: true, force: true }));
-  const configFile = path.join(root, "useful-skills", "models.yml");
+  const configFile = path.join(root, "harness-useful-skills", "models.yml");
   const agentDir = path.join(root, "agents");
   return {
     root,

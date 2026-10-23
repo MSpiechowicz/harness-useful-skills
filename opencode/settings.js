@@ -2,6 +2,7 @@ import { lstatSync, mkdirSync } from "node:fs";
 import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
 
+import { DATA_DIRECTORY } from "../names.js";
 import { gitWorkTreeRoot, readWorkflowSnapshot, STAGES } from "../workflow-settings.js";
 import { opencodeConfigDir } from "./paths.js";
 
@@ -25,7 +26,7 @@ async function defaultSnapshot(configDir, cwd) {
   const values = Object.fromEntries(KEYS.map(key => [key, true]));
   const sources = Object.fromEntries(KEYS.map(key => [key, "default"]));
   const errors = {};
-  const snapshot = { directory: path.join(configDir, "useful-skills", "workflow-settings"), scopeRoot: undefined, workflowFile: undefined, values, errors, sources };
+  const snapshot = { directory: path.join(configDir, DATA_DIRECTORY, "workflow-settings"), scopeRoot: undefined, workflowFile: undefined, values, errors, sources };
 
   try {
     snapshot.scopeRoot = (await gitWorkTreeRoot(cwd)) ?? await realpath(cwd);
@@ -54,7 +55,7 @@ export async function readOpenCodeWorkflow({ environment = process.env, cwd } = 
 
 /**
  * The config dir that holds the settings store, created with default permissions when it does not exist yet so
- * a first setting can be saved; the store itself creates its owner-only `useful-skills` directory below it.
+ * a first setting can be saved; the store itself creates its owner-only `harness-useful-skills` directory below it.
  */
 export function ensureOpenCodeConfigDir(environment = process.env) {
   const configDir = opencodeConfigDir(environment);

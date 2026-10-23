@@ -21,7 +21,7 @@ export function createInstallSandbox() {
     environment,
     cwd,
     configDir: path.join(environment.XDG_CONFIG_HOME, "opencode"),
-    dataDir: path.join(environment.XDG_DATA_HOME, "opencode", "useful-skills"),
+    dataDir: path.join(environment.XDG_DATA_HOME, "opencode", "harness-useful-skills"),
     bundleRoot: path.join(root, "bundle"),
     cleanup: () => rmSync(root, { recursive: true, force: true }),
   };
@@ -33,12 +33,12 @@ export function createInstallSandbox() {
  */
 export function writeBundle(bundleRoot, { version = "1.0.0", files = {} } = {}) {
   rmSync(bundleRoot, { recursive: true, force: true });
-  const runtime = path.join(bundleRoot, "useful-skills");
+  const runtime = path.join(bundleRoot, "harness-useful-skills");
   mkdirSync(path.join(runtime, "opencode"), { recursive: true });
   cpSync(REAL_AGENTS, path.join(runtime, "opencode", "agents"), { recursive: true });
 
   const content = {
-    "package.json": `${JSON.stringify({ name: "useful-skills-opencode", private: true, type: "module", version })}\n`,
+    "package.json": `${JSON.stringify({ name: "harness-useful-skills-opencode", private: true, type: "module", version })}\n`,
     "opencode/mcp-server.js": `// mcp ${version}\n`,
     "opencode/v1.js": `export const UsefulSkills = async () => ({}); // ${version}\n`,
     "opencode/skills/us-plan/SKILL.md": `---\nname: us-plan\n---\nPlan ${version}\n`,
@@ -53,5 +53,5 @@ export function writeBundle(bundleRoot, { version = "1.0.0", files = {} } = {}) 
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, text);
   }
-  writeFileSync(path.join(bundleRoot, "useful-skills.js"), 'export { UsefulSkills } from "./useful-skills/opencode/v1.js";\n');
+  writeFileSync(path.join(bundleRoot, "harness-useful-skills.js"), 'export { UsefulSkills } from "./harness-useful-skills/opencode/v1.js";\n');
 }

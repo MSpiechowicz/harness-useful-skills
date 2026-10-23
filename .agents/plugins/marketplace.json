@@ -3,7 +3,7 @@
   "interface": { "displayName": "Harness Skills" },
   "plugins": [
     {
-      "name": "useful-skills",
+      "name": "harness-useful-skills",
       "source": { "source": "local", "path": "./plugins/codex" },
       "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
       "category": "Developer Tools"

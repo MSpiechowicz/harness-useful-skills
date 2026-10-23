@@ -1,6 +1,6 @@
 # Read-only reconnaissance worker brief
 
-Load `/useful-skills:us-write-concisely` before responding. Use only native read/search/navigation tools. Do not edit files, run validation, build memory/Graphify, plan, publish, or launch another worker/workflow.
+Load `/harness-useful-skills:us-write-concisely` before responding. Use only native read/search/navigation tools. Do not edit files, run validation, build memory/Graphify, plan, publish, or launch another worker/workflow.
 
 ## Objective
 

@@ -41,7 +41,7 @@ async function fixture(t) {
   delete linuxOnly.uv.platforms["darwin-arm64"];
   delete linuxOnly.python.platforms["darwin-arm64"];
   const lockHash = digest(Buffer.concat([Buffer.from(JSON.stringify(linuxOnly)), Buffer.from([0]), lock]));
-  const storage = path.join(agentDir, "useful-skills", "dependencies");
+  const storage = path.join(agentDir, "harness-useful-skills", "dependencies");
   const versionRoot = path.join(storage, lockHash);
   return {
     root,
@@ -162,7 +162,7 @@ test("owned storage refuses a symlink without modifying its destination", async 
   await mkdir(outside);
   await writeFile(path.join(outside, "keep"), "untouched");
   await mkdir(source.agentDir);
-  await symlink(outside, path.join(source.agentDir, "useful-skills"));
+  await symlink(outside, path.join(source.agentDir, "harness-useful-skills"));
   await assert.rejects(manager(source).ensure({ agentDir: source.agentDir }), /not a symlink/i);
   assert.deepEqual(await readdir(outside), ["keep"]);
   assert.equal(await readFile(path.join(outside, "keep"), "utf8"), "untouched");

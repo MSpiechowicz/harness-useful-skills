@@ -26,14 +26,14 @@ function policies() {
 }
 
 test("each host names skills its own way and nothing else differs", () => {
-  const ignoreClaude = "An attested native invocation of `useful-skills:us-ignore-workflow`";
+  const ignoreClaude = "An attested native invocation of `harness-useful-skills:us-ignore-workflow`";
   const ignoreOpenCode = "A user-run `/us-ignore-workflow` command";
 
   for (const current of policies()) {
     const claudeText = claude.workflowContext(current);
     const opencodeText = opencode.workflowContext(current);
-    assert.doesNotMatch(opencodeText, /useful-skills:/);
-    assert.equal(claudeText.replace(ignoreClaude, ignoreOpenCode).replaceAll("useful-skills:", ""), opencodeText);
+    assert.doesNotMatch(opencodeText, /harness-useful-skills:/);
+    assert.equal(claudeText.replace(ignoreClaude, ignoreOpenCode).replaceAll("harness-useful-skills:", ""), opencodeText);
   }
   assert.equal(claude.fastLaneContext(), opencode.fastLaneContext());
 });

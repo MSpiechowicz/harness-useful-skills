@@ -28,6 +28,7 @@ const FILES = [
   // Host-neutral modules shared with the Claude adapter.
   'workflow-context.js', 'tool-safety.js', 'command-core.js', 'model-roles.js',
   'doctor-setup.js', 'local-facts.js', 'host-roots.js', 'mcp-memory-server.js', 'entrypoint.js',
+  'names.js', 'legacy-names.js', 'data-migration.js',
   // Claude adapter.
   'claude/command.js', 'claude/hooks.js', 'claude/mcp-server.js', 'claude/models.js',
   'claude/settings.js', 'claude/context.js', 'claude/host-context.js',
@@ -92,7 +93,7 @@ function expectedOutput() {
     sources: [...FILES, ...skillFiles],
     generated: [
       { path: '.claude-plugin/plugin.json', content: json(manifest(skills)) },
-      { path: 'package.json', content: json({ name: 'useful-skills-claude', private: true, type: 'module' }) },
+      { path: 'package.json', content: json({ name: 'harness-useful-skills-claude', private: true, type: 'module' }) },
     ],
   });
 }

@@ -132,9 +132,9 @@ test("a relative USEFUL_SKILLS_DATA fails tool calls with a printable reason", a
   assert.deepEqual(await readdir(f.data), []);
 });
 
-test("without USEFUL_SKILLS_DATA, facts live in $HOME/.codex/useful-skills/data", async t => {
+test("without USEFUL_SKILLS_DATA, facts live in $HOME/.codex/harness-useful-skills/data", async t => {
   const f = await fixture(t);
-  const fallback = path.join(f.home, ".codex", "useful-skills", "data");
+  const fallback = path.join(f.home, ".codex", "harness-useful-skills", "data");
   await mkdir(fallback, { recursive: true, mode: 0o700 });
 
   const client = connect(t, { cwd: f.project, environment: f.environment });

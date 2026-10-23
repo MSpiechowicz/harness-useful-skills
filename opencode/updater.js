@@ -16,6 +16,7 @@ import { pipeline } from "node:stream/promises";
 import { promisify } from "node:util";
 import { createGunzip } from "node:zlib";
 
+import { PLUGIN_NAME } from "../names.js";
 import { onTermination } from "../process.js";
 import { REPOSITORY, UpdateError, githubToken, isNewerVersion, latestRelease, usableToken } from "../release-check.js";
 import { RUNTIME_ROOT, bundleVersion, runtimeInstall, scopeRootFor } from "./paths.js";
@@ -39,8 +40,8 @@ const TAR_TIMEOUT_MS = 60_000;
 const INSTALL_TIMEOUT_MS = 120_000;
 
 /** Files a release must ship for its installer to set up OpenCode. */
-const REQUIRED_FILES = ["useful-skills", "plugins/opencode/useful-skills.js"];
-const VERSIONED_MANIFESTS = ["package.json", "plugins/opencode/useful-skills/package.json"];
+const REQUIRED_FILES = ["useful-skills", `plugins/opencode/${PLUGIN_NAME}.js`];
+const VERSIONED_MANIFESTS = ["package.json", `plugins/opencode/${PLUGIN_NAME}/package.json`];
 
 const errorText = (error) => (error instanceof Error ? error.message : String(error));
 const quoted = (name) => JSON.stringify(name.length > 200 ? `${name.slice(0, 200)}...` : name);

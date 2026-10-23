@@ -1,5 +1,5 @@
 /**
- * The plugin definition OpenCode loads from `<config>/plugins/useful-skills.js`, whatever its plugin API. Each
+ * The plugin definition OpenCode loads from `<config>/plugins/harness-useful-skills.js`, whatever its plugin API. Each
  * loader reads the default export and ignores the fields it does not know:
  * - OpenCode 1.x detects a default export with an `id` and calls its `server`.
  * - OpenCode 2.x requires a default export with an `id` and a `setup`.

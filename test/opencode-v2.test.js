@@ -187,7 +187,7 @@ async function injected(hooks, sessionID) {
 test("the V2 module's only export is a plugin definition with an id and a setup function", () => {
   assert.deepEqual(Object.keys(v2), ["default"]);
   assert.deepEqual(Object.keys(v2.default).sort(), ["id", "setup"]);
-  assert.equal(v2.default.id, "useful-skills");
+  assert.equal(v2.default.id, "harness-useful-skills");
   assert.equal(typeof v2.default.setup, "function");
 });
 
