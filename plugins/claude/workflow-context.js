@@ -16,7 +16,7 @@ const STAGE_SKILLS = Object.freeze({
  * tools are there, so the agent never splits them across two stores. `skill(name)` names a skill as on that host.
  */
 export function backendMemoryGuidance(skill) {
-  return `Automatic backend-memory stage enabled when applicable. Keep durable facts in Harness Memory: when its \`note_search\` and \`note_save\` tools are available, follow \`${skill("us-use-harness-memory")}\` and do not search or save facts with Useful Skills memory. Only without those tools consult \`${skill("us-manage-memory")}\`.`;
+  return `Automatic backend-memory stage enabled when applicable. Keep durable facts in Harness Memory: when its \`note_search\` and \`note_save\` tools are available, follow \`${skill("us-use-harness-memory")}\` and do not search or save facts with Useful Skills memory. Only without those tools consult \`${skill("us-manage-memory")}\`. Write note titles and bodies in English and search with a few English keywords. Add 3-5 lowercase tags with synonyms someone might search for.`;
 }
 
 /**

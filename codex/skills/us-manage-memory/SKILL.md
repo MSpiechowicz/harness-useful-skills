@@ -9,7 +9,7 @@ Load the `us-write-concisely` skill. Use the five separate tools of the `harness
 
 If these tools are not available (the plugin was installed from the marketplace without the installer), report memory as unavailable, suggest running the installer for Codex (`./useful-skills install --host codex`, or the install script with `HARNESS_SKILLS_HOST=codex`), check the installation with `./useful-skills doctor --host codex`, continue inspecting source, and never write another memory store.
 
-When the Harness Memory tools `note_search` and `note_save` are available, durable facts belong there (Harness Desktop → Memory): search and save them with the `us-use-harness-memory` skill, and make no memory search or save call through this skill, automatic or for "remember this". This skill then covers only the Graphify code graph.
+When the Harness Memory tools `note_search` and `note_save` are available, durable facts belong there (Harness Desktop → Memory): search and save them with the `us-use-harness-memory` skill, and make no memory search or save call through this skill, automatic or for "remember this". Write those notes in English with 3-5 lowercase tags including synonyms, and search with a few English keywords. This skill then covers only the Graphify code graph.
 
 Apply pre-composition lane selection in the `us-run-workflow` skill, including on direct loading. The memory stages alone do not require calls for an eligible focused repair. Select each eligible automatic action only for concrete memory/relationship impact; normal composition still uses its applicable memory stages. Explicit memory/graph requests remain independent. This skill never forces new research, planning, delegation, or reviews.
 
