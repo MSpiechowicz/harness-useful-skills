@@ -1,6 +1,6 @@
 {
   "name": "harness-useful-skills",
-  "version": "0.3.13",
+  "version": "0.4.0",
   "description": "Skill-led development workflows for Codex: clarify, research, plan, implement, review, and remember, with role agents and project memory.",
   "author": {
     "name": "Maciej Spiechowicz"
