@@ -1,4 +1,5 @@
 import { formatDoctor } from "./doctor.js";
+import { syncOmpAgents } from "./omp/agents-sync.js";
 import { boundedDisplay, runGraphTest } from "./graph-test.js";
 import { runUpdate } from "./updater.js";
 import { readWorkflowSettings, STAGES, writeWorkflowSetting } from "./workflow-settings.js";
@@ -153,12 +154,21 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
     }
   }
 
+  /** OMP's task tool reads agents only from `<agentDir>/agents`, so every session copies the bundled ones there. */
+  function ompAgents() {
+    try {
+      return syncOmpAgents({ agentDir: pi.pi.getAgentDir() });
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error), agents: {} };
+    }
+  }
+
   async function doctor(ctx) {
     const [core, memory] = await Promise.all([
       resourceInventory(),
       memoryAction({ action: "status" }, { cwd: ctx.cwd, agentDir: pi.pi.getAgentDir(), memory: ctx.memory }),
     ]);
-    notify(ctx, formatDoctor({ core, safety: safetyEnabled(), memory }));
+    notify(ctx, formatDoctor({ core, safety: safetyEnabled(), memory, ompAgents: ompAgents() }));
   }
 
   async function workbench(args, ctx) {
@@ -361,6 +371,9 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
   });
 
   pi.on("session_start", (_event, ctx) => {
+    // Before the headless early return: subagent and print-mode sessions need the agents too.
+    ompAgents();
+
     if (!ctx.hasUI || startupScheduled) {
       return;
     }

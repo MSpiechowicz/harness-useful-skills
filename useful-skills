@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { formatDoctor } from "./doctor.js";
 import { PLUGIN_NAME } from "./names.js";
+import { removeOmpAgents } from "./omp/agents-sync.js";
 import { installPlugin, PACKAGE_ROOT, runUpdate, UpdateError } from "./updater.js";
 import { formatResources, listResources, parseCatalogArguments, resourceInventory, safetyEnabled } from "./resources.js";
 const USAGE = `Usage:
@@ -11,6 +13,7 @@ const USAGE = `Usage:
   ./useful-skills update check|install [--profile PROFILE]
   ./useful-skills list [query]
   ./useful-skills doctor
+  ./useful-skills uninstall --host omp [--profile NAME]
   ./useful-skills install --host opencode [--scope user|project]
   ./useful-skills update check|install --host opencode [--scope user|project]
   ./useful-skills uninstall --host opencode [--scope user|project]
@@ -23,6 +26,7 @@ const USAGE = `Usage:
 
 Requires Node.js 22+ and OMP with marketplace support.
 --host omp is the default; --host opencode installs into OpenCode instead (restart OpenCode afterwards).
+uninstall --host omp removes the agents Useful Skills copied into the OMP agent directory (~/.omp/profiles/NAME/agent for --profile, OMP_PROFILE or PI_PROFILE; else PI_CODING_AGENT_DIR, default ~/.omp/agent), then prints the omp command that removes the plugin.
 --host codex installs into Codex (CODEX_HOME, default ~/.codex) and needs the codex command on PATH;
 --local adds this directory as the marketplace instead of the GitHub release (restart Codex afterwards).
 models apply --host codex writes the roles of $CODEX_HOME/harness-useful-skills/models.yml into the Codex agents (the installer does it too).
@@ -79,9 +83,52 @@ function parseOptions(argv, allowed) {
 
 /** Commands that accept `--host`; `list` and `help` are host-agnostic. */
 const HOSTED_COMMANDS = new Set(["install", "update", "uninstall", "doctor", "models"]);
-const OMP_UNINSTALL = "uninstall needs --host opencode or --host codex; for OMP run `omp plugin uninstall harness-useful-skills@harness-useful-skills`.";
+const OMP_PLUGIN_UNINSTALL = "omp plugin uninstall harness-useful-skills@harness-useful-skills";
+const OMP_UNINSTALL = `uninstall needs --host omp, opencode or codex; for OMP run \`./useful-skills uninstall --host omp\` and then \`${OMP_PLUGIN_UNINSTALL}\`.`;
 const HOSTS = new Set(["omp", "opencode", "codex"]);
 const CODEX_UPDATE = "Useful Skills for Codex updates by installing again: re-run install.sh (or install.ps1) with HARNESS_SKILLS_HOST=codex, or run `./useful-skills install --host codex` from an updated checkout.";
+
+const OMP_PROFILE_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+
+/**
+ * The OMP agent directory, resolved as OMP does: a named profile (`--profile`, else `OMP_PROFILE`, else `PI_PROFILE`)
+ * uses `~/.omp/profiles/<name>/agent`; the default profile uses `PI_CODING_AGENT_DIR`, else `~/.omp/agent`.
+ */
+function ompAgentDir(profileOption) {
+  const raw = profileOption ?? process.env.OMP_PROFILE ?? process.env.PI_PROFILE;
+  const profile = raw?.trim();
+
+  if (profile && profile !== "default") {
+    if (!OMP_PROFILE_NAME.test(profile) || profile.endsWith(".")) {
+      throw new UpdateError(`Invalid OMP profile: ${profile}`);
+    }
+
+    return path.join(os.homedir(), ".omp", "profiles", profile, "agent");
+  }
+
+  const override = process.env.PI_CODING_AGENT_DIR;
+  return override ? path.resolve(override) : path.join(os.homedir(), ".omp", "agent");
+}
+
+/** Remove the agents copied into the OMP agent directory; the plugin itself is removed by OMP's own command. */
+function ompUninstall(argv) {
+  let profile;
+  const rest = [...argv];
+  const index = rest.indexOf("--profile");
+  if (index !== -1) {
+    profile = optionValue(rest, index, "--profile");
+    rest.splice(index, 2);
+  }
+
+  if (rest.length > 0) {
+    throw new UpdateError(`Unknown argument: ${rest[0]}`);
+  }
+
+  const removed = removeOmpAgents({ agentDir: ompAgentDir(profile) });
+  const lines = removed.length ? ["Removed OMP agents:", ...removed.map(file => `  ${file}`)] : ["No Useful Skills agents found in the OMP agent directory."];
+  lines.push(`Now run \`${OMP_PLUGIN_UNINSTALL}\` to remove the plugin.`);
+  return lines.join("\n");
+}
 
 /** Remove `--host VALUE` from the arguments; an omitted host means OMP. */
 function splitHost(argv) {
@@ -279,6 +326,7 @@ export async function main(argv = process.argv.slice(2)) {
     }
 
     if (HOSTED_COMMANDS.has(argv[0])) {
+      const explicitHost = argv.includes("--host");
       const { host, rest } = splitHost(argv.slice(1));
       if (argv[0] === "models" && host !== "codex") {
         modelsOperation(host, rest);
@@ -288,6 +336,11 @@ export async function main(argv = process.argv.slice(2)) {
       }
       if (host === "codex") {
         return await codexCommand(argv[0], rest);
+      }
+      if (host === "omp" && explicitHost && argv[0] === "uninstall") {
+        const { printableText } = await import("./opencode/paths.js");
+        console.log(printableText(ompUninstall(rest)));
+        return 0;
       }
       argv = [argv[0], ...rest];
     }
