@@ -45,7 +45,7 @@ async function hookCli(f, args) {
 
 /** The policy of saved settings where every stage is enabled and the workflow is as given. */
 function policy(workflow) {
-  const stages = { research: true, plan: true, review: true, "security-review": true, "backend-memory": true, "graphify-memory": true };
+  const stages = { research: true, plan: true, review: true, "security-review": true, "backend-memory": true, "code-graph": true };
   return effectiveWorkflow({ values: { workflow, ...stages }, errors: {} });
 }
 

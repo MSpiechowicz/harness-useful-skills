@@ -32,6 +32,8 @@ const OPTION_ENV: Readonly<Record<string, string>> = {
   review: 'CLAUDE_PLUGIN_OPTION_REVIEW',
   security_review: 'CLAUDE_PLUGIN_OPTION_SECURITY_REVIEW',
   backend_memory: 'CLAUDE_PLUGIN_OPTION_BACKEND_MEMORY',
+  code_graph: 'CLAUDE_PLUGIN_OPTION_CODE_GRAPH',
+  // Deprecated name of code_graph, read by the CLI only while code_graph is unset.
   graphify_memory: 'CLAUDE_PLUGIN_OPTION_GRAPHIFY_MEMORY',
 }
 
@@ -39,7 +41,7 @@ const OPTION_ENV: Readonly<Record<string, string>> = {
 const WRITE_ORIGINS: ReadonlySet<string> = new Set(['composer', 'sdk'])
 
 // Every other subcommand can change saved settings; `doctor` from these origins only checks.
-const READ_ONLY: ReadonlySet<string> = new Set(['status', 'help', 'list', 'doctor', 'update', 'graph'])
+const READ_ONLY: ReadonlySet<string> = new Set(['status', 'help', 'list', 'doctor', 'update'])
 
 type Stage = { key: string; label: string }
 
@@ -51,7 +53,7 @@ const STAGES_FIRST: readonly Stage[] = [
 const STAGES_SECOND: readonly Stage[] = [
   { key: 'security-review', label: 'Security review' },
   { key: 'backend-memory', label: 'Backend memory' },
-  { key: 'graphify-memory', label: 'Graphify memory' },
+  { key: 'code-graph', label: 'Code graph' },
 ]
 
 type Run = (tokens: readonly string[]) => Promise<string>

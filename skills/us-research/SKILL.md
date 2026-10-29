@@ -26,4 +26,4 @@ Return exact paths/symbols, caller/test relationships, conventions/docs, observe
 
 ## Failure behavior
 
-A missing graph, native memory backend, or worker does not block source research. Record the exact unavailable capability and complete all reachable source inspection. Do not invent worker findings or infer behavior from stale memory. Dependency/cache writes, when permitted, belong only to the explicit actions described in `skill://us-manage-memory`.
+A missing code graph, native memory backend, or worker does not block source research. Record the exact unavailable capability and complete all reachable source inspection. Do not invent worker findings or infer behavior from stale memory. When `code_map`, `code_symbol`, `code_impact`, and `code_path` are advertised, use them instead of grep for code-structure questions (routing in `skill://us-manage-memory`); grep stays for literal text, error messages, config values, and unindexed files.

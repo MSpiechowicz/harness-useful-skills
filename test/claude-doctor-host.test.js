@@ -43,7 +43,7 @@ test("unresolvable plugin data directories are not checked and nothing is writte
       assert.match(report.text, /\nSettings\n/);
       assert.doesNotMatch(report.text, /\nSetup\n/);
     }
-    assert.deepEqual(f.calls, { install: 0, build: 0 });
+    assert.equal(f.calls.probe, 0);
   }
 
   await assertNoWrites(outside);
@@ -80,8 +80,7 @@ test("a directory marketplace install resolves its data directory and runs docto
 
   const setup = await f.run(["doctor"], { packageRoot: pluginRepo });
   assert.equal(setup.exitCode, 0, setup.text);
-  assert.match(setup.text, /\nSetup\n {2}Facts: created\n {2}Dependencies: installed\n {2}Graph: built \(1 nodes, 0 edges\)\n/);
-  assert.deepEqual(f.calls, { install: 1, build: 1 });
+  assert.match(setup.text, /\nSetup\n {2}Facts: created\n {2}Code graph: available\n/);
   assert.equal((await stat(await factsDirectory(f))).isDirectory(), true);
 });
 
@@ -128,7 +127,7 @@ test("directory marketplace installs that cannot be matched exactly are not chec
       assert.match(report.text, reason);
       assert.doesNotMatch(report.text, /\nSetup\n/);
     }
-    assert.deepEqual(f.calls, { install: 0, build: 0 });
+    assert.equal(f.calls.probe, 0);
     await assertNoWrites(f);
   }
 });

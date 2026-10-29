@@ -90,6 +90,6 @@ test("skills name their tools and namespace with the unified name", () => {
   assert.match(skill("claude", "us-run-workflow"), /`harness-useful-skills:planner`/);
   assert.match(skill("claude", "us-manage-memory"), /MCP server `harness-useful-skills`/);
   assert.match(skill("opencode", "us-manage-memory"), /`harness-useful-skills_memory_status`/);
-  assert.match(skill("opencode", "us-manage-memory"), /`harness-useful-skills_graph_query`/);
+  assert.match(skill("opencode", "us-manage-memory"), /`code_impact`/);
   assert.match(skill("codex", "us-manage-memory"), /`harness-useful-skills` MCP server/);
 });

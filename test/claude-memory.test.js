@@ -85,7 +85,7 @@ test("stdio lifecycle, literal fact search, concurrent durable writes, restart a
   assert.equal((await first.request(0, "tools/list")).error.code, -32002);
   await first.init();
   const list = await first.request(2, "tools/list");
-  assert.deepEqual(list.result.tools.map(tool => tool.name), ["memory_status", "memory_search", "memory_save", "graph_build", "graph_query"]);
+  assert.deepEqual(list.result.tools.map(tool => tool.name), ["memory_status", "memory_search", "memory_save"]);
   assert.deepEqual(await readdir(data), []);
   const initialStatus = await first.call(3, "memory_status");
   assert.equal(initialStatus.value.native.observation.active, true);
@@ -122,7 +122,7 @@ test("stdio lifecycle, literal fact search, concurrent durable writes, restart a
   }
 });
 
-test("protocol failures, secret refusal, invalid fields and unavailable graph remain explicit", async t => {
+test("protocol failures, secret refusal, invalid fields and the retired graph tools remain explicit", async t => {
   const { project, data } = await fixture(t);
   const client = connect(t, project, data);
   client.send("{invalid json");
@@ -133,30 +133,14 @@ test("protocol failures, secret refusal, invalid fields and unavailable graph re
   assert.equal((await client.request(2, "missing")).error.code, -32601);
   assert.equal((await client.request(3, "tools/call", { name: "unknown", arguments: {} })).error.code, -32602);
   assert.equal((await client.request(7, "tools/call", { name: "memory_status", arguments: { action: "build" } })).error.code, -32602);
-  const cancelled = client.request(8, "tools/call", { name: "graph_build", arguments: {} });
-  client.send({ method: "notifications/cancelled", params: { requestId: 8, reason: "Stop" } });
-  assert.equal((await cancelled).result.isError, true);
+  for (const [id, name] of [[8, "graph_build"], [9, "graph_query"]]) {
+    assert.equal((await client.request(id, "tools/call", { name, arguments: {} })).error.code, -32602, name);
+  }
   const secret = await client.call(4, "memory_save", { content: `token=${"x".repeat(24)}` });
   assert.equal(secret.isError, true);
   assert.match(secret.value.error, /secret-shaped/);
   assert.equal((await client.call(5, "memory_save", { content: "Use meters.", cwd: project })).isError, true);
-  const graph = await client.call(6, "graph_query", { query: "unit" });
-  assert.equal(graph.isError, true);
-  assert.match(graph.value.error, /No active graph/);
   assert.deepEqual(await readdir(data), []);
-  await client.close();
-});
-
-test("graph_build refuses a project that is the home directory before installing dependencies", async t => {
-  const { project, data } = await fixture(t);
-  const client = connect(t, project, data, { HOME: project });
-  await client.init();
-
-  const build = await client.call(2, "graph_build");
-  assert.equal(build.isError, true);
-  assert.match(build.value.error, /Graphify build refused: workspace includes a home directory or is the filesystem root/);
-  assert.deepEqual(await readdir(data), []);
-  assert.deepEqual(await readdir(project), []);
   await client.close();
 });
 

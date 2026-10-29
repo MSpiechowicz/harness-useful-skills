@@ -7,8 +7,10 @@ import { migrateDataDirectory } from "./data-migration.js";
 import { DATA_DIRECTORY } from "./names.js";
 
 export const STAGES = Object.freeze([
-  "research", "plan", "review", "security-review", "backend-memory", "graphify-memory",
+  "research", "plan", "review", "security-review", "backend-memory", "code-graph",
 ]);
+// Setting files from before the Graphify retirement: read only while the current file is missing.
+const LEGACY_KEYS = Object.freeze({ "code-graph": "graphify-memory" });
 const KEYS = Object.freeze(["workflow", ...STAGES]);
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
@@ -207,6 +209,12 @@ async function privateChild(parent, name) {
 
 async function readSetting(directory, key) {
   const file = path.join(directory, `${key}.json`);
+  const legacy = LEGACY_KEYS[key];
+  if (legacy && !await lstat(file).then(() => true, () => false)) {
+    const found = await readSetting(directory, legacy);
+    return found.source === "file" ? found : { value: true, source: "default" };
+  }
+
   try {
     const details = await lstat(file);
     if (!details.isFile() || details.isSymbolicLink()) {

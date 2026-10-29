@@ -6,10 +6,10 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { workspaceMemoryPaths } from "../graphify.js";
+import { workspaceMemoryPaths } from "../memory-paths.js";
 
 const SERVER = fileURLToPath(new URL("../codex/mcp-server.js", import.meta.url));
-const TOOLS = ["memory_status", "memory_search", "memory_save", "graph_build", "graph_query"];
+const TOOLS = ["memory_status", "memory_search", "memory_save"];
 
 /** A temp HOME, two projects, and a private data dir; the environment holds only what Codex passes to MCP servers. */
 async function fixture(t) {

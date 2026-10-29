@@ -39,8 +39,7 @@ MAX_ENTRIES=20000
 MAX_ENTRY_NAME=4096
 HOST="${HARNESS_SKILLS_HOST:-opencode}"
 # Files a release must ship for its installer to set up the chosen host, and the manifests that carry its version.
-# select_host fills them in. Where a file moved when the names were unified, the entry lists the current path and the
-# earlier one joined by `|`, so a pinned earlier release still installs.
+# select_host fills them in.
 HOST_LABEL=""
 REQUIRED_FILES=""
 VERSIONED_MANIFESTS=""
@@ -112,31 +111,17 @@ select_host() {
   case "$HOST" in
     opencode)
       HOST_LABEL="OpenCode"
-      REQUIRED_FILES="useful-skills plugins/opencode/harness-useful-skills.js|plugins/opencode/useful-skills.js"
-      VERSIONED_MANIFESTS="package.json plugins/opencode/harness-useful-skills/package.json|plugins/opencode/useful-skills/package.json"
+      REQUIRED_FILES="useful-skills plugins/opencode/harness-useful-skills.js"
+      VERSIONED_MANIFESTS="package.json plugins/opencode/harness-useful-skills/package.json"
       ;;
     codex)
       HOST_LABEL="Codex"
-      REQUIRED_FILES="useful-skills plugins/codex/.codex-plugin/plugin.json plugins/codex-runtime/harness-useful-skills/codex/mcp-server.js|plugins/codex-runtime/useful-skills/codex/mcp-server.js .agents/plugins/marketplace.json"
+      REQUIRED_FILES="useful-skills plugins/codex/.codex-plugin/plugin.json plugins/codex-runtime/harness-useful-skills/codex/mcp-server.js .agents/plugins/marketplace.json"
       VERSIONED_MANIFESTS="package.json plugins/codex/.codex-plugin/plugin.json"
       ;;
   esac
 }
 
-# Prints the first of the `|`-separated paths in $1 that the release ships as a regular file, else the first path.
-first_shipped() {
-  _rest="$1|"
-  _first="${_rest%%|*}"
-  while [ -n "$_rest" ]; do
-    _one="${_rest%%|*}"
-    _rest="${_rest#*|}"
-    if [ -f "$ROOT/$_one" ] && [ ! -L "$ROOT/$_one" ]; then
-      printf '%s' "$_one"
-      return 0
-    fi
-  done
-  printf '%s' "$_first"
-}
 
 # Pairs the verbose listing $2 with the plain name list $1 and sums the entry sizes. The size column is found by
 # anchoring on the trailing tokens, never on text a user or group name could imitate:
@@ -292,8 +277,7 @@ main() {
 
   # The release must ship the bundle and installer of the chosen host and be exactly the announced version. The files are
   # checked first, so a release from before the Codex adapter gets the clear message instead of a version mismatch.
-  for ENTRY in $REQUIRED_FILES; do
-    FILE="$(first_shipped "$ENTRY")"
+  for FILE in $REQUIRED_FILES; do
     if [ -L "$ROOT/$FILE" ] || [ ! -f "$ROOT/$FILE" ]; then
       if [ "$HOST" = "codex" ]; then
         fail "this release ($VERSION) has no Codex adapter (missing $FILE); use a newer release"
@@ -301,8 +285,7 @@ main() {
       fail "the release archive has no $FILE, so it cannot install the $HOST_LABEL plugin"
     fi
   done
-  for ENTRY in $VERSIONED_MANIFESTS; do
-    MANIFEST="$(first_shipped "$ENTRY")"
+  for MANIFEST in $VERSIONED_MANIFESTS; do
     FOUND="$(json_string "$ROOT/$MANIFEST" version)"
     if [ "$FOUND" != "$VERSION_NUMBER" ]; then
       # Only a plain version is echoed: the value comes from the archive and could carry terminal escapes.

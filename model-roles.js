@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { closeSync, constants, fchmodSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, constants, fchmodSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { migrateDataDirectory } from "./data-migration.js";
@@ -107,11 +107,13 @@ export function ensurePrivateDirectory(directory) {
 }
 
 /** Replace a file through a uniquely named temporary file so readers never see partial text. */
-export function writeAtomic(file, text) {
+export function writeAtomic(file, text, mode = 0o644) {
   mkdirSync(path.dirname(file), { recursive: true });
   const temporary = `${file}.${randomUUID()}.tmp`;
   try {
-    writeFileSync(temporary, text, { flag: "wx", mode: 0o644 });
+    writeFileSync(temporary, text, { flag: "wx", mode });
+    // The umask can only narrow the mode the file was created with; set the exact one before the rename publishes it.
+    chmodSync(temporary, mode);
     renameSync(temporary, file);
   } finally {
     rmSync(temporary, { force: true });

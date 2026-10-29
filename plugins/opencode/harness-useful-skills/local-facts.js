@@ -3,8 +3,7 @@ import { constants } from "node:fs";
 import { link, lstat, mkdir, open, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 
-import { prepareStorage } from "./graph-storage.js";
-import { workspaceMemoryPaths } from "./graphify.js";
+import { prepareStorage, workspaceMemoryPaths } from "./memory-paths.js";
 
 // JSON.stringify can escape each UTF-16 code unit as six ASCII bytes (e.g. \\u0000).
 const MAX_FACT_BYTES = 16_384 * 6 + 128;
@@ -94,8 +93,8 @@ async function publishFact(directory, temporary, label) {
  * and `directory` is the facts folder name inside the workspace memory directory.
  */
 export function createLocalFacts({ cwd, agentDir, host }) {
-  async function pathsForAction() {
-    return workspaceMemoryPaths({ cwd, agentDir });
+  async function pathsForAction(retire = false) {
+    return workspaceMemoryPaths({ cwd, agentDir, retire });
   }
 
   return Object.freeze({
@@ -113,7 +112,7 @@ export function createLocalFacts({ cwd, agentDir, host }) {
 
     /** Create the private facts directory only when it is missing. */
     async ensure() {
-      const paths = await pathsForAction();
+      const paths = await pathsForAction(true);
       if (await factsDirectory(paths, host)) {
         return { created: false };
       }
@@ -145,7 +144,7 @@ export function createLocalFacts({ cwd, agentDir, host }) {
     },
 
     async save({ content }) {
-      const paths = await pathsForAction();
+      const paths = await pathsForAction(true);
       const directory = await factsDirectory(paths, host, true);
       const temporary = path.join(directory, `.${randomUUID()}.json.tmp`);
       const payload = JSON.stringify({ content });

@@ -4,51 +4,24 @@ import os from "node:os";
 import path from "node:path";
 
 import { runCommand } from "../../claude/command.js";
-import { runDoctorSetup } from "../../doctor-setup.js";
-import { resolveHostContext } from "../../claude/host-context.js";
-import { workspaceMemoryPaths } from "../../graphify.js";
-import { extract, service, validGraph } from "./graph-fixture.js";
+import { workspaceMemoryPaths } from "../../memory-paths.js";
 
 export const SECRET = `token=${"x".repeat(25)}`;
-export const HOME_BLOCKED = "project's Git work tree includes the home directory or is the filesystem root";
 
-/** Fake dependency runtime: missing until installed, with call counters for install and Graphify extraction. */
-function fakeServices({ installError, buildError, dependencyState = "missing" } = {}) {
-  const calls = { install: 0, build: 0 };
-  let installed = false;
+/** Fake services: the code graph probe answers from `codeGraph` and counts its calls; nothing else is installed or built. */
+function fakeServices({ codeGraph = "available" } = {}) {
+  const calls = { probe: 0 };
+  const outcomes = {
+    available: { outcome: "available", state: "ok" },
+    old: { outcome: "not available", state: "ok", detail: "update Harness Memory for the code index" },
+    missing: { outcome: "harness-memory not found", state: "ok", detail: "install Harness Memory for the code_map, code_symbol, code_impact and code_path tools" },
+  };
 
   const services = {
-    dependencyStatus: async () => {
-      if (installed) {
-        return { ready: true, state: "ready" };
-      }
-
-      return { ready: false, state: dependencyState, reason: "Platform is unsupported" };
+    probeCodeGraph: async () => {
+      calls.probe++;
+      return outcomes[codeGraph];
     },
-    ensureDependencies: async ({ signal } = {}) => {
-      calls.install++;
-      if (installError === "wait") {
-        await new Promise(resolve => signal.addEventListener("abort", resolve, { once: true }));
-        throw new Error("Managed Graphify setup was cancelled.");
-      }
-
-      if (installError) {
-        throw new Error(installError);
-      }
-
-      installed = true;
-      return { python: "/managed/python", version: "0.9.65" };
-    },
-    graphify: service({
-      runProcess: async (_file, args) => {
-        calls.build++;
-        if (buildError) {
-          throw new Error(buildError);
-        }
-
-        return extract(args, validGraph);
-      },
-    }),
   };
 
   return { calls, services };
@@ -90,19 +63,6 @@ export function assertNoWrites(f) {
     readdir(f.dataDir).then(entries => assert.deepEqual(entries, [])),
     readdir(f.configDir).then(entries => assert.deepEqual(entries, ["plugins"])),
   ]);
-}
-
-/** A dotfiles-style home directory that is itself a Git work tree. */
-export async function gitHome(f) {
-  const home = path.join(f.root, "real-home");
-  await mkdir(path.join(home, ".git"), { recursive: true });
-  return home;
-}
-
-export async function graphOutcome(f, workspace, system) {
-  const host = await resolveHostContext({ workspace, data: f.dataDir });
-  const outcome = await runDoctorSetup({ ...host, services: f.services, system });
-  return outcome.steps.at(-1);
 }
 
 /**

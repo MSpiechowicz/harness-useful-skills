@@ -150,7 +150,7 @@ test("doctor formats fresh, disabled, and failed memory states for consumers", a
 
   await handler("doctor", f.ctx);
   assert.match(f.messages.at(-1).message, /Native: Unavailable/);
-  assert.match(f.messages.at(-1).message, /Graph: Not built/);
+  assert.doesNotMatch(f.messages.at(-1).message, /Graph:/);
   assert.doesNotMatch(f.messages.at(-1).message, /"native"|\/profile\//);
 
   f.ctx.memory = { status: async () => ({ backend: "off", active: false }) };

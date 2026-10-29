@@ -1,5 +1,5 @@
 import { containsSecret } from "./resources.js";
-import { buildGraph, graphStatus, queryGraph, workspaceMemoryPaths } from "./graphify.js";
+import { workspaceMemoryPaths } from "./memory-paths.js";
 
 const MAX_QUERY_CHARS = 4_096;
 const MAX_SAVE_CHARS = 16_384;
@@ -11,8 +11,8 @@ export const MEMORY_PARAMETERS = {
   additionalProperties: false,
   required: ["action"],
   properties: {
-    action: { type: "string", enum: ["status", "build", "query", "search", "save"] },
-    query: { type: ["string", "null"], minLength: 1, maxLength: MAX_QUERY_CHARS, description: "Required non-empty text for query/search. For other actions omit or pass null." },
+    action: { type: "string", enum: ["status", "search", "save"] },
+    query: { type: ["string", "null"], minLength: 1, maxLength: MAX_QUERY_CHARS, description: "Required non-empty text for search. For other actions omit or pass null." },
     content: { type: ["string", "null"], minLength: 1, maxLength: MAX_SAVE_CHARS, description: "Required secret-free durable fact for save. For other actions omit or pass null." },
   },
 };
@@ -77,21 +77,15 @@ async function nativeStatus(memory, paths) {
   }
 }
 
-async function memoryStatus({ cwd, agentDir, memory, paths }) {
-  const [native, graph] = await Promise.all([
-    nativeStatus(memory, paths),
-    graphStatus({ cwd, agentDir }),
-  ]);
+async function memoryStatus({ memory, paths }) {
+  const native = await nativeStatus(memory, paths);
 
   return {
-    ok: native.ok && graph.ok,
+    ok: native.ok,
     backend: "us_memory",
     paths,
     native,
-    graph,
-    ...(native.ok && graph.ok ? {} : {
-      error: [native.error, graph.error].filter(Boolean).join(" ") || "Memory status is incomplete.",
-    }),
+    ...(native.ok ? {} : { error: native.error || "Memory status is incomplete." }),
   };
 }
 
@@ -147,10 +141,10 @@ async function nativeSave(memory, content, paths) {
   }
 }
 
-export async function executeMemory(args, { cwd, agentDir, memory, signal } = {}) {
+export async function executeMemory(args, { cwd, agentDir, memory } = {}) {
   let paths;
   try {
-    paths = await workspaceMemoryPaths({ cwd, agentDir });
+    paths = await workspaceMemoryPaths({ cwd, agentDir, retire: args?.action === "save" });
   } catch (error) {
     return { ok: false, backend: "us_memory", paths: undefined, error: errorMessage(error) };
   }
@@ -160,7 +154,7 @@ export async function executeMemory(args, { cwd, agentDir, memory, signal } = {}
   }
 
   let payload;
-  if (args.action === "query" || args.action === "search") {
+  if (args.action === "search") {
     payload = "query";
   } else if (args.action === "save") {
     payload = "content";
@@ -192,11 +186,7 @@ export async function executeMemory(args, { cwd, agentDir, memory, signal } = {}
 
   switch (args.action) {
     case "status":
-      return memoryStatus({ cwd, agentDir, memory, paths });
-    case "build":
-      return buildGraph({ cwd, agentDir, signal });
-    case "query":
-      return queryGraph({ cwd, agentDir, query: args.query, signal });
+      return memoryStatus({ memory, paths });
     case "search":
       return nativeSearch(memory, args.query, paths);
     case "save":
@@ -206,4 +196,3 @@ export async function executeMemory(args, { cwd, agentDir, memory, signal } = {}
   }
 }
 
-export { graphStatus };

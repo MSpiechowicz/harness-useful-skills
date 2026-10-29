@@ -9,6 +9,7 @@ import { directoryProblem, isPrintable, lstatOrNull, printableText } from "../op
 import { readAgents } from "./agents.js";
 import { adoptMarkedAgents } from "./apply-models.js";
 import { codexClient, marketplaceRef, releaseTagState, sameMcp, sameSource } from "./codex-cli.js";
+import { registerHook } from "./hooks-config.js";
 import { describeSelection, ensureCodexModels, readCodexModels, renderCodexAgent, selectionFor } from "./models.js";
 import { AGENT_RELS, DATA_REL, GITHUB_SOURCE, INSTALL_COMMAND, LEGACY_LAYOUT, MARKETPLACE_NAME, PACKAGE_ROOT, PLUGIN_ID, RECORD_REL, RUNTIME_DIR, agentRel, atHome, codexHomeFor, mcpEntryFor, readCodexRecord, readLegacyRecord } from "./paths.js";
 
@@ -291,6 +292,16 @@ function removeLegacyRegistrations({ client, codexHome, record }) {
   return lines;
 }
 
+/** Register the PreToolUse hint hook in hooks.json. A file it cannot use is reported, never a reason to fail the install. */
+function hookLines(codexHome) {
+  try {
+    const { changed, file } = registerHook(codexHome);
+    return [`Code-graph hint hook ${changed ? "registered" : "already registered"} in ${file}. Codex skips it until you review and trust it: open /hooks in Codex.`];
+  } catch (error) {
+    return [`Code-graph hint hook not registered (${error instanceof Error ? error.message : String(error)}). Fix or move that file, then run the install again.`];
+  }
+}
+
 /** Lines naming the model of each role that does not inherit, then where the models file is. */
 function modelLines(models, created) {
   const lines = [`Model roles: ${models.configFile}${created ? " (created; every role inherits)" : ""}.`];
@@ -392,6 +403,10 @@ export async function installCodex({ environment = process.env, packageRoot = PA
     record.mcp = mcp;
     saveRecord();
     done.push("MCP server registered");
+
+    stage = "registering the code-graph hint hook";
+    lines.push(...hookLines(codexHome));
+    done.push("hint hook registered");
 
     stage = "removing the earlier install";
     lines.push(...removeLegacyRegistrations({ client, codexHome, record: legacy.record }));

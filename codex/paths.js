@@ -47,7 +47,7 @@ export const agentRel = (role) => `agents/us-${role}.toml`;
 export const AGENT_RELS = Object.freeze(AGENT_ROLES.map(agentRel));
 
 export const INSTALL_COMMAND = "./useful-skills install --host codex";
-export const TIMEOUT_NOTE = `Long graph builds can exceed Codex's MCP tool timeout; raise tool_timeout_sec under [mcp_servers.${MCP_NAME}] in config.toml if they do (the installer never edits config.toml).`;
+export const TIMEOUT_NOTE = `A slow memory operation can exceed Codex's MCP tool timeout; raise tool_timeout_sec under [mcp_servers.${MCP_NAME}] in config.toml if they do (the installer never edits config.toml).`;
 
 const RECORD_MAX_BYTES = 1024 * 1024;
 const SHA256 = /^[0-9a-f]{64}$/;

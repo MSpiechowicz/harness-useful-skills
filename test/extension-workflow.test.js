@@ -100,7 +100,7 @@ test("commands persist exact modes, expose both scopes and paths, and reject inv
       const report = f.messages.at(-1).message;
       assert.match(report, /Workflow: saved disabled, effective disabled/);
       assert.match(report, /Security review: saved disabled, effective disabled/);
-      assert.match(report, /Graphify memory: saved disabled, effective disabled/);
+      assert.match(report, /Code graph: saved disabled, effective disabled/);
       await handler("workflow enabled", f.ctx);
       assert.equal((await settings(f)).values.review, false, "master switch retains stage choices");
       if (!hasUI) {

@@ -229,7 +229,7 @@ test("list shows Claude skill invocations", async t => {
   assert.deepEqual(none, { text: "No skills matching \"no-such-skill-anywhere\".", exitCode: 0 });
 });
 
-test("doctor, update, and graph commands give Claude guidance", async t => {
+test("doctor and update commands give Claude guidance, and the retired graph command is unknown", async t => {
   const f = await fixture(t);
 
   // This checkout is not installed in the fixture's Claude plugin cache, so memory cannot be located.
@@ -252,9 +252,9 @@ test("doctor, update, and graph commands give Claude guidance", async t => {
   }
 
   const graph = await f.run(["graph", "test"]);
-  assert.equal(graph.exitCode, 0);
-  assert.match(graph.text, /`graph_build`/);
-  assert.match(graph.text, /`graph_query`/);
+  assert.equal(graph.exitCode, 2);
+  assert.match(graph.text, /^Unknown \/useful-skills command\./);
+  assert.doesNotMatch(graph.text, /graph_build|graph_query|Graphify/);
 });
 
 test("the CLI prints results to stdout and failures to stderr with the exit code", async t => {

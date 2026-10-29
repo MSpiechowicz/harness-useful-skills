@@ -8,10 +8,9 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { createCommandRunner } from "../command-core.js";
-import { workspaceMemoryPaths } from "../graphify.js";
+import { workspaceMemoryPaths } from "../memory-paths.js";
 import { runCommand } from "../opencode/command.js";
 import { installRecordPath } from "../opencode/paths.js";
-import { extract, service, validGraph } from "./helpers/graph-fixture.js";
 
 const execute = promisify(execFile);
 const COMMAND = fileURLToPath(new URL("../opencode/command.js", import.meta.url));
@@ -49,7 +48,7 @@ test("bare /useful-skills prints help with chat and terminal commands", async t 
   const f = await fixture(t);
   const { text, exitCode } = await f.run([]);
   assert.equal(exitCode, 0);
-  for (const command of ["/useful-skills graph test", "/useful-skills update install", "/useful-skills doctor --check", "./useful-skills install --host opencode", "./useful-skills uninstall --host opencode", "./useful-skills list"]) {
+  for (const command of ["/useful-skills update install", "/useful-skills doctor --check", "./useful-skills install --host opencode", "./useful-skills uninstall --host opencode", "./useful-skills list"]) {
     assert.ok(text.includes(command), command);
   }
   assert.deepEqual(await f.run(["help"]), { text, exitCode: 0 });
@@ -124,44 +123,20 @@ test("update check and install run the OpenCode updater and report failures", as
   assert.match(usage.text, /^Expected \/useful-skills update check\|install\./);
 });
 
-test("graph test builds this workspace's graph and runs a diagnostic query", async t => {
+test("the retired graph test command is unknown and help no longer lists it", async t => {
   const f = await fixture(t);
-  const actions = [];
-  const memoryAction = async (args, options) => {
-    actions.push([args, options.cwd, options.agentDir]);
-    if (args.action === "build") {
-      return { ok: true, active: { generation: "g1", graph: "/graphs/g1" }, snapshot: { nodes: 3, edges: 2, sources: 1 } };
-    }
-
-    return { ok: true, active: { generation: "g1" }, output: "main --calls--> helper" };
-  };
-
-  const { text, exitCode } = await f.run(["graph test"], { memoryAction });
-  assert.equal(exitCode, 0, text);
-  assert.match(text, /Graphify built generation g1: 3 nodes, 2 edges, 1 source files\./);
-  assert.match(text, /Graphify query "main" output:\nmain --calls--> helper$/);
-  assert.deepEqual(actions.map(([args, cwd, agentDir]) => [args.action, cwd, agentDir]), [["build", f.repo, f.dataDir], ["query", f.repo, f.dataDir]]);
-
-  const moved = await f.run(["graph", "test"], {
-    memoryAction: async args => (args.action === "build"
-      ? { ok: true, active: { generation: "g1", graph: "/graphs/g1" }, snapshot: { nodes: 1, edges: 0, sources: 1 } }
-      : { ok: true, active: { generation: "g2" }, output: "x" }),
-  });
-  assert.equal(moved.exitCode, 1);
-  assert.match(moved.text, /active generation changed from g1 to g2/);
-
-  const usage = await f.run(["graph build"], { memoryAction });
-  assert.equal(usage.exitCode, 2);
-  assert.match(usage.text, /^Expected \/useful-skills graph test\./);
+  const { text } = await f.run([]);
+  assert.doesNotMatch(text, /graph test|Graphify|graph_build|graph_query/);
+  for (const argv of [["graph test"], ["graph", "test"]]) {
+    const result = await f.run(argv);
+    assert.equal(result.exitCode, 2);
+    assert.match(result.text, /^Unknown \/useful-skills command\./);
+  }
 });
 
-test("graph test and doctor explain a missing install instead of guessing a data dir", async t => {
+test("doctor explains a missing install instead of guessing a data dir", async t => {
   const f = await fixture(t);
   const environment = f.base;
-
-  const graph = await f.run(["graph test"], { environment, memoryAction: async () => assert.fail("no memory action without data") });
-  assert.equal(graph.exitCode, 1);
-  assert.match(graph.text, /install --host opencode/);
 
   const doctor = await f.run(["doctor", "--check"], { environment, inspectInstall: ({ scope }) => ({ text: `OpenCode install (${scope} scope): not installed.` }) });
   assert.equal(doctor.exitCode, 1);
@@ -179,15 +154,7 @@ test("doctor sets up OpenCode memory in the recorded data dir and appends instal
     schema: 1, version: "1.0.0", scope: "user", scopeRoot, dataDir: f.dataDir, configFile: null, mcpEntry: null, files: {},
   }));
 
-  let installed = false;
-  const doctorServices = {
-    dependencyStatus: async () => (installed ? { ready: true, state: "ready" } : { ready: false, state: "missing" }),
-    ensureDependencies: async () => {
-      installed = true;
-      return { python: "/managed/python", version: "0.9.65" };
-    },
-    graphify: service({ runProcess: async (_file, args) => extract(args, validGraph) }),
-  };
+  const doctorServices = { probeCodeGraph: async () => ({ outcome: "available", state: "ok" }) };
   const inspections = [];
   const inspectInstall = options => {
     inspections.push(options);
@@ -196,7 +163,7 @@ test("doctor sets up OpenCode memory in the recorded data dir and appends instal
 
   const report = await f.run(["doctor"], { environment: f.base, packageRoot: runtimeRoot, doctorServices, inspectInstall });
   assert.equal(report.exitCode, 0, report.text);
-  assert.match(report.text, /\nSetup\n {2}Facts: created\n {2}Dependencies: installed\n {2}Graph: built \(1 nodes, 0 edges\)\n/);
+  assert.match(report.text, /\nSetup\n {2}Facts: created\n {2}Code graph: available\n/);
   assert.ok(report.text.endsWith(`\n\nOpenCode install (user scope): Useful Skills 1.0.0 in ${scopeRoot}`), report.text);
   assert.equal(report.text.split("OpenCode install (").length, 2, "the install header appears once");
   assert.equal(report.text.includes(f.dataDir), false, "the data dir path is masked");
@@ -210,18 +177,16 @@ test("doctor sets up OpenCode memory in the recorded data dir and appends instal
   assert.equal(inspections.length, 1, "a usage error gets no install status");
 });
 
-test("a command host profile must choose guidance text or a handler for update and graph, not both or neither", () => {
-  const profile = { updateGuidance: "Update elsewhere.", graphGuidance: "Use the graph tools." };
+test("a command host profile must choose guidance text or a handler for update, not both or neither", () => {
+  const profile = { updateGuidance: "Update elsewhere." };
   assert.equal(typeof createCommandRunner(profile), "function");
-  assert.equal(typeof createCommandRunner({ update: async () => {}, graph: async () => {} }), "function");
+  assert.equal(typeof createCommandRunner({ update: async () => {} }), "function");
 
   const handler = async () => {};
   for (const misconfigured of [
-    { graphGuidance: "Use the graph tools." },
     { ...profile, update: handler },
-    { updateGuidance: "Update elsewhere." },
-    { ...profile, graph: handler },
-    { update: "not a function", graphGuidance: "Use the graph tools." },
+    {},
+    { update: "not a function" },
   ]) {
     assert.throws(() => createCommandRunner(misconfigured), /exactly one of/);
   }

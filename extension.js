@@ -1,6 +1,5 @@
 import { formatDoctor } from "./doctor.js";
 import { syncOmpAgents } from "./omp/agents-sync.js";
-import { boundedDisplay, runGraphTest } from "./graph-test.js";
 import { runUpdate } from "./updater.js";
 import { readWorkflowSettings, STAGES, writeWorkflowSetting } from "./workflow-settings.js";
 import { backendMemoryGuidance } from "./workflow-context.js";
@@ -21,7 +20,7 @@ const STAGE_LABELS = Object.freeze({
   review: "Review",
   "security-review": "Security review",
   "backend-memory": "Backend memory",
-  "graphify-memory": "Graphify memory",
+  "code-graph": "Code graph",
 });
 const STAGE_GUIDANCE = Object.fromEntries(STAGES.map(stage => [stage, Object.freeze({
   enabled: `Useful Skills profile: automatic ${stage} stage enabled and eligible when applicable. Assess focused repair versus normal composition before dispatch; enabled alone does not require this stage in a focused repair. ${stage === "backend-memory" ? backendMemoryGuidance(name => name) : "Follow the relevant us-* skill for selected or independently required stages."} This setting is not evidence of execution or permission to bypass other controls.`,
@@ -42,20 +41,18 @@ const OWNED_GUIDANCE = new Set([
   ...STAGES.map(stage => `Useful Skills profile: automatic ${stage} stage enabled when the development workflow applies. Follow the relevant us-* skill's requirements for this stage; this setting is not evidence that the stage ran or permission to bypass other controls.`),
   ...STAGES.flatMap(stage => Object.values(STAGE_GUIDANCE[stage])),
 ]);
-const GRAPH_NOTICE_LIMIT = 4_096;
+const STAGE_ALIASES = Object.freeze({ "graphify-memory": "code-graph", graphify_memory: "code-graph", code_graph: "code-graph" });
 const HELP = [
   "Useful Skills for Oh My Pi",
   "/skill:us-<name> — load an owned skill; natural requests also select skills by description.",
   "/useful-skills list [query] — browse owned skills.",
   "/useful-skills workflow enabled|disabled — set the development workflow for this repository/checkout (default: enabled); outside Git, scoped to the canonical workspace.",
-  "/useful-skills stage <research|plan|review|security-review|backend-memory|graphify-memory> enabled|disabled — set an independent automatic stage for this profile.",
+  "/useful-skills stage <research|plan|review|security-review|backend-memory|code-graph> enabled|disabled — set an independent automatic stage for this profile.",
   "/useful-skills status — read repository master and profile stage settings, paths, and errors.",
   "/skill:us-ignore-workflow — use the fast lane for one explicit request without changing saved settings.",
   "/useful-skills doctor — inspect resources and memory availability without setup.",
-  "/useful-skills graph test — explicitly build this workspace graph and run a diagnostic query.",
   "/useful-skills update check|install — check or install marketplace updates.",
   "Memory: us_memory handles agent actions; native /memory is unchanged.",
-  "Graphify setup is lazy on explicit build/query or graph test. No startup workflow dependency.",
   "Terminal: ./useful-skills list | doctor | update check|install",
 ].join("\n");
 
@@ -107,19 +104,6 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
         { triggerTurn: false },
       );
     }
-  }
-
-  function graphNotice(ctx, message, level = "info") {
-    notify(ctx, boundedDisplay(redactText(message), GRAPH_NOTICE_LIMIT), level);
-  }
-
-  async function graphTest(ctx) {
-    await runGraphTest({
-      memoryAction,
-      options: { cwd: ctx.cwd, agentDir: pi.pi.getAgentDir(), memory: ctx.memory },
-      storage: "your OMP profile",
-      report: (message, level) => graphNotice(ctx, message, level),
-    });
   }
 
   async function update(action, ctx, quiet = false) {
@@ -180,10 +164,6 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
 
       if (command === "doctor") {
         return await doctor(ctx);
-      }
-
-      if (directTokens[0] === "graph" && directTokens.length === 2 && directTokens[1] === "test") {
-        return await graphTest(ctx);
       }
 
       if (directTokens[0] === "update" && directTokens.length === 2 && ["check", "install"].includes(directTokens[1])) {
@@ -282,11 +262,11 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
       const tokens = command.split(/\s+/);
       if (tokens[0] === "workflow" || tokens[0] === "stage") {
         const stageCommand = tokens[0] === "stage";
-        const key = stageCommand ? tokens[1] : "workflow";
+        const key = stageCommand ? (STAGE_ALIASES[tokens[1]] ?? tokens[1]) : "workflow";
         const mode = tokens[stageCommand ? 2 : 1];
         if (tokens.length !== (stageCommand ? 3 : 2) || (stageCommand && !STAGES.includes(key)) || !["enabled", "disabled"].includes(mode)) {
           const usage = stageCommand
-            ? "stage <research|plan|review|security-review|backend-memory|graphify-memory> enabled|disabled"
+            ? "stage <research|plan|review|security-review|backend-memory|code-graph> enabled|disabled"
             : "workflow enabled|disabled";
           return notify(ctx, `Expected /useful-skills ${usage}.\n${status(snapshot)}`, "warning");
         }
@@ -306,9 +286,6 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
         const scope = stageCommand ? "this OMP profile" : `this repository/workspace (${confirmed.scopeRoot})`;
         return notify(ctx, `Useful Skills ${key} ${mode} for ${scope}.`);
       }
-      if (tokens[0] === "graph" && tokens.length === 2 && tokens[1] === "test") {
-        return await graphTest(ctx);
-      }
       if (tokens[0] === "update" && tokens.length === 2 && ["check", "install"].includes(tokens[1])) {
         return await update(tokens[1], ctx);
       }
@@ -320,14 +297,14 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
   }
 
   pi.registerCommand("useful-skills", {
-    description: "Browse skills, health, graph diagnostics, and updates",
+    description: "Browse skills, health, and updates",
     handler: workbench,
   });
 
   pi.registerTool({
     name: "us_memory",
     label: "Useful Skills Memory",
-    description: "Observe native memory and project graph status, explicitly build/query Graphify, or search/save durable facts. No workflow execution. Build/query may lazily install pinned managed dependencies; status never installs or writes.",
+    description: "Observe native memory status, or search/save durable facts. No workflow execution. Status never installs or writes.",
     parameters: MEMORY_PARAMETERS,
     loadMode: "essential",
     approval: args => ["status", "search"].includes(args?.action) ? "read" : args?.action === "save" ? "write" : "exec",

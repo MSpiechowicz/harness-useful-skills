@@ -19,8 +19,6 @@
  *   `doctor` appends to its report.
  * - Exactly one of `updateGuidance` (fixed text for `update check|install`) or
  *   `update(action, context)` (a handler for action "check" or "install").
- * - Exactly one of `graphGuidance` (fixed text for any `graph ...` command) or
- *   `graph(args, context)` (a handler for the tokens after `graph`).
  *
  * Handlers receive `context` = the runCommand options with defaults applied plus `usage(message, exitCode = 2)`,
  * which builds the standard usage error. They resolve to `{ text, exitCode }`; a thrown error becomes a usage
@@ -39,7 +37,10 @@ const MODES = Object.freeze(["enabled", "disabled"]);
 const STAGE_ALIASES = Object.freeze({
   security_review: "security-review",
   backend_memory: "backend-memory",
-  graphify_memory: "graphify-memory",
+  code_graph: "code-graph",
+  // Names from before the Graphify retirement keep working.
+  graphify_memory: "code-graph",
+  "graphify-memory": "code-graph",
 });
 const STAGE_LABELS = Object.freeze({
   research: "Research",
@@ -47,7 +48,7 @@ const STAGE_LABELS = Object.freeze({
   review: "Review",
   "security-review": "Security review",
   "backend-memory": "Backend memory",
-  "graphify-memory": "Graphify memory",
+  "code-graph": "Code graph",
 });
 
 export const WORKFLOW_USAGE = "workflow enabled|disabled";
@@ -193,7 +194,6 @@ function assertOneOf(host, guidance, handler) {
 /** Bind the `/useful-skills` subcommands to one host profile (see the module comment); throws on a misconfigured profile. */
 export function createCommandRunner(host) {
   assertOneOf(host, "updateGuidance", "update");
-  assertOneOf(host, "graphGuidance", "graph");
 
   function usage(message, exitCode = 2) {
     return commandResult(`${message}\n${host.help}`, exitCode);
@@ -310,14 +310,6 @@ export function createCommandRunner(host) {
     return commandResult(host.updateGuidance);
   }
 
-  async function graph(tokens, context) {
-    if (host.graph) {
-      return await host.graph(tokens.slice(1), context);
-    }
-
-    return commandResult(host.graphGuidance);
-  }
-
   /** Run one `/useful-skills` subcommand for this host; never throws. */
   return async function runCommand(argv, {
     environment = process.env,
@@ -350,8 +342,6 @@ export function createCommandRunner(host) {
           return await catalog(tokens);
         case "update":
           return await update(tokens, handlerContext);
-        case "graph":
-          return await graph(tokens, handlerContext);
         default:
           return usage("Unknown /useful-skills command.");
       }

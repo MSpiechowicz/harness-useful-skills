@@ -25,16 +25,12 @@ const ENTRY = `export { default } from "./${RUNTIME}/opencode/entry.js";\n`;
 const FILES = [
   // Root runtime modules reached by importing opencode/*.js (and the files they spawn or read).
   'doctor.js', 'resources.js', 'workflow-policy.js', 'workflow-settings.js', 'memory.js',
-  'graphify.js', 'graph-safety.js', 'graph-storage.js', 'graph-validation.js',
-  'graph-import-provenance.js', 'graph-import-provenance.py', 'graph-placeholder-imports.js',
-  'graph-scope.js', 'graph-mounts.js', 'path-boundary.js', 'process.js',
-  'setup-lock.js', 'setup-runner.js', 'setup-watchdog.js',
-  'dependencies.js', 'dependency-policy.js', 'dependency-transport.js',
+  'memory-paths.js', 'graphify-retirement.js', 'path-boundary.js', 'process.js',
   // Host-neutral modules shared with the other adapters.
   'workflow-context.js', 'tool-safety.js', 'command-core.js', 'model-roles.js',
   'doctor-setup.js', 'local-facts.js', 'host-roots.js', 'mcp-memory-server.js',
   'names.js', 'legacy-names.js', 'data-migration.js',
-  'entrypoint.js', 'graph-test.js', 'release-check.js',
+  'entrypoint.js', 'release-check.js',
   // OpenCode adapter.
   'opencode/entry.js', 'opencode/v1.js', 'opencode/v2.js', 'opencode/v2-commands.js', 'opencode/session.js', 'opencode/node-runner.js', 'opencode/context.js',
   'opencode/paths.js', 'opencode/settings.js', 'opencode/host-context.js', 'opencode/models.js',
@@ -46,12 +42,9 @@ const FILES = [
   'opencode/commands/useful-skills.md', 'opencode/commands/us-ignore-workflow.md',
   // The versioned manifest; becomes harness-useful-skills/package.json (see expectedOutput).
   'opencode/package.json',
-  // Pinned dependency metadata Graphify setup verifies.
-  'dependencies/manifest.json', 'dependencies/graphify.lock',
   // Licenses: opencode/skills carries text derived from every upstream below, so all of them ship.
   'LICENSE',
   'licenses/caveman/LICENSE.txt', 'licenses/ecc/LICENSE.txt',
-  'licenses/graphify/LICENSE-MIT.txt', 'licenses/graphify/LICENSE.txt', 'licenses/graphify/NOTICE.txt',
   'licenses/mattpocock-skills/LICENSE.txt', 'licenses/superpowers/LICENSE.txt',
 ];
 

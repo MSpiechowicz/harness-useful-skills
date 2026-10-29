@@ -130,3 +130,24 @@ test("repository workflow switches are isolated per checkout", async t => {
   assert.equal(effectiveWorkflow(second).workflow.effective, "enabled");
   assert.notEqual(first.workflowFile, second.workflowFile);
 });
+
+test("legacy graphify_memory applies while code_graph is unset, and an explicit code_graph wins", async t => {
+  const f = await fixture(t);
+  const read = environment => readClaudeWorkflow({ environment: f.environment(environment), cwd: f.repo });
+
+  const unset = await read({ CLAUDE_PLUGIN_OPTION_GRAPHIFY_MEMORY: "false" });
+  assert.equal(unset.values["code-graph"], false);
+  const reenabled = await read({ CLAUDE_PLUGIN_OPTION_GRAPHIFY_MEMORY: "false", CLAUDE_PLUGIN_OPTION_CODE_GRAPH: "true" });
+  assert.equal(reenabled.values["code-graph"], true);
+  const explicit = await read({ CLAUDE_PLUGIN_OPTION_GRAPHIFY_MEMORY: "true", CLAUDE_PLUGIN_OPTION_CODE_GRAPH: "false" });
+  assert.equal(explicit.values["code-graph"], false);
+  const enabled = await read({ CLAUDE_PLUGIN_OPTION_GRAPHIFY_MEMORY: "true", CLAUDE_PLUGIN_OPTION_CODE_GRAPH: "true" });
+  assert.equal(enabled.values["code-graph"], true);
+});
+
+test("plugin.json gives code_graph no default", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const manifest = JSON.parse(await readFile(new URL("../.claude-plugin/plugin.json", import.meta.url), "utf8"));
+  assert.equal("default" in manifest.userConfig.code_graph, false);
+  assert.ok(manifest.userConfig.graphify_memory);
+});

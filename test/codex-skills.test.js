@@ -46,7 +46,7 @@ test("Codex skills name Codex tools and carry no other host's wording", async ()
 
   const memory = await readFile(path.join(SKILLS, "us-manage-memory", "SKILL.md"), "utf8");
   assert.match(memory, /`harness-useful-skills` MCP server/);
-  for (const tool of ["memory_status", "memory_search", "memory_save", "graph_build", "graph_query"]) {
+  for (const tool of ["memory_status", "memory_search", "memory_save", "code_map", "code_symbol", "code_impact", "code_path"]) {
     assert.ok(memory.includes(`\`${tool}\``), tool);
   }
 

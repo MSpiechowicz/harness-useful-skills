@@ -22,7 +22,6 @@ const AGENT_ROLES = ['planner', 'scout', 'frontend', 'backend', 'general-purpose
 const LICENSES = [
   'LICENSE',
   'licenses/caveman/LICENSE.txt', 'licenses/ecc/LICENSE.txt',
-  'licenses/graphify/LICENSE-MIT.txt', 'licenses/graphify/LICENSE.txt', 'licenses/graphify/NOTICE.txt',
   'licenses/mattpocock-skills/LICENSE.txt', 'licenses/superpowers/LICENSE.txt',
 ];
 
@@ -36,13 +35,9 @@ const RUNTIME_FILES = [
   'mcp-memory-server.js', 'command-core.js', 'host-roots.js', 'local-facts.js', 'memory.js',
   'names.js', 'legacy-names.js', 'data-migration.js',
   'workflow-policy.js', 'workflow-settings.js', 'doctor.js', 'resources.js', 'process.js', 'path-boundary.js',
-  'graphify.js', 'graph-safety.js', 'graph-storage.js', 'graph-validation.js',
-  'graph-import-provenance.js', 'graph-import-provenance.py', 'graph-placeholder-imports.js',
-  'graph-scope.js', 'graph-mounts.js',
-  'setup-lock.js', 'setup-runner.js', 'setup-watchdog.js',
-  'dependencies.js', 'dependency-policy.js', 'dependency-transport.js',
-  // Pinned dependency metadata Graphify setup verifies.
-  'dependencies/manifest.json', 'dependencies/graphify.lock',
+  'memory-paths.js', 'graphify-retirement.js',
+  // The code-graph hint hook that hooks.json points at.
+  'codex/hooks.js', 'codex/hook-input.js', 'code-hint.js', 'doctor-setup.js',
   ...AGENT_ROLES.map(role => `codex/agents/${role}.toml`),
   ...LICENSES,
 ];

@@ -4,8 +4,6 @@ import path from "node:path";
 import { commandResult, createCommandRunner, errorMessage, STAGE_USAGE, WORKFLOW_USAGE } from "../command-core.js";
 import { runDoctorSetup } from "../doctor-setup.js";
 import { invokedDirectly } from "../entrypoint.js";
-import { boundedDisplay, runGraphTest } from "../graph-test.js";
-import { executeMemory } from "../memory.js";
 import { exitOnTermination } from "../process.js";
 import { redactText } from "../resources.js";
 import { locateOpenCodeHost } from "./host-context.js";
@@ -19,14 +17,13 @@ const HELP = [
   `/useful-skills ${WORKFLOW_USAGE} — set the development workflow for this repository/checkout (default: enabled); outside Git, scoped to the canonical workspace.`,
   `/useful-skills ${STAGE_USAGE} — set an independent automatic stage for this OpenCode profile.`,
   "/useful-skills status [--json] — read repository workflow and profile stage settings, their sources, paths, and errors.",
-  "/useful-skills doctor — set up this project's memory (private facts store, pinned Graphify dependencies, graph) and report status and the OpenCode install.",
+  "/useful-skills doctor — set up this project's memory (private facts store) and report status, whether the code graph is available and the OpenCode install.",
   "/useful-skills doctor --check — report status only; writes nothing.",
-  "/useful-skills graph test — explicitly build this workspace's graph and run a diagnostic query.",
   "/useful-skills update check — check for a newer Useful Skills release.",
   "/useful-skills update install — install the latest release into the recorded scope; restart OpenCode afterwards.",
   "/useful-skills help — show this help.",
   "/us-ignore-workflow <request> — use the fast lane for that one request without changing saved settings.",
-  "Memory: the `harness-useful-skills_memory_status`, `harness-useful-skills_memory_search`, `harness-useful-skills_memory_save`, `harness-useful-skills_graph_build`, and `harness-useful-skills_graph_query` tools.",
+  "Memory: the `harness-useful-skills_memory_status`, `harness-useful-skills_memory_search`, and `harness-useful-skills_memory_save` tools.",
   "A saved setting wins; without one, the setting is enabled.",
   "",
   "Terminal commands (from a Useful Skills checkout):",
@@ -37,29 +34,6 @@ const HELP = [
   "./useful-skills doctor --host opencode",
   "./useful-skills list",
 ].join("\n");
-
-const GRAPH_OUTPUT_LIMIT = 16_384;
-
-/** `/useful-skills graph test`; `context.memoryAction` replaces memory.js executeMemory in tests. */
-async function graph(args, { environment, cwd, packageRoot, memoryAction = executeMemory, usage }) {
-  if (args.length !== 1 || args[0] !== "test") {
-    return usage("Expected /useful-skills graph test.");
-  }
-
-  const { host, reason } = await locateOpenCodeHost({ workspace: cwd, environment, runtimeRoot: packageRoot });
-  if (!host) {
-    return commandResult(`Graphify test unavailable: ${reason}`, 1);
-  }
-
-  const lines = [];
-  const ok = await runGraphTest({
-    memoryAction,
-    options: host,
-    storage: "the Useful Skills OpenCode data directory",
-    report: message => lines.push(message),
-  });
-  return commandResult(boundedDisplay(redactText(lines.join("\n")), GRAPH_OUTPUT_LIMIT), ok ? 0 : 1);
-}
 
 /**
  * `/useful-skills update check|install` through opencode/updater.js. The updater is imported only when an update
@@ -92,7 +66,6 @@ const runCoreCommand = createCommandRunner({
   resolveDoctorHost: doctorHost,
   runDoctor: runDoctorSetup,
   update,
-  graph,
 });
 
 /** The tokens of a doctor run that core accepts, so only a real report gets the install status appended. */
@@ -137,7 +110,7 @@ async function installStatus({ environment, cwd, packageRoot, inspectInstall }) 
 
 /**
  * Run one `/useful-skills` subcommand for OpenCode; never throws. Besides the command-core options, tests may pass
- * `updater` ({ checkOpenCodeUpdate, installOpenCodeUpdate }), `memoryAction` (graph test), and `inspectInstall` (doctor).
+ * `updater` ({ checkOpenCodeUpdate, installOpenCodeUpdate }) and `inspectInstall` (doctor).
  */
 export async function runCommand(argv, options = {}) {
   const { environment = process.env, cwd = process.cwd(), packageRoot = RUNTIME_ROOT } = options;
@@ -152,8 +125,8 @@ export async function runCommand(argv, options = {}) {
 }
 
 if (invokedDirectly(import.meta.url)) {
-  // The plugin ends this script with SIGTERM on timeout or shutdown; Graphify and dependency setup run in
-  // process groups of their own that would otherwise outlive it, as would an update's temporary directory.
+  // The plugin ends this script with SIGTERM on timeout or shutdown; child process groups and an update's
+  // temporary directory would otherwise outlive it.
   exitOnTermination();
   const { text, exitCode } = await runCommand(process.argv.slice(2));
   (exitCode === 0 ? process.stdout : process.stderr).write(`${text}\n`);

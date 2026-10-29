@@ -6,8 +6,8 @@ import { LEGACY_DATA_DIRECTORY } from "./legacy-names.js";
 import { DATA_DIRECTORY } from "./names.js";
 
 /**
- * Folders at the top of a data directory that are not carried over: the Graphify environment holds absolute
- * paths, so a moved copy would not run. It is a cache that setup rebuilds on demand.
+ * Folders at the top of a data directory that are not carried over: the environment of the retired Graphify
+ * integration holds absolute paths and nothing uses it any more, so it is dropped instead of moved.
  */
 const REBUILT_FOLDERS = Object.freeze(["dependencies"]);
 

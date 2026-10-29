@@ -18,7 +18,6 @@ const LONG_COMMAND_TIMEOUT_MS = 600_000;
 // Subcommands that can run for minutes, with the notice shown first: hooks have no progress UI.
 const LONG_COMMAND_NOTICES = new Map([
   ["doctor", "Useful Skills: running doctor; first setup can take minutes."],
-  ["graph test", "Useful Skills: running the graph test; it can take minutes."],
   ["update install", "Useful Skills: installing the update; it can take minutes."],
 ]);
 

@@ -20,11 +20,12 @@ test("HARNESS_SKILLS_HOST=codex runs the release installer for Codex without a s
   assert.deepEqual(outcome.leftovers, []);
 });
 
-test("a Codex release from before the names were unified still installs", { skip }, async () => {
+test("a Codex release from before the names were unified is refused", { skip }, async () => {
   const { archive } = await buildRelease({ codex: true, earlier: true });
   const outcome = await runInstaller({ archive, bin: await codexStubBin(), env: CODEX });
-  assert.equal(outcome.status, 0, outcome.stderr);
-  assert.deepEqual(outcome.recorded.argv.slice(1), ["install", "--host", "codex"]);
+  assert.notEqual(outcome.status, 0);
+  assert.match(outcome.stderr, /has no Codex adapter/);
+  assert.equal(outcome.recorded, null);
 });
 
 test("an unset, empty or opencode host keeps the OpenCode installer arguments", { skip }, async () => {

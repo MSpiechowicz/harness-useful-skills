@@ -73,7 +73,7 @@ test("a host's facts label, reason failures and facts backend reach MCP clients"
 
   const listed = await request(2, "tools/list");
   const status = listed.result.tools.find(tool => tool.name === "memory_status");
-  assert.equal(status.description, "Inspect local Example facts and the project graph without creating storage or installing dependencies.");
+  assert.equal(status.description, "Inspect local Example facts without creating storage.");
 
   const refused = await request(3, "tools/call", { name: "memory_status", arguments: {} });
   assert.deepEqual(refused.result, { content: [{ type: "text", text: "Example install record is missing." }], isError: true });

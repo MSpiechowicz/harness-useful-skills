@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { workspaceMemoryPaths } from "../graphify.js";
+import { workspaceMemoryPaths } from "../memory-paths.js";
 
 const SERVER = fileURLToPath(new URL("../opencode/mcp-server.js", import.meta.url));
 
@@ -90,7 +90,7 @@ test("the OpenCode memory server keeps facts per workspace in the configured dat
   const client = connect(t, { cwd: f.project, environment });
   await client.init();
   const tools = (await client.request(2, "tools/list")).result.tools;
-  assert.deepEqual(tools.map(tool => tool.name), ["memory_status", "memory_search", "memory_save", "graph_build", "graph_query"]);
+  assert.deepEqual(tools.map(tool => tool.name), ["memory_status", "memory_search", "memory_save"]);
   assert.match(tools[0].description, /OpenCode facts/);
 
   const saved = await client.call(3, "memory_save", { content: "Use meters." });

@@ -8,7 +8,7 @@ import test from "node:test";
 import { claudeLegacyNotes, pluginDataName, resolveHostContext } from "../claude/host-context.js";
 import { generatedAgentName, modelsConfigPath, syncRoleAgents } from "../claude/models.js";
 import { LEGACY_CLAUDE_PLUGIN_ID, LEGACY_DATA_DIRECTORY, legacyClaudeAgentFile } from "../legacy-names.js";
-import { workspaceMemoryPaths } from "../graphify.js";
+import { workspaceMemoryPaths } from "../memory-paths.js";
 import { readWorkflowSnapshot, writeWorkflowSetting } from "../workflow-settings.js";
 import { fixture } from "./helpers/claude-doctor-fixture.js";
 

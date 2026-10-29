@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { invokedDirectly } from "../entrypoint.js";
+import { codeHint, searchTerm } from "../code-hint.js";
 import { effectiveWorkflow } from "../workflow-policy.js";
 import { commandGuardDenial, INVALID_TOOL_INPUT, redactValue } from "../tool-safety.js";
 import { fastLaneContext, workflowContext } from "./context.js";
@@ -59,6 +60,7 @@ export function handleHook(input, environment = process.env, { settings } = {}) 
     }
     case "PreToolUse": {
       if (input.tool_name !== "Bash") {
+        // Grep is only nudged (see main), never guarded.
         return undefined;
       }
       const denial = commandGuardDenial(input.tool_input?.command);
@@ -78,17 +80,38 @@ export function handleHook(input, environment = process.env, { settings } = {}) 
   }
 }
 
-async function readInput() {
+/** The raw stdin text, truncated at the size limit (`oversized` is then true). */
+async function readText() {
   const chunks = [];
   let length = 0;
   for await (const chunk of process.stdin) {
     length += chunk.length;
     if (length > MAX_INPUT_BYTES) {
-      throw new Error(INVALID_TOOL_INPUT);
+      return { text: Buffer.concat(chunks).toString("utf8"), oversized: true };
     }
     chunks.push(chunk);
   }
-  return JSON.parse(Buffer.concat(chunks, length).toString("utf8"));
+  return { text: Buffer.concat(chunks, length).toString("utf8"), oversized: false };
+}
+
+/** Whether unparsable PreToolUse input is positively a Grep call: a nudge hook must never block a search. */
+const isGrepCall = (text) => /"tool_name"\s*:\s*"Grep"/.test(text);
+
+/** Nudge toward the code tools on an identifier search. Silent on every failure and when the code-graph stage is off. */
+async function writeSearchHint(input) {
+  try {
+    const dataDir = process.env.CLAUDE_PLUGIN_DATA;
+    if (!dataDir || !searchTerm(input)) {
+      return;
+    }
+    const policy = effectiveWorkflow(await readClaudeWorkflow({ environment: process.env, cwd: input.cwd }));
+    const hint = await codeHint(input, { enabled: policy.stages["code-graph"]?.effective === "enabled", dataDir });
+    if (hint) {
+      process.stdout.write(`${JSON.stringify(additionalContext("PreToolUse", hint))}\n`);
+    }
+  } catch {
+    // A hint is never worth failing a tool call.
+  }
 }
 
 async function main() {
@@ -98,12 +121,17 @@ async function main() {
     return;
   }
 
+  let raw = { text: "", oversized: false };
   try {
-    const input = await readInput();
+    raw = await readText();
+    if (raw.oversized) {
+      throw new Error(INVALID_TOOL_INPUT);
+    }
+    const input = JSON.parse(raw.text);
     if (input?.hook_event_name !== expected) {
       throw new Error(INVALID_TOOL_INPUT);
     }
-    if (expected === "PreToolUse" && input.tool_name !== "Bash") {
+    if (expected === "PreToolUse" && input.tool_name !== "Bash" && input.tool_name !== "Grep") {
       process.stdout.write(`${JSON.stringify(deny(INVALID_TOOL_INPUT))}\n`);
       return;
     }
@@ -115,12 +143,19 @@ async function main() {
     }
 
     const result = handleHook(input, process.env, { settings });
+    if (!result && expected === "PreToolUse") {
+      await writeSearchHint(input);
+      return;
+    }
     if (result) {
       process.stdout.write(`${JSON.stringify(result)}\n`);
     }
   } catch {
     if (expected === "PreToolUse") {
-      process.stdout.write(`${JSON.stringify(deny(INVALID_TOOL_INPUT))}\n`);
+      // Only the dangerous-command guard fails closed. A Grep call that cannot be read is let through silently.
+      if (!isGrepCall(raw.text)) {
+        process.stdout.write(`${JSON.stringify(deny(INVALID_TOOL_INPUT))}\n`);
+      }
     } else if (expected === "SessionStart") {
       process.stdout.write(`${JSON.stringify(additionalContext(expected, MODELS_UNAVAILABLE))}\n`);
     } else if (expected === "UserPromptSubmit") {

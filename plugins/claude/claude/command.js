@@ -16,13 +16,12 @@ const HELP = [
   `/useful-skills ${STAGE_USAGE} — set an independent automatic stage for this Claude profile.`,
   "/useful-skills status [--json] — read repository workflow and profile stage settings, their sources, paths, and errors.",
   "/harness-useful-skills:us-ignore-workflow — use the fast lane for one explicit request without changing saved settings.",
-  "/useful-skills doctor [--check] — set up this project's memory (private facts store, pinned Graphify dependencies, graph) and report status; --check only reports status and writes nothing.",
+  "/useful-skills doctor [--check] — set up this project's memory (private facts store) and report status and whether the code graph is available; --check only reports status and writes nothing.",
   "/useful-skills update check|install — show how Claude Code updates this plugin.",
-  "Memory: use the `memory_status`, `graph_build`, and `graph_query` MCP tools.",
+  "Memory: use the `memory_status`, `memory_search`, and `memory_save` MCP tools.",
   "A saved setting overrides the plugin option of the same name; without either, the setting is enabled.",
 ].join("\n");
 const UPDATE_GUIDANCE = "Claude Code updates the plugin itself: use `/plugin` (Installed tab) or run `claude plugin update harness-useful-skills@<marketplace>`, then `/reload-plugins`.";
-const GRAPH_GUIDANCE = "Graph diagnostics in Claude Code use the `graph_build` and `graph_query` MCP tools: ask Claude to build this workspace's graph, then query it. `memory_status` reports graph state without building.";
 
 /** Resolve the project and Claude plugin data roots, or return a printable reason they cannot be trusted. */
 async function doctorHost({ environment, workspace, packageRoot }) {
@@ -59,7 +58,6 @@ export const runCommand = createCommandRunner({
   legacyNotes: ({ environment }) => claudeLegacyNotes(environment),
   runDoctor: runDoctorSetup,
   updateGuidance: UPDATE_GUIDANCE,
-  graphGuidance: GRAPH_GUIDANCE,
 });
 
 if (invokedDirectly(import.meta.url)) {

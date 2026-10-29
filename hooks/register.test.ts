@@ -91,8 +91,23 @@ describe('useful-skills command with arguments', () => {
     expect(calls[0]!.env).toMatchObject({
       CLAUDE_PLUGIN_OPTION_WORKFLOW: 'false',
       CLAUDE_PLUGIN_OPTION_SECURITY_REVIEW: 'false',
-      CLAUDE_PLUGIN_OPTION_GRAPHIFY_MEMORY: 'true',
     })
+  })
+
+  test('passes an explicit code_graph next to a legacy graphify_memory', { options: { graphify_memory: false, code_graph: true } }, async ($, on) => {
+    const calls = fakeCli(on, () => ({ stdout: 'ok' }))
+
+    await runCommand($, 'status')
+
+    expect(calls[0]!.env).toMatchObject({ CLAUDE_PLUGIN_OPTION_GRAPHIFY_MEMORY: 'false', CLAUDE_PLUGIN_OPTION_CODE_GRAPH: 'true' })
+  })
+
+  test('keeps an explicit code_graph=false next to a legacy value', { options: { graphify_memory: true, code_graph: false } }, async ($, on) => {
+    const calls = fakeCli(on, () => ({ stdout: 'ok' }))
+
+    await runCommand($, 'status')
+
+    expect(calls[0]!.env).toMatchObject({ CLAUDE_PLUGIN_OPTION_CODE_GRAPH: 'false' })
   })
 })
 

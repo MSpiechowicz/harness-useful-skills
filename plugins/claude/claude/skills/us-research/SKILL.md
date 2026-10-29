@@ -25,4 +25,4 @@ Return exact paths/symbols, caller/test relationships, conventions/docs, observe
 
 ## Failure behavior
 
-A missing graph, Claude facts backend, or worker does not block source research. Record the exact unavailable capability and complete all reachable source inspection. Do not invent worker findings or infer behavior from stale memory. Dependency/cache writes, when permitted, belong only to the explicit actions described in `/harness-useful-skills:us-manage-memory`.
+A missing code graph, Claude facts backend, or worker does not block source research. Record the exact unavailable capability and complete all reachable source inspection. Do not invent worker findings or infer behavior from stale memory. When `code_map`, `code_symbol`, `code_impact`, and `code_path` are advertised, use them instead of grep for code-structure questions (routing in `/harness-useful-skills:us-manage-memory`); grep stays for literal text, error messages, config values, and unindexed files.

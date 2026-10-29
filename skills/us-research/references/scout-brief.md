@@ -1,6 +1,6 @@
 # Read-only reconnaissance worker brief
 
-Load `skill://us-write-concisely` before responding. Use only native read/search/navigation tools. Do not edit files, run validation, build memory/Graphify, plan, publish, or launch another worker/workflow.
+Load `skill://us-write-concisely` before responding. Use only native read/search/navigation tools. Do not edit files, run validation, build a code index, plan, publish, or launch another worker/workflow. When the Harness Memory tools `code_map`, `code_symbol`, or `code_path` are advertised, use them instead of grep for code structure (each takes `project_path`, the absolute git root): `code_map` for an unfamiliar area, `code_symbol` for where X is and who calls or uses it, `code_impact` for what breaks if X changes, and ONE `code_path` call for how A reaches B or a flow (a symbol, a repo-relative file path, a command or event name, or plain words; the reply has call-site lines, so do not re-read files to confirm them). If grep found the starting point, switch to `code_path` from there. Use grep or Read only for literal text, error messages, config values, lines the tools do not show, or when a tool says the repository is not indexed. Without the tools, read the source.
 
 ## Objective
 

@@ -13,7 +13,7 @@ const MAX_CONFIG_BYTES = 1024 * 1024;
 const MCP_TIMEOUT_MS = 600_000;
 const SCHEMA_URL = "https://opencode.ai/config.json";
 
-/** The MCP server entry the installer writes; graph builds can run for minutes, hence the long timeout. */
+/** The MCP server entry the installer writes; the long timeout leaves room for a slow disk. */
 export function mcpEntryFor(scopeRoot) {
   return {
     type: "local",

@@ -10,11 +10,18 @@ const OPTION_KEYS = Object.freeze({
   review: "REVIEW",
   "security-review": "SECURITY_REVIEW",
   "backend-memory": "BACKEND_MEMORY",
-  "graphify-memory": "GRAPHIFY_MEMORY",
+  "code-graph": "CODE_GRAPH",
 });
 
-function optionName(key) {
-  return `CLAUDE_PLUGIN_OPTION_${OPTION_KEYS[key]}`;
+// The option name before the Graphify retirement: read only while the new one is unset.
+const LEGACY_OPTION_KEYS = Object.freeze({ "code-graph": "GRAPHIFY_MEMORY" });
+
+function optionName(key, environment = {}) {
+  const current = `CLAUDE_PLUGIN_OPTION_${OPTION_KEYS[key]}`;
+  const legacy = LEGACY_OPTION_KEYS[key] && `CLAUDE_PLUGIN_OPTION_${LEGACY_OPTION_KEYS[key]}`;
+  if (!legacy || environment[legacy] === undefined) return current;
+  // The deprecated name applies only while the new option is unset (it has no default, so a value is the user's choice).
+  return environment[current] === undefined ? legacy : current;
 }
 
 /** Claude exports boolean userConfig values as strings to hook processes. */
@@ -23,7 +30,7 @@ export function readClaudeSettings(environment = process.env) {
   const errors = {};
 
   for (const key of KEYS) {
-    const option = optionName(key);
+    const option = optionName(key, environment);
     const raw = environment[option];
     if (raw === undefined) {
       values[key] = true;
@@ -60,7 +67,7 @@ export async function readClaudeWorkflow({ environment = process.env, cwd } = {}
     } else if (store.sources?.[key] === "file") {
       values[key] = store.values[key];
       sources[key] = "file";
-    } else if (environment[optionName(key)] !== undefined) {
+    } else if (environment[optionName(key, environment)] !== undefined) {
       values[key] = options.values[key];
       sources[key] = "option";
       if (options.errors[key]) {

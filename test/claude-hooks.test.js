@@ -42,15 +42,28 @@ test("native boolean switches independently gate workflow stages; malformed opti
   const disabled = readClaudeSettings({
     CLAUDE_PLUGIN_OPTION_PLAN: "false",
     CLAUDE_PLUGIN_OPTION_SECURITY_REVIEW: "false",
-    CLAUDE_PLUGIN_OPTION_GRAPHIFY_MEMORY: "false",
+    CLAUDE_PLUGIN_OPTION_CODE_GRAPH: "false",
   });
   const policy = effectiveWorkflow(disabled);
   assert.equal(policy.stages.plan.effective, "disabled");
   assert.equal(policy.stages["security-review"].effective, "disabled");
-  assert.equal(policy.stages["graphify-memory"].effective, "disabled");
+  assert.equal(policy.stages["code-graph"].effective, "disabled");
   assert.equal(policy.stages.research.effective, "enabled");
   assert.equal(policy.stages.review.effective, "enabled");
   assert.equal(policy.stages["backend-memory"].effective, "enabled");
+
+  const legacy = effectiveWorkflow(readClaudeSettings({ CLAUDE_PLUGIN_OPTION_GRAPHIFY_MEMORY: "false" }));
+  assert.equal(legacy.stages["code-graph"].effective, "disabled", "the deprecated option applies while the new one is unset");
+  const both = effectiveWorkflow(readClaudeSettings({
+    CLAUDE_PLUGIN_OPTION_GRAPHIFY_MEMORY: "false",
+    CLAUDE_PLUGIN_OPTION_CODE_GRAPH: "true",
+  }));
+  assert.equal(both.stages["code-graph"].effective, "enabled", "an explicit code_graph (it has no default) wins over the legacy option");
+  const explicitNew = effectiveWorkflow(readClaudeSettings({
+    CLAUDE_PLUGIN_OPTION_GRAPHIFY_MEMORY: "true",
+    CLAUDE_PLUGIN_OPTION_CODE_GRAPH: "false",
+  }));
+  assert.equal(explicitNew.stages["code-graph"].effective, "disabled", "the new option wins otherwise");
 
   const malformed = effectiveWorkflow(readClaudeSettings({
     CLAUDE_PLUGIN_OPTION_WORKFLOW: "yes",

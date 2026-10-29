@@ -3,6 +3,7 @@ import { realpathSync, rmSync } from "node:fs";
 import { writeAtomic } from "../model-roles.js";
 import { leftNote, ownedState, pruneEmptyDirectories, recordText, removeOwned } from "../opencode/install-files.js";
 import { directoryProblem, lstatOrNull, printableText } from "../opencode/paths.js";
+import { unregisterHook } from "./hooks-config.js";
 import { CodexMissingError, codexClient, sameMcp, sameSource } from "./codex-cli.js";
 import { LEGACY_LAYOUT, MODELS_REL, PLUGIN_ID, RECORD_REL, atHome, codexHomeFor, readCodexRecord, readLegacyRecord } from "./paths.js";
 
@@ -111,6 +112,13 @@ export function uninstallCodex({ environment = process.env } = {}) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(printableText(`${message}\nThe uninstall stopped before removing files. ${install.recordFile} records what is still in place; fix the cause and run \`./useful-skills uninstall --host codex\` again.`));
     }
+  }
+
+  try {
+    const { changed, file } = unregisterHook(codexHome);
+    if (changed) lines.push(`Removed the code-graph hint hook from ${file}.`);
+  } catch (error) {
+    lines.push(`Left the code-graph hint hook alone (${error instanceof Error ? error.message : String(error)}). Remove the entry whose command runs harness-useful-skills/runtime/codex/hooks.js yourself.`);
   }
 
   const removed = { removed: 0, left: [] };

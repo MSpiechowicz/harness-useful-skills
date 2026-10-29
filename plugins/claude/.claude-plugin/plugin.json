@@ -19,7 +19,7 @@
     "planning",
     "subagents",
     "memory",
-    "knowledge-graph",
+    "code-graph",
     "skills"
   ],
   "agents": [
@@ -99,10 +99,15 @@
       "description": "Use local memory during development workflows. A saved /useful-skills setting overrides this.",
       "default": true
     },
+    "code_graph": {
+      "type": "boolean",
+      "title": "Code graph stage",
+      "description": "Use the Harness Memory code graph (code_map, code_symbol, code_impact, code_path) during development workflows. A saved /useful-skills setting overrides this. Unset means enabled."
+    },
     "graphify_memory": {
       "type": "boolean",
-      "title": "Graph memory stage",
-      "description": "Use project knowledge graph during development workflows. A saved /useful-skills setting overrides this.",
+      "title": "Graph memory stage (deprecated)",
+      "description": "Deprecated: replaced by the Code graph stage and removed in a later release. Read only while code_graph is unset.",
       "default": true
     }
   }

@@ -99,12 +99,12 @@ describe('useful-skills doctor', () => {
     fakeCli(on, () => {
       clock.now += 600_000
 
-      return { exitCode: 1, stderr: 'graphify install failed\n' }
+      return { exitCode: 1, stderr: 'facts setup failed\n' }
     })
 
     const result = await runCommand($, 'doctor')
 
-    expect(result.text).toBe('graphify install failed')
+    expect(result.text).toBe('facts setup failed')
   })
 
   test('reports a setup that could not start as missing Node.js', async ($, on) => {

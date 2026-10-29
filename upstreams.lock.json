@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "purpose": "Pinned provenance for reviewed prompt sources and the managed Graphify dependency. These sources are not runtime auto-sync targets or workflow dependencies, except Graphify when its separately pinned managed setup is explicitly invoked.",
+  "purpose": "Pinned provenance for reviewed prompt sources. These sources are not runtime auto-sync targets or workflow dependencies.",
   "sources": [
     {
       "name": "Everything Claude Code",
@@ -41,18 +41,6 @@
       "licenseSource": "https://raw.githubusercontent.com/juliusbrussee/caveman/2fd153c67988e980fb0b2455c90832159a6a5a25/LICENSING.md",
       "role": "Reviewed concise-prose prompt guidance only; no Caveman runtime is included",
       "runtimeDependency": false
-    },
-    {
-      "name": "Graphify",
-      "repository": "https://github.com/Graphify-Labs/graphify",
-      "commit": "20a20d30d8e7eef77675651f0199d87f913bd3e7",
-      "source": "https://github.com/Graphify-Labs/graphify/tree/20a20d30d8e7eef77675651f0199d87f913bd3e7",
-      "package": "graphifyy==0.9.65",
-      "license": "Apache-2.0",
-      "licenseSource": "https://raw.githubusercontent.com/Graphify-Labs/graphify/20a20d30d8e7eef77675651f0199d87f913bd3e7/LICENSE",
-      "noticeSource": "https://raw.githubusercontent.com/Graphify-Labs/graphify/20a20d30d8e7eef77675651f0199d87f913bd3e7/NOTICE",
-      "role": "Pinned managed dependency for an explicitly invoked Graphify build or query",
-      "runtimeDependency": true
     }
   ]
 }

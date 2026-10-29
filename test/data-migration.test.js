@@ -175,7 +175,7 @@ test("migrateDirectory moves between arbitrary locations and creates the parent"
 test("an OMP profile's memory and settings move when the profile is first used under the new name", async t => {
   const { createHash } = await import("node:crypto");
   const { realpathSync } = await import("node:fs");
-  const { workspaceMemoryPaths } = await import("../graphify.js");
+  const { workspaceMemoryPaths } = await import("../memory-paths.js");
   const { readWorkflowSettings } = await import("../workflow-settings.js");
 
   const f = sandbox(t);

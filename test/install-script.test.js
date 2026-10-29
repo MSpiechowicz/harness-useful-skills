@@ -45,19 +45,11 @@ test("installs from the release tag and runs its installer for OpenCode in the u
   assert.deepEqual(outcome.leftovers, []);
 });
 
-test("a pinned release from before the names were unified still installs, with its own file names", { skip }, async () => {
+test("a pinned release from before the names were unified is refused", { skip }, async () => {
   const { archive } = await buildRelease({ earlier: true });
   const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
-  assert.equal(outcome.status, 0, outcome.stderr);
-  assert.deepEqual(outcome.recorded.argv.slice(1), ["install", "--host", "opencode", "--scope", "user"]);
-  assert.deepEqual(outcome.leftovers, []);
-});
-
-test("an earlier-layout release whose bundle manifest has another version is refused", { skip }, async () => {
-  const { archive } = await buildRelease({ earlier: true, extra: (root) => writeFile(path.join(root, "plugins", "opencode", "useful-skills", "package.json"), JSON.stringify({ version: "9.9.9" })) });
-  const outcome = await runInstaller({ archive, env: { HARNESS_SKILLS_VERSION: "v1.2.3" } });
   assert.notEqual(outcome.status, 0);
-  assert.match(outcome.stderr, /plugins\/opencode\/useful-skills\/package\.json has version 9\.9\.9, expected 1\.2\.3/);
+  assert.match(outcome.stderr, /has no plugins\/opencode\/harness-useful-skills\.js/);
   assert.equal(outcome.recorded, null);
 });
 

@@ -33,7 +33,6 @@ models apply --host codex writes the roles of $CODEX_HOME/harness-useful-skills/
 Owned us-* skills are selected by description or /skill:us-<name>.
 No startup workflow.
 Development uses one plan approval; publication requires an explicit request.
-Graphify setup is lazy on the agent's us_memory build/query, not installation.
 Load the package directory (omp -e .), not extension.js alone.
 Source checkouts: git pull --ff-only. Marketplace updates require restart.`;
 

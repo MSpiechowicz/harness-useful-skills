@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { executeMemory } from "../memory.js";
+import { executeMemory, MEMORY_PARAMETERS } from "../memory.js";
 
 async function fixture(t, memory) {
   const root = await mkdtemp(path.join(os.tmpdir(), "us-memory-"));
@@ -85,26 +85,22 @@ test("native status distinguishes disabled backend from healthy availability", a
     const result = await executeMemory({ action: "status" }, { ...ctx, memory: { status: async () => observation } });
     assert.equal(result.ok, active);
     assert.deepEqual(result.native.observation, observation);
-    assert.equal(result.graph.available, false);
+    assert.equal("graph" in result, false);
   }
 });
 
-test("nullable inactive payloads preserve status and query behavior", async t => {
+test("nullable inactive payloads preserve status and search behavior", async t => {
   const ctx = await fixture(t, {
     status: async () => ({ backend: "local", active: true }),
     search: async () => ({ backend: "local", count: 0, items: [] }),
   });
   const status = await executeMemory({ action: "status", query: null, content: null }, ctx);
   assert.equal(status.ok, true);
-  assert.equal(status.graph.available, false);
+  assert.equal("graph" in status, false);
 
   const search = await executeMemory({ action: "search", query: "units", content: null }, ctx);
   assert.equal(search.ok, true);
   assert.deepEqual(search.observation.items, []);
-
-  const query = await executeMemory({ action: "query", query: "units", content: null }, ctx);
-  assert.equal(query.ok, false);
-  assert.match(query.error, /No active graph/);
 });
 
 test("conflicting payloads and unknown fields never reach storage", async t => {
@@ -153,7 +149,8 @@ test("invalid action, text and extra fields fail before invoking any backend", a
   const invalid = [
     null, [], {}, { action: "erase" },
     { action: "status", query: "x" }, { action: "build", extra: true },
-    { action: "query" }, { action: "query", query: " " }, { action: "query", query: "x".repeat(4097) },
+    { action: "build" }, { action: "query", query: "units" },
+    { action: "search", query: " " }, { action: "search", query: "x".repeat(4097) },
     { action: "search" }, { action: "search", query: 7 },
     { action: "save" }, { action: "save", content: "x".repeat(16385) },
   ];
@@ -162,7 +159,5 @@ test("invalid action, text and extra fields fail before invoking any backend", a
   }
 
   assert.equal((await executeMemory({ action: "status" }, {})).ok, false);
-  const missingGraph = await executeMemory({ action: "query", query: "units" }, ctx);
-  assert.equal(missingGraph.ok, false);
-  assert.match(missingGraph.error, /No active graph/);
+  assert.deepEqual(MEMORY_PARAMETERS.properties.action.enum, ["status", "search", "save"]);
 });

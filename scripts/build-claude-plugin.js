@@ -20,14 +20,10 @@ const PRESERVED = { files: ['README.md'], trees: ['evals'], required: ['README.m
 const FILES = [
   // Root runtime modules reached by importing claude/*.js (and the files they spawn or read).
   'doctor.js', 'resources.js', 'workflow-policy.js', 'workflow-settings.js', 'memory.js',
-  'graphify.js', 'graph-safety.js', 'graph-storage.js', 'graph-validation.js',
-  'graph-import-provenance.js', 'graph-import-provenance.py', 'graph-placeholder-imports.js',
-  'graph-scope.js', 'graph-mounts.js', 'path-boundary.js', 'process.js',
-  'setup-lock.js', 'setup-runner.js', 'setup-watchdog.js',
-  'dependencies.js', 'dependency-policy.js', 'dependency-transport.js',
+  'memory-paths.js', 'graphify-retirement.js', 'path-boundary.js', 'process.js',
   // Host-neutral modules shared with the Claude adapter.
   'workflow-context.js', 'tool-safety.js', 'command-core.js', 'model-roles.js',
-  'doctor-setup.js', 'local-facts.js', 'host-roots.js', 'mcp-memory-server.js', 'entrypoint.js',
+  'doctor-setup.js', 'code-hint.js', 'local-facts.js', 'host-roots.js', 'mcp-memory-server.js', 'entrypoint.js',
   'names.js', 'legacy-names.js', 'data-migration.js',
   // Claude adapter.
   'claude/command.js', 'claude/hooks.js', 'claude/mcp-server.js', 'claude/models.js',
@@ -35,13 +31,11 @@ const FILES = [
   'claude/agents/backend.md', 'claude/agents/frontend.md', 'claude/agents/general-purpose.md',
   'claude/agents/planner.md', 'claude/agents/reviewer.md', 'claude/agents/scout.md',
   'claude/agents/security-reviewer.md',
-  // Hook registration and the pinned dependency metadata Graphify setup verifies.
+  // Hook registration.
   'hooks/hooks.json', 'hooks/register.ts',
-  'dependencies/manifest.json', 'dependencies/graphify.lock',
   // Licenses: claude/skills carries text derived from every upstream below, so all of them ship.
   'LICENSE',
   'licenses/caveman/LICENSE.txt', 'licenses/ecc/LICENSE.txt',
-  'licenses/graphify/LICENSE-MIT.txt', 'licenses/graphify/LICENSE.txt', 'licenses/graphify/NOTICE.txt',
   'licenses/mattpocock-skills/LICENSE.txt', 'licenses/superpowers/LICENSE.txt',
   '.claude-plugin/icon.png',
 ];

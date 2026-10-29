@@ -5,6 +5,7 @@ import { ownedState } from "../opencode/install-files.js";
 import { directoryProblem, lstatOrNull, printableText } from "../opencode/paths.js";
 import { CODEX_MISSING, codexClient, marketplaceRef, sameMcp } from "./codex-cli.js";
 import { LEGACY_DATA_DIRECTORY } from "../legacy-names.js";
+import { hookState } from "./hooks-config.js";
 import { describeSelection, readCodexModels, selectionFor } from "./models.js";
 import { AGENT_RELS, INSTALL_COMMAND, LEGACY_LAYOUT, MARKETPLACE_NAME, PLUGIN_ID, RECORD_REL, TIMEOUT_NOTE, atHome, codexHomeFor, mcpEntryFor, readCodexRecord, readLegacyRecord } from "./paths.js";
 
@@ -160,6 +161,10 @@ function reportLines(environment, lines) {
   if (version.value) lines.push(...codexLines(codexClient({ environment, codexHome }), codexHome, record.value));
   else lines.push("Plugin, marketplace and MCP server: not checked without the codex command.");
 
+  const hook = hookState(codexHome);
+  lines.push(hook.state === "unreadable"
+    ? `Code-graph hint hook: cannot be checked (${hook.reason}).`
+    : `Code-graph hint hook: ${hook.state === "registered" ? "registered in hooks.json (Codex runs it once you trust it in /hooks)" : "not registered"}.`);
   lines.push(dataLine(record.value?.dataDir ?? mcpEntryFor(codexHome).env.USEFUL_SKILLS_DATA));
   lines.push(...modelLines(codexHome));
   lines.push(...legacyLines(codexHome, version.value ? codexClient({ environment, codexHome }) : undefined));

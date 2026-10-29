@@ -248,11 +248,10 @@ test("/useful-skills reports a run with no output as (no output)", async () => {
   assert.match(parts[0].text, /\(exit 0\)[^]*\n\n\(no output\)$/);
 });
 
-test("doctor, graph test, and update install get a long timeout and a notice; other commands do not", async () => {
+test("doctor and update install get a long timeout and a notice; other commands do not", async () => {
   const { session, calls, toasts } = harness({ respond: () => ({ exitCode: 0, stdout: "done\n", stderr: "" }) });
   const budgets = [
     [" doctor ", 600_000, "Useful Skills: running doctor; first setup can take minutes."],
-    ["graph   test", 600_000, "Useful Skills: running the graph test; it can take minutes."],
     ["update install", 600_000, "Useful Skills: installing the update; it can take minutes."],
     ["doctor --check", 60_000],
     ["update check", 60_000],

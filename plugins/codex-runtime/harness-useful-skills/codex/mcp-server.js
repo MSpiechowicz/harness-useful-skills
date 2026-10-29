@@ -10,7 +10,7 @@ function workspace() {
   return configured && path.isAbsolute(configured) ? configured : process.cwd();
 }
 
-// Graph builds run Graphify in a process group of its own, which would outlive a server stopped by a signal.
+// A server stopped by a signal must still end any child process it started.
 exitOnTermination();
 startMemoryServer({
   factsLabel: "Codex",

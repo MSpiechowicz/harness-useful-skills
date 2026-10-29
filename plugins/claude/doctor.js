@@ -59,68 +59,6 @@ function nativeStatus(memory) {
   return "Unavailable";
 }
 
-function graphStatus(memory) {
-  if (!record(memory)) {
-    return "Unavailable";
-  }
-
-  const graph = memory.graph;
-  if (!record(graph)) {
-    return "Unavailable — no graph status was returned.";
-  }
-
-  const error = diagnostic(graph.error);
-  if (error) {
-    return `Error — ${error}`;
-  }
-
-  if (!graph.available) {
-    return "Not built";
-  }
-
-  const nodes = graph.snapshot?.nodes;
-  const edges = graph.snapshot?.edges;
-  if (Number.isSafeInteger(nodes) && nodes >= 0 && Number.isSafeInteger(edges) && edges >= 0) {
-    return `Ready — ${nodes} nodes, ${edges} edges`;
-  }
-
-  return "Ready";
-}
-
-function dependencyStatus(memory) {
-  if (!record(memory)) {
-    return "Unavailable";
-  }
-
-  const dependency = memory.graph?.dependency;
-  if (!record(dependency)) {
-    return "Unavailable — no dependency status was returned.";
-  }
-
-  const reason = diagnostic(dependency.reason);
-  if (dependency.ready === true || dependency.state === "ready") {
-    return "Ready";
-  }
-
-  if (dependency.state === "missing") {
-    return "Not installed";
-  }
-
-  if (dependency.state === "partial") {
-    return "Incomplete";
-  }
-
-  if (dependency.state === "unsupported") {
-    return reason ? `Unsupported — ${reason}` : "Unsupported";
-  }
-
-  if (dependency.state === "unknown") {
-    return reason ? `Error — ${reason}` : "Unavailable";
-  }
-
-  return reason ? `Error — ${reason}` : "Unavailable";
-}
-
 function memorySection(memory, setup) {
   if (setup?.unavailable !== undefined) {
     return [`Memory: not checked — ${diagnostic(setup.unavailable) ?? "unknown reason"}`];
@@ -129,9 +67,7 @@ function memorySection(memory, setup) {
   return [
     "Memory",
     `  Native: ${nativeStatus(memory)}`,
-    `  Graph: ${graphStatus(memory)}`,
-    `  Dependencies: ${dependencyStatus(memory)}`,
-    ...(memory?.error && !memory.native && !memory.graph ? [`  Status: Error — ${diagnostic(memory.error)}`] : []),
+    ...(memory?.error && !memory.native ? [`  Status: Error — ${diagnostic(memory.error)}`] : []),
     ...(!record(memory) && !setup ? ["Run /useful-skills doctor in OMP for current profile memory status."] : []),
   ];
 }

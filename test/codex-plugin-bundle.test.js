@@ -146,7 +146,7 @@ test("the bundled memory MCP server answers initialize and lists its five tools"
   assert.equal(initialized.result.protocolVersion, "2025-06-18");
   child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
   const listed = await request(2, "tools/list");
-  assert.deepEqual(listed.result.tools.map(tool => tool.name), ["memory_status", "memory_search", "memory_save", "graph_build", "graph_query"]);
+  assert.deepEqual(listed.result.tools.map(tool => tool.name), ["memory_status", "memory_search", "memory_save"]);
   child.stdin.end();
 });
 

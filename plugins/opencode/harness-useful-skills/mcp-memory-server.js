@@ -9,17 +9,14 @@ const CONTENT = { type: "object", properties: { content: { type: "string", minLe
 
 function memoryTools(factsLabel) {
   return [
-    { name: "memory_status", description: `Inspect local ${factsLabel} facts and the project graph without creating storage or installing dependencies.`, inputSchema: EMPTY, annotations: { readOnlyHint: true } },
+    { name: "memory_status", description: `Inspect local ${factsLabel} facts without creating storage.`, inputSchema: EMPTY, annotations: { readOnlyHint: true } },
     { name: "memory_search", description: "Search saved project facts using bounded literal text matching.", inputSchema: QUERY, annotations: { readOnlyHint: true } },
     { name: "memory_save", description: "Persist a secret-free durable fact privately for this project.", inputSchema: CONTENT },
-    { name: "graph_build", description: "Explicitly build this project's Graphify graph; may install pinned dependencies and scan workspace files.", inputSchema: EMPTY },
-    { name: "graph_query", description: "Query the existing project graph; may load the pinned Graphify runtime.", inputSchema: QUERY },
   ];
 }
 
 const actions = new Map([
   ["memory_status", "status"], ["memory_search", "search"], ["memory_save", "save"],
-  ["graph_build", "build"], ["graph_query", "query"],
 ]);
 
 function record(value) {
