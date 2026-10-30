@@ -11,6 +11,7 @@ const MIN_TERM = 3;
 const MAX_TERM = 80;
 const HINT_TIMEOUT_MS = 1000;
 const MAX_HINT_CHARS = 600;
+const MAX_NAMES_PER_SEARCH = 3;
 const MAX_HINTS_PER_SESSION = 5;
 const MAX_LOOKUPS_PER_SESSION = 20;
 const MAX_SEEN_TERMS = 40;
@@ -27,6 +28,22 @@ const LONG_VALUE = new Set([
   "glob", "type", "type-not", "iglob", "max-depth", "max-filesize", "threads", "replace", "ignore", "path-to-ignore",
   "color", "colour", "directories", "devices", "binary-files", "label", "type-add", "pre", "encoding", "sort", "sortr",
 ]);
+
+/** The index of the last character of a redirection that starts at `at`: its operator, `&` and the plain or quoted target. */
+function skipRedirect(text, at) {
+  let i = at;
+  while (text[i + 1] === ">" || text[i + 1] === "<" || text[i + 1] === "&" || text[i + 1] === "|") i += 1;
+  if (text[i + 1] === "(") return i;
+  let j = i + 1;
+  while (text[j] === " " || text[j] === "\t") j += 1;
+  const quote = text[j];
+  if (quote === "'" || quote === '"') {
+    const end = text.indexOf(quote, j + 1);
+    return end < 0 ? i : end;
+  }
+  while (j < text.length && !" \t|;&\n\r<>()`$".includes(text[j])) j += 1;
+  return j - 1 > i ? j - 1 : i;
+}
 
 /**
  * Split a shell command line into segments of words without executing or expanding anything. A segment containing a
@@ -63,7 +80,10 @@ export function tokenize(command) {
       let j = i + 1;
       for (; j < text.length && text[j] !== '"'; j += 1) {
         if (text[j] === "\\" && j + 1 < text.length) {
-          j += 1;
+          // in double quotes a backslash only escapes $, a backtick, a double quote, a backslash and a newline
+          if ("$`\"\\\n".includes(text[j + 1])) {
+            j += 1;
+          }
           word += text[j];
         } else {
           if (text[j] === "`" || text[j] === "$") unsafe = true;
@@ -81,13 +101,19 @@ export function tokenize(command) {
     } else if (ch === "`" || ch === "$" || ch === "(" || ch === ")" || ch === "{" || ch === "}" || ch === "<" || ch === ">") {
       // Substitutions, groups and redirections: the word cannot be trusted as a literal.
       if (ch === ">" || ch === "<") {
-        endWord();
         unsafe = unsafe || text[i + 1] === "(";
+        // a file descriptor number before the operator is part of the redirection
+        if (started && /^\d+$/.test(word)) started = false;
+        i = skipRedirect(text, i);
+        endWord();
       } else {
         unsafe = true;
         word += ch;
         started = true;
       }
+    } else if (ch === "&" && text[i + 1] === ">") {
+      i = skipRedirect(text, i + 1);
+      endWord();
     } else if (ch === "|" || ch === ";" || ch === "&" || ch === "\n" || ch === "\r") {
       endSegment();
     } else if (ch === " " || ch === "\t") {
@@ -187,6 +213,26 @@ export function searchTerm(input) {
   return term.length >= MIN_TERM && term.length <= MAX_TERM && IDENTIFIER.test(term) ? term : undefined;
 }
 
+/**
+ * The identifier alternatives of a Grep or Bash search in order, for patterns such as `a|b|c`, `a\|b`, `(a|b)` or
+ * `\b(a|b)\b`. Alternatives that are not identifiers are skipped. A plain identifier pattern yields itself.
+ */
+export function searchTerms(input) {
+  const name = input?.tool_name;
+  const toolInput = input?.tool_input;
+  let pattern;
+  if (name === "Grep") pattern = toolInput?.pattern;
+  else if (name === "Bash") pattern = bashSearchTerm(toolInput?.command);
+  if (typeof pattern !== "string" || pattern.length > MAX_TERM * 8) return [];
+  const names = pattern
+    .replace(/\\[b<>]/g, "")
+    .replace(/\\?[()]/g, "")
+    .replace(/[\^$]/g, "")
+    .split(/\\?\|/)
+    .filter(term => term.length >= MIN_TERM && term.length <= MAX_TERM && IDENTIFIER.test(term));
+  return [...new Set(names)];
+}
+
 function sessionKey(sessionId) {
   return createHash("sha256").update(String(sessionId)).digest("hex").slice(0, 32);
 }
@@ -254,25 +300,34 @@ export async function codeHint(input, { enabled = true, dataDir, env = process.e
     const project = input?.cwd;
     if (typeof sessionId !== "string" || !sessionId || sessionId.length > 200) return undefined;
     if (typeof project !== "string" || !path.isAbsolute(project)) return undefined;
-    const term = searchTerm(input);
-    if (!term) return undefined;
+    const terms = searchTerms(input);
+    if (!terms.length) return undefined;
 
     const now = (services.now ?? Date.now)();
     const file = path.join(dataDir, STATE_FILE);
     const key = sessionKey(sessionId);
     const state = pruned(readState(file), now);
     const session = state[key] ?? { t: now, hints: 0, lookups: 0, seen: [] };
-    const lookups = Number.isFinite(session.lookups) ? session.lookups : session.seen.length;
-    if (session.hints >= MAX_HINTS_PER_SESSION || lookups >= MAX_LOOKUPS_PER_SESSION || session.seen.includes(term)) return undefined;
+    let lookups = Number.isFinite(session.lookups) ? session.lookups : session.seen.length;
+    const candidates = terms.filter(term => !session.seen.includes(term)).slice(0, MAX_NAMES_PER_SEARCH);
+    if (session.hints >= MAX_HINTS_PER_SESSION || lookups >= MAX_LOOKUPS_PER_SESSION || !candidates.length) return undefined;
 
     const binary = (services.resolve ?? resolveHarnessMemory)({ cwd: project, env });
     if (!binary) return undefined;
-    const hint = await askHint(binary, project, term, services.execFile ?? execFile);
+    let hint = null;
+    for (const term of candidates) {
+      if (lookups >= MAX_LOOKUPS_PER_SESSION) break;
+      hint = await askHint(binary, project, term, services.execFile ?? execFile);
+      lookups += 1;
+      session.seen = [...session.seen, term].slice(-MAX_SEEN_TERMS);
+      if (hint) {
+        session.hints += 1;
+        break;
+      }
+    }
 
     session.t = now;
-    session.lookups = lookups + 1;
-    session.seen = [...session.seen, term].slice(-MAX_SEEN_TERMS);
-    if (hint) session.hints += 1;
+    session.lookups = lookups;
     state[key] = session;
     writeState(dataDir, file, pruned(state, now));
     return hint ?? undefined;

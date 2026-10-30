@@ -1,3 +1,4 @@
+import path from "node:path";
 import { formatDoctor } from "./doctor.js";
 import { syncOmpAgents } from "./omp/agents-sync.js";
 import { runUpdate } from "./updater.js";
@@ -5,6 +6,10 @@ import { readWorkflowSettings, STAGES, writeWorkflowSetting } from "./workflow-s
 import { backendMemoryGuidance } from "./workflow-context.js";
 import { effectiveWorkflow } from "./workflow-policy.js";
 import { executeMemory, MEMORY_PARAMETERS } from "./memory.js";
+import { codeHint, searchTerms } from "./code-hint.js";
+import { DATA_DIRECTORY } from "./names.js";
+import { ompSearchInput } from "./omp/hook-input.js";
+import { createNudgeTracker, repoNudge } from "./omp/nudge.js";
 import {
   dangerousCommandReason, formatResources, listResources, parseCatalogArguments,
   redactText, redactToolResultContent, resourceInventory, safetyEnabled,
@@ -56,7 +61,7 @@ const HELP = [
   "Terminal: ./useful-skills list | doctor | update check|install",
 ].join("\n");
 
-export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) {
+export default function usefulSkills(pi, { memoryAction = executeMemory, codeHintServices } = {}) {
   pi.setLabel("Useful Skills");
   let busy = false;
   let startupScheduled = false;
@@ -331,7 +336,17 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
       : { systemPrompt: next };
   });
 
-  pi.on("tool_call", event => {
+  const nudges = createNudgeTracker();
+  const sessionIdOf = ctx => {
+    try {
+      return ctx?.sessionManager?.getSessionId?.();
+    } catch {
+      return undefined;
+    }
+  };
+
+  pi.on("tool_call", (event, ctx) => {
+    nudges.noteToolUse(event, sessionIdOf(ctx));
     if (!safetyEnabled() || event.toolName !== "bash") {
       return;
     }
@@ -342,9 +357,62 @@ export default function usefulSkills(pi, { memoryAction = executeMemory } = {}) 
     }
   });
 
-  pi.on("tool_result", event => {
+  /** The one-line code-tool hint for an identifier search, or undefined. Silent on every failure and when the code-graph stage is off. */
+  async function searchHint(event, ctx) {
+    try {
+      const input = ompSearchInput(event, ctx);
+      if (!input || !searchTerms(input).length) {
+        return undefined;
+      }
+      const policy = effectiveWorkflow(await settings(ctx));
+      const dataDir = path.join(pi.pi.getAgentDir(), DATA_DIRECTORY);
+      return await codeHint(input, { enabled: policy.stages["code-graph"]?.effective === "enabled", dataDir, services: codeHintServices });
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** The exploration nudge for the first directory listing or third source read of a session, or undefined. */
+  async function explorationNudge(ctx) {
+    const sessionId = sessionIdOf(ctx);
+    const line = await nudgeLine(ctx);
+    if (!line) {
+      nudges.release(sessionId);
+    }
+    return line;
+  }
+
+  async function nudgeLine(ctx) {
+    try {
+      const policy = effectiveWorkflow(await settings(ctx));
+      if (policy.stages["code-graph"]?.effective !== "enabled") {
+        return undefined;
+      }
+      return await repoNudge(ctx.cwd, { services: codeHintServices });
+    } catch {
+      return undefined;
+    }
+  }
+
+  pi.on("tool_result", (event, ctx) => {
+    nudges.noteToolUse(event, sessionIdOf(ctx));
     const content = redactToolResultContent(event.content);
-    return content ? { content } : undefined;
+    // Synchronous unless the call is an identifier search or an exploration, which may append one line after the result.
+    if (event.isError || !Array.isArray(event.content)) {
+      return content ? { content } : undefined;
+    }
+    const searching = searchTerms(ompSearchInput(event, ctx)).length > 0;
+    // the claim is synchronous so that parallel results cannot both carry the nudge
+    const exploring = !searching && nudges.claim(event, sessionIdOf(ctx), ctx?.cwd);
+    if (!searching && !exploring) {
+      return content ? { content } : undefined;
+    }
+    return (searching ? searchHint(event, ctx) : explorationNudge(ctx)).then(line => {
+      if (!line) {
+        return content ? { content } : undefined;
+      }
+      return { content: [...(content ?? event.content), { type: "text", text: line }] };
+    });
   });
 
   pi.on("session_start", (_event, ctx) => {

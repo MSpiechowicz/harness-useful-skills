@@ -7,7 +7,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { codeHint, searchTerm } from "../code-hint.js";
+import { codeHint, searchTerms } from "../code-hint.js";
 import { invokedDirectly } from "../entrypoint.js";
 import { DATA_DIRECTORY } from "../names.js";
 import { effectiveWorkflow } from "../workflow-policy.js";
@@ -32,7 +32,7 @@ export function hookLocations(environment = process.env, file = fileURLToPath(im
 /** The hint text for a Codex PreToolUse input, or undefined. `locations` and `services` are replaced in tests. */
 export async function codexHint(input, { environment = process.env, locations, services } = {}) {
   const adapted = codexSearchInput(input);
-  if (!adapted || !searchTerm(adapted)) return undefined;
+  if (!adapted || !searchTerms(adapted).length) return undefined;
   const { dataDir } = locations ?? hookLocations(environment);
   if (typeof dataDir !== "string") return undefined;
   // Codex has no settings command, but the shared store under the private data directory is still read: no file

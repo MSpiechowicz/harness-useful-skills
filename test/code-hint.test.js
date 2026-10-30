@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { bashSearchTerm, codeHint, searchTerm, tokenize } from "../code-hint.js";
+import { bashSearchTerm, codeHint, searchTerm, searchTerms, tokenize } from "../code-hint.js";
 
 const hooks = fileURLToPath(new URL("../claude/hooks.js", import.meta.url));
 
@@ -151,6 +151,9 @@ test("hook emits only additionalContext, honours the code-graph switch, and igno
   const bash = run(environment, { ...payload, session_id: "b", tool_name: "Bash", tool_input: { command: "rg -n otherSymbol src" } });
   assert.match(bash.stdout, /additionalContext/);
 
+  const several = run(environment, { ...payload, session_id: "several", tool_input: { pattern: "short|manyA|manyB" } });
+  assert.match(several.stdout, /additionalContext/);
+
   const missing = run({ ...environment, PATH: "/nonexistent" }, { ...payload, session_id: "m", tool_input: { pattern: "freshSymbol" } });
   assert.equal(missing.status, 0);
   assert.equal(missing.stdout, "");
@@ -188,4 +191,58 @@ test("unparsable Grep input never blocks a search, while unparsable Bash input s
   assert.match(run('{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":').stdout, /"permissionDecision":"deny"/);
   assert.match(run("not json").stdout, /"permissionDecision":"deny"/);
   assert.match(run("").stdout, /"permissionDecision":"deny"/);
+});
+
+test("searchTerms lists the identifier alternatives of a pattern in order", () => {
+  const terms = pattern => searchTerms({ tool_name: "Grep", tool_input: { pattern } });
+  assert.deepEqual(terms("alpha|beta|gamma"), ["alpha", "beta", "gamma"]);
+  assert.deepEqual(terms("alpha\\|beta"), ["alpha", "beta"]);
+  assert.deepEqual(terms("(alpha|beta)"), ["alpha", "beta"]);
+  assert.deepEqual(terms("\\b(alpha|beta)\\b"), ["alpha", "beta"]);
+  assert.deepEqual(terms("^alpha$|x|two words|alpha|Foo::bar"), ["alpha", "Foo::bar"]);
+  assert.deepEqual(terms("\\balpha\\b"), ["alpha"]);
+  assert.deepEqual(terms("a|b"), []);
+  assert.deepEqual(terms("foo.*bar"), []);
+  assert.deepEqual(terms(`${"x".repeat(81)}|okName`), ["okName"]);
+  assert.deepEqual(searchTerms({ tool_name: "Bash", tool_input: { command: "rg -n 'alpha|beta' src" } }), ["alpha", "beta"]);
+  assert.deepEqual(searchTerms({ tool_name: "Read", tool_input: { pattern: "alpha|beta" } }), []);
+});
+
+test("a search of several names tries up to three, skips seen names and stops at the first hint", async t => {
+  const f = await fixture(t);
+  const queried = () => f.calls.map(call => call.args[call.args.indexOf("--query") + 1]);
+  const misses = names => ({ ...f.services, execFile: (file, args, options, done) => {
+    f.calls.push({ args });
+    const term = args[args.indexOf("--query") + 1];
+    done(null, JSON.stringify({ hint: names.includes(term) ? `hint ${term}` : null }));
+  } });
+  assert.equal(await codeHint(f.input("aaa|bbb|ccc|ddd"), { dataDir: f.dataDir, services: misses(["ddd"]) }), undefined);
+  assert.deepEqual(queried(), ["aaa", "bbb", "ccc"]);
+  assert.equal(await codeHint(f.input("aaa|ddd|eee|fff"), { dataDir: f.dataDir, services: misses(["ddd", "eee"]) }), "hint ddd");
+  assert.deepEqual(queried().slice(3), ["ddd"]);
+  assert.equal(await codeHint(f.input("aaa|bbb|ccc"), { dataDir: f.dataDir, services: misses(["aaa"]) }), undefined);
+  assert.equal(f.calls.length, 4, "every name was seen, so nothing is asked");
+});
+
+test("each name of a search counts as a lookup", async t => {
+  const f = await fixture(t);
+  const miss = { ...f.services, execFile: (file, args, options, done) => { f.calls.push({ args }); done(null, '{"hint":null}'); } };
+  for (let i = 0; i < 10; i += 1) await codeHint(f.input(`ma${i}x|mb${i}x|mc${i}x`), { dataDir: f.dataDir, services: miss });
+  assert.equal(f.calls.length, 20);
+});
+
+test("the tokenizer keeps regex backslashes in double quotes and drops redirections", () => {
+  const words = command => tokenize(command)[0].words;
+  assert.deepEqual(words('grep "\\bfoo\\b"'), ["grep", "\\bfoo\\b"]);
+  assert.deepEqual(words('grep "say \\"hi\\" \\\\ \\$x"'), ["grep", 'say "hi" \\ $x']);
+  assert.deepEqual(words("ls src 2>/dev/null"), ["ls", "src"]);
+  assert.deepEqual(words("ls src > /tmp/o 2>&1"), ["ls", "src"]);
+  assert.deepEqual(words("ls src &>/dev/null"), ["ls", "src"]);
+});
+
+test("backslash word boundaries around quoted names are noise", () => {
+  const terms = command => searchTerms({ tool_name: "Bash", tool_input: { command } });
+  assert.deepEqual(terms('grep "\\bfoo\\b" src'), ["foo"]);
+  assert.deepEqual(terms('grep -E "\\b(foo|bar)\\b" src'), ["foo", "bar"]);
+  assert.deepEqual(terms("rg '\\bfoo\\b' src"), ["foo"]);
 });

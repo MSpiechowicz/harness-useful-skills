@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { invokedDirectly } from "../entrypoint.js";
-import { codeHint, searchTerm } from "../code-hint.js";
+import { codeHint, searchTerms } from "../code-hint.js";
 import { effectiveWorkflow } from "../workflow-policy.js";
 import { commandGuardDenial, INVALID_TOOL_INPUT, redactValue } from "../tool-safety.js";
 import { fastLaneContext, workflowContext } from "./context.js";
@@ -101,7 +101,7 @@ const isGrepCall = (text) => /"tool_name"\s*:\s*"Grep"/.test(text);
 async function writeSearchHint(input) {
   try {
     const dataDir = process.env.CLAUDE_PLUGIN_DATA;
-    if (!dataDir || !searchTerm(input)) {
+    if (!dataDir || !searchTerms(input).length) {
       return;
     }
     const policy = effectiveWorkflow(await readClaudeWorkflow({ environment: process.env, cwd: input.cwd }));

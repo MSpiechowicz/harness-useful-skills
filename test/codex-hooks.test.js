@@ -237,3 +237,8 @@ test("a private hooks.json keeps its mode through the rewrite, which is created 
   writeAtomic(file, "{}");
   assert.equal(statSync(file).mode & 0o777, 0o644 & ~process.umask());
 });
+
+test("a Codex shell search of several names gets a hint for the first known name", async (t) => {
+  const box = runtimeBox(t);
+  assert.equal(await codexHint(box.input("rg -n 'alphaName|betaName' src"), { locations: box.locations, services: box.services }), "use code_symbol for alphaName");
+});

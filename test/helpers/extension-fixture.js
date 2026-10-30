@@ -5,7 +5,7 @@ import usefulSkills from "../../extension.js";
 
 export const LEFT = Symbol("select left");
 
-export async function fixture(t, hasUI = true, memoryAction, sharedAgentDir) {
+export async function fixture(t, hasUI = true, memoryAction, sharedAgentDir, extra = {}) {
   const parent = await mkdtemp(path.join(os.tmpdir(), "us-extension-"));
   const root = path.join(parent, "workspace");
   const agentDir = sharedAgentDir ?? path.join(parent, "profile");
@@ -31,7 +31,7 @@ export async function fixture(t, hasUI = true, memoryAction, sharedAgentDir) {
     registerTool: definition => tools.set(definition.name, definition),
     on: (name, callback) => events.set(name, callback),
     sendMessage: (message, options) => messages.push({ message: message.content, options }),
-  }, { memoryAction });
+  }, { memoryAction, ...extra });
 
   let currentSession = "session-one";
   const ctx = {
