@@ -9,6 +9,7 @@ const OPTION_KEYS = Object.freeze({
   plan: "PLAN",
   review: "REVIEW",
   "security-review": "SECURITY_REVIEW",
+  "release-assessment": "RELEASE_ASSESSMENT",
   "backend-memory": "BACKEND_MEMORY",
   "code-graph": "CODE_GRAPH",
 });

@@ -79,7 +79,7 @@ test("generated role agents under the earlier file names are replaced, the user'
   assert.equal(files.includes(legacyClaudeAgentFile("planner")), false, "the generated earlier agent is gone");
   assert.equal(files.includes(legacyClaudeAgentFile("scout")), true, "a file Harness Skills did not generate stays");
   assert.equal(readFileSync(path.join(configDir, "agents", legacyClaudeAgentFile("scout")), "utf8"), "---\nname: mine\n---\nuser written\n");
-  assert.equal(files.filter(file => file.startsWith("harness-useful-skills-")).length, 7);
+  assert.equal(files.filter(file => file.startsWith("harness-useful-skills-")).length, 8);
 });
 
 test("an invalid models file leaves the earlier generated agents in place", t => {

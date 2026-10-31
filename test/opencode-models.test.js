@@ -42,7 +42,7 @@ test("first sync lists every role as inherit and writes inherit-model agents fro
   assert.equal(result.configFile, modelsConfigPath(root));
   assert.equal(result.error, undefined);
   const written = await readFile(result.configFile, "utf8");
-  for (const role of ["research", "frontend", "backend", "implementation", "review", "security", "plan", "default"]) {
+  for (const role of ["research", "frontend", "backend", "implementation", "review", "security", "plan", "assess", "default"]) {
     assert.match(written, new RegExp(`^  ${role}: inherit$`, "m"), role);
   }
   assert.equal((await stat(path.dirname(result.configFile))).mode & 0o777, 0o700);
@@ -83,6 +83,36 @@ test("configured roles set a quoted model and variant, and unchanged agents are 
   const context = openCodeRoutingContext(again);
   assert.match(context, /`us-reviewer`: openai\/gpt-5, variant high/);
   assert.match(context, /`us-scout`: inherits the session model/);
+});
+
+test("a config with only a default row gives the release assessor the session model and every other role the default", async t => {
+  const root = await scopeRoot(t);
+  await mkdir(path.dirname(modelsConfigPath(root)), { recursive: true });
+  await writeFile(modelsConfigPath(root), "modelRoles:\n  default: anthropic/claude-sonnet-4-5:high\n");
+
+  const result = syncOpenCodeAgents({ scopeRoot: root });
+
+  assert.equal(result.error, undefined);
+  assert.deepEqual(result.agents["release-assessor"].selection, { model: null, variant: undefined });
+  const assessor = frontmatter(await readFile(generatedAgentPath(root, "release-assessor"), "utf8"));
+  assert.ok(!assessor.some(line => /^(model|variant):/.test(line)), "the assessor inherits the session model");
+  const scout = frontmatter(await readFile(generatedAgentPath(root, "scout"), "utf8"));
+  assert.ok(scout.includes("model: \"anthropic/claude-sonnet-4-5\""));
+  assert.ok(scout.includes("variant: high"));
+  assert.match(openCodeRoutingContext(result), /`us-release-assessor`: inherits the session model/);
+  assert.equal(await readFile(modelsConfigPath(root), "utf8"), "modelRoles:\n  default: anthropic/claude-sonnet-4-5:high\n", "the user's file is not rewritten");
+});
+
+test("an explicit assess row sets the release assessor model", async t => {
+  const root = await scopeRoot(t);
+  await mkdir(path.dirname(modelsConfigPath(root)), { recursive: true });
+  await writeFile(modelsConfigPath(root), "modelRoles:\n  default: inherit\n  assess: \"openai/gpt-5:high\"\n");
+
+  const result = syncOpenCodeAgents({ scopeRoot: root });
+
+  assert.deepEqual(result.agents["release-assessor"].selection, { model: "openai/gpt-5", variant: "high" });
+  const assessor = frontmatter(await readFile(generatedAgentPath(root, "release-assessor"), "utf8"));
+  assert.ok(assessor.includes("model: \"openai/gpt-5\""));
 });
 
 test("a user-owned agent file is never overwritten and an invalid config changes nothing", async t => {

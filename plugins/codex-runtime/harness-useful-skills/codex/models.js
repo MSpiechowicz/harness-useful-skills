@@ -3,7 +3,7 @@
  * schema as the Claude and OpenCode files, and the `model` and `model_reasoning_effort` lines it adds to the generated
  * `agents/us-<role>.toml`. Runs in the installer and in the installed runtime (apply-models.js).
  */
-import { ROLE_AGENTS, ROLES, parseModelsConfig, readConfigText, writeAtomic } from "../model-roles.js";
+import { ROLE_AGENTS, ROLES, parseModelsConfig, readConfigText, roleSelection, writeAtomic } from "../model-roles.js";
 import { directoryProblem, lstatOrNull } from "../opencode/paths.js";
 import { MODELS_REL, atHome } from "./paths.js";
 
@@ -18,7 +18,7 @@ const HEADER = [
   "# Selector: <model>[:<effort>], for example gpt-5.5:high. Effort: " + EFFORTS.join(", ") + ".",
   "# `inherit` uses the model and reasoning effort of your Codex setup, and `inherit:<effort>` changes only the effort.",
   "# Every role inherits. Replace `inherit` with a selector to give a role its own model.",
-  "# `default` applies only to a role whose row is removed.",
+  "# `default` applies only to a role whose row is removed, except `assess`, which then inherits.",
   "# Changes apply to the agents once they are applied again (./useful-skills models apply --host codex) or the",
   "# installer runs again, and to Codex sessions started afterwards.",
   "modelRoles:",
@@ -83,9 +83,9 @@ export function ensureCodexModels(models) {
   return true;
 }
 
-/** The selection for a plugin agent (`planner`): its role's row, else `default`, else inherit. */
+/** The selection for a plugin agent (`planner`): its role's row, else `default`, else inherit. A missing `assess` row inherits. */
 export function selectionFor(agent, roles) {
-  return roles[ROLE_AGENTS[agent]] ?? roles.default ?? INHERIT;
+  return roleSelection(roles, ROLE_AGENTS[agent], INHERIT);
 }
 
 /** Add the selection to a generated agent file: `model` and `model_reasoning_effort` follow `description`, unset ones are omitted. */

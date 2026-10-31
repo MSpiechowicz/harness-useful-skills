@@ -7,6 +7,7 @@ const STAGE_SKILLS = Object.freeze({
   plan: "us-plan",
   review: "us-review",
   "security-review": "us-check-security",
+  "release-assessment": "us-assess-release",
   "backend-memory": "us-manage-memory",
   "code-graph": "us-manage-memory",
 });

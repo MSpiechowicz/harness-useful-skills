@@ -16,7 +16,7 @@ if (process.argv.length > 3 || (process.argv[2] && !check)) {
   throw new Error('Usage: node scripts/build-codex-plugin.js [--check]');
 }
 
-const AGENT_ROLES = ['planner', 'scout', 'frontend', 'backend', 'general-purpose', 'reviewer', 'security-reviewer'];
+const AGENT_ROLES = ['planner', 'scout', 'frontend', 'backend', 'general-purpose', 'reviewer', 'security-reviewer', 'release-assessor'];
 
 // Licenses: codex/skills carries text derived from every upstream below, so all of them ship with the plugin and the runtime.
 const LICENSES = [

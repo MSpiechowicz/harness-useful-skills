@@ -10,7 +10,7 @@ const execute = promisify(execFile);
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SKILLS = path.join(ROOT, "opencode", "skills");
 const AGENTS = path.join(ROOT, "opencode", "agents");
-const AGENT_NAMES = ["backend", "frontend", "general-purpose", "planner", "reviewer", "scout", "security-reviewer"];
+const AGENT_NAMES = ["backend", "frontend", "general-purpose", "planner", "release-assessor", "reviewer", "scout", "security-reviewer"];
 
 function frontmatterOf(text) {
   const match = /^---\n([\s\S]*?)\n---\n/.exec(text);
@@ -25,7 +25,7 @@ test("rendered OpenCode skills match the canonical sources", async () => {
 
 test("every OpenCode skill has OpenCode-valid frontmatter", async () => {
   const folders = (await readdir(SKILLS, { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name);
-  assert.equal(folders.length, 21);
+  assert.equal(folders.length, 22);
 
   for (const folder of folders) {
     const rows = frontmatterOf(await readFile(path.join(SKILLS, folder, "SKILL.md"), "utf8"));
@@ -46,6 +46,7 @@ const EXPECTED_PERMISSIONS = {
   planner: READ_ONLY,
   reviewer: { ...READ_ONLY, bash: "ask" },
   "security-reviewer": { ...READ_ONLY, bash: "ask" },
+  "release-assessor": { ...READ_ONLY, bash: "ask" },
   frontend: { ...READ_ONLY, edit: "allow", bash: "ask" },
   backend: { ...READ_ONLY, edit: "allow", bash: "ask" },
   "general-purpose": { ...READ_ONLY, edit: "allow", bash: "ask" },

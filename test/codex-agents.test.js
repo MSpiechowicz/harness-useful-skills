@@ -7,10 +7,10 @@ import { fileURLToPath } from "node:url";
 import { AGENT_MARKER, AGENT_ROLES, parseAgentToml, readAgents } from "../codex/agents.js";
 
 const AGENTS = fileURLToPath(new URL("../codex/agents/", import.meta.url));
-const READ_ONLY = ["planner", "scout", "reviewer", "security-reviewer"];
+const READ_ONLY = ["planner", "scout", "reviewer", "security-reviewer", "release-assessor"];
 
-test("there are exactly the seven role files", async () => {
-  assert.equal(AGENT_ROLES.length, 7);
+test("there are exactly the eight role files", async () => {
+  assert.equal(AGENT_ROLES.length, 8);
   assert.deepEqual((await readdir(AGENTS)).sort(), AGENT_ROLES.map(role => `${role}.toml`).sort());
 });
 

@@ -38,7 +38,7 @@ const FILES = [
   'opencode/install-status.js', 'opencode/install-files.js', 'opencode/config-file.js', 'opencode/updater.js', 'opencode/legacy.js',
   'opencode/agents/backend.md', 'opencode/agents/frontend.md', 'opencode/agents/general-purpose.md',
   'opencode/agents/planner.md', 'opencode/agents/reviewer.md', 'opencode/agents/scout.md',
-  'opencode/agents/security-reviewer.md',
+  'opencode/agents/security-reviewer.md', 'opencode/agents/release-assessor.md',
   'opencode/commands/useful-skills.md', 'opencode/commands/us-ignore-workflow.md',
   // The versioned manifest; becomes harness-useful-skills/package.json (see expectedOutput).
   'opencode/package.json',

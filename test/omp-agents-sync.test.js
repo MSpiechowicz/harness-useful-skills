@@ -6,7 +6,7 @@ import test from "node:test";
 import { GENERATED_MARKER, isGeneratedAgent } from "../model-roles.js";
 import { removeOmpAgents, syncOmpAgents } from "../omp/agents-sync.js";
 
-const BUNDLED = ["backend", "frontend", "planner"];
+const BUNDLED = ["backend", "frontend", "planner", "release-assessor"];
 
 async function host(t) {
   const root = await mkdtemp(path.join(os.tmpdir(), "us-omp-agents-"));
@@ -33,7 +33,7 @@ test("sync writes the bundled agents as marked files whose frontmatter still par
   const result = await syncOmpAgents({ agentDir: h.agentDir });
 
   assert.equal(result.directory, h.agents);
-  assert.deepEqual(states(result), { backend: "created", frontend: "created", planner: "created" });
+  assert.deepEqual(states(result), { backend: "created", frontend: "created", planner: "created", "release-assessor": "created" });
   assert.deepEqual((await readdir(h.agents)).sort(), BUNDLED.map(name => `${name}.md`));
 
   for (const name of BUNDLED) {
@@ -67,7 +67,7 @@ test("a user-owned agent with a bundled name is a conflict and stays byte for by
 
   const result = await syncOmpAgents({ agentDir: h.agentDir });
 
-  assert.deepEqual(states(result), { backend: "created", frontend: "conflict", planner: "conflict" });
+  assert.deepEqual(states(result), { backend: "created", frontend: "conflict", planner: "conflict", "release-assessor": "created" });
   assert.equal(await readFile(path.join(h.agents, "planner.md"), "utf8"), mine);
   assert.match(await readFile(path.join(h.agents, "frontend.md"), "utf8"), /^---\nname: frontend/);
 });
@@ -105,7 +105,7 @@ test("sync removes generated agents that are no longer bundled and keeps the use
 
   const result = await syncOmpAgents({ agentDir: h.agentDir, sourceDir: source });
 
-  assert.deepEqual(states(result), { backend: "removed", frontend: "removed", planner: "removed", scout: "created" });
+  assert.deepEqual(states(result), { backend: "removed", frontend: "removed", planner: "removed", "release-assessor": "removed", scout: "created" });
   assert.deepEqual((await readdir(h.agents)).sort(), ["mine.md", "notes.txt", "scout.md"]);
 });
 

@@ -42,11 +42,13 @@ test("native boolean switches independently gate workflow stages; malformed opti
   const disabled = readClaudeSettings({
     CLAUDE_PLUGIN_OPTION_PLAN: "false",
     CLAUDE_PLUGIN_OPTION_SECURITY_REVIEW: "false",
+    CLAUDE_PLUGIN_OPTION_RELEASE_ASSESSMENT: "false",
     CLAUDE_PLUGIN_OPTION_CODE_GRAPH: "false",
   });
   const policy = effectiveWorkflow(disabled);
   assert.equal(policy.stages.plan.effective, "disabled");
   assert.equal(policy.stages["security-review"].effective, "disabled");
+  assert.equal(policy.stages["release-assessment"].effective, "disabled");
   assert.equal(policy.stages["code-graph"].effective, "disabled");
   assert.equal(policy.stages.research.effective, "enabled");
   assert.equal(policy.stages.review.effective, "enabled");
@@ -83,6 +85,26 @@ test("native boolean switches independently gate workflow stages; malformed opti
     CLAUDE_PLUGIN_OPTION_REVIEW: "invalid",
   }));
   assert.equal(masterOff.stages.review.effective, "disabled");
+});
+
+test("the release-assessment stage shows in the prompt context as enabled, then disabled, then enabled again", async t => {
+  const isolated = await workspace(t);
+  const prompt = () => {
+    const result = run("UserPromptSubmit", { hook_event_name: "UserPromptSubmit", prompt: "hello", cwd: isolated.cwd }, isolated.environment);
+    assert.equal(result.status, 0);
+    return JSON.parse(result.stdout).hookSpecificOutput.additionalContext;
+  };
+  const setStage = enabled => writeWorkflowSetting({ agentDir: isolated.configDir, cwd: isolated.cwd, key: "release-assessment", enabled });
+
+  assert.match(prompt(), /Automatic release-assessment stage enabled when applicable; consult `harness-useful-skills:us-assess-release`/);
+
+  await setStage(false);
+  const disabled = prompt();
+  assert.match(disabled, /Automatic release-assessment stage disabled; do not require it automatically/);
+  assert.match(disabled, /Automatic security-review stage enabled when applicable/, "other stages are unaffected");
+
+  await setStage(true);
+  assert.match(prompt(), /Automatic release-assessment stage enabled when applicable/);
 });
 
 test("only an attested direct plugin skill expansion opts this request out", () => {

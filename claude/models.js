@@ -20,6 +20,7 @@ export const DEFAULT_ROLES = Object.freeze({
   review: "claude-sonnet-5-5:medium",
   security: "claude-opus-5-5:high",
   plan: "claude-opus-5-5:high",
+  assess: "inherit",
   default: "claude-opus-5-5:medium",
 });
 
@@ -45,7 +46,7 @@ function defaultConfig() {
     "# Useful Skills model roles for Claude Code.",
     "# Selector: <model>[:<effort>]. Model is a Claude model ID or alias (opus, sonnet, haiku, fable, inherit);",
     "# an OMP-style \"anthropic/\" prefix is accepted. Effort: low, medium, high, xhigh, max.",
-    "# A missing role uses `default`. Changes apply to Claude Code sessions started afterwards.",
+    "# A missing role uses `default`, except `assess`, which then inherits the session model. Changes apply to Claude Code sessions started afterwards.",
     "modelRoles:",
     ...rows,
     "",

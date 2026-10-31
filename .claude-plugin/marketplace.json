@@ -30,7 +30,8 @@
         "./claude/skills/us-grill-me/",
         "./claude/skills/us-check-code-quality/",
         "./claude/skills/us-check-performance/",
-        "./claude/skills/us-check-security/"
+        "./claude/skills/us-check-security/",
+        "./claude/skills/us-assess-release/"
       ]
     }
   ]

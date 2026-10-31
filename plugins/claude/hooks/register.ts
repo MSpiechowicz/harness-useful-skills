@@ -31,6 +31,7 @@ const OPTION_ENV: Readonly<Record<string, string>> = {
   plan: 'CLAUDE_PLUGIN_OPTION_PLAN',
   review: 'CLAUDE_PLUGIN_OPTION_REVIEW',
   security_review: 'CLAUDE_PLUGIN_OPTION_SECURITY_REVIEW',
+  release_assessment: 'CLAUDE_PLUGIN_OPTION_RELEASE_ASSESSMENT',
   backend_memory: 'CLAUDE_PLUGIN_OPTION_BACKEND_MEMORY',
   code_graph: 'CLAUDE_PLUGIN_OPTION_CODE_GRAPH',
   // Deprecated name of code_graph, read by the CLI only while code_graph is unset.
@@ -52,6 +53,9 @@ const STAGES_FIRST: readonly Stage[] = [
 ]
 const STAGES_SECOND: readonly Stage[] = [
   { key: 'security-review', label: 'Security review' },
+  { key: 'release-assessment', label: 'Release assessment' },
+]
+const STAGES_THIRD: readonly Stage[] = [
   { key: 'backend-memory', label: 'Backend memory' },
   { key: 'code-graph', label: 'Code graph' },
 ]
@@ -219,6 +223,17 @@ function stagesMenu(header: string, stages: readonly Stage[], saved: Record<stri
 function buildMenu(saved: Record<string, string>): Menu {
   const workflow = saved.workflow ?? 'unknown'
 
+  const stages: Menu = {
+    question: 'Which stages?',
+    header: 'Stages',
+    choices: [
+      { label: 'Stages 1/3', menu: stagesMenu('Stages 1/3', STAGES_FIRST, saved) },
+      { label: 'Stages 2/3', menu: stagesMenu('Stages 2/3', STAGES_SECOND, saved) },
+      { label: 'Stages 3/3', menu: stagesMenu('Stages 3/3', STAGES_THIRD, saved) },
+      { label: 'Back', back: true },
+    ],
+  }
+
   const settings: Menu = {
     question: 'Which setting?',
     header: 'Settings',
@@ -227,8 +242,7 @@ function buildMenu(saved: Record<string, string>): Menu {
         label: `Repository workflow (${workflow})`,
         menu: modeMenu('repository workflow', 'Workflow', workflow, ['workflow']),
       },
-      { label: 'Stages 1/2', menu: stagesMenu('Stages 1/2', STAGES_FIRST, saved) },
-      { label: 'Stages 2/2', menu: stagesMenu('Stages 2/2', STAGES_SECOND, saved) },
+      { label: 'Stages…', menu: stages },
       { label: 'Back', back: true },
     ],
   }

@@ -29,9 +29,26 @@ export const ROLE_AGENTS = Object.freeze({
   "general-purpose": "implementation",
   reviewer: "review",
   "security-reviewer": "security",
+  "release-assessor": "assess",
 });
 
-export const ROLES = Object.freeze(["research", "frontend", "backend", "implementation", "review", "security", "plan", "default"]);
+export const ROLES = Object.freeze(["research", "frontend", "backend", "implementation", "review", "security", "plan", "assess", "default"]);
+
+/** Roles whose missing row inherits the host's session model instead of using `default`. */
+export const INHERIT_WHEN_ABSENT = Object.freeze(new Set(["assess"]));
+
+/** The selection for a role: its own row, else `fallback` for an inherit-when-absent role, else `default`, else `fallback`. */
+export function roleSelection(roles, role, fallback) {
+  if (Object.hasOwn(roles, role)) {
+    return roles[role];
+  }
+
+  if (INHERIT_WHEN_ABSENT.has(role)) {
+    return fallback;
+  }
+
+  return roles.default ?? fallback;
+}
 
 /**
  * A strict YAML subset: comments, a `modelRoles:` key, and indented `role: selector` rows.
@@ -140,7 +157,8 @@ export function readOptional(file) {
  * - `defaultConfig`: text written when `configFile` does not exist.
  * - `parseSelector(role, raw)`: the host's selector syntax (see parseModelsConfig).
  * - `render(agent, selection)`: the full generated agent text.
- * - `fallback`: the selection when neither the agent's role nor `default` is configured.
+ * - `fallback`: the selection when neither the agent's role nor `default` is configured, and for a role in
+ *   INHERIT_WHEN_ABSENT whose row is missing.
  *
  * Returns `{ configFile, created, agents }` where each agent maps to `{ state, file, selection }` and state is
  * created, updated, ready, or conflict; an invalid config instead returns `{ configFile, created, error, agents: {} }`.
@@ -165,7 +183,7 @@ export function syncRoleAgents({ configFile, agentFile, defaultConfig, parseSele
   const agents = {};
   for (const [agent, role] of Object.entries(ROLE_AGENTS)) {
     const file = agentFile(agent);
-    const selection = roles[role] ?? roles.default ?? fallback;
+    const selection = roleSelection(roles, role, fallback);
     const existing = readOptional(file);
     if (existing !== undefined && !isGeneratedAgent(existing)) {
       agents[agent] = { state: "conflict", file, selection };

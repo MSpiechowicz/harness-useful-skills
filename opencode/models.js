@@ -19,7 +19,7 @@ const HEADER = [
   "# Selector: <provider>/<model>[:<variant>], for example anthropic/claude-sonnet-4-5:high.",
   `# Variant: ${VARIANTS.join(", ")}; any other \`:suffix\` stays part of the model ID.`,
   "# Every role inherits the session model. Replace `inherit` with a selector to give a role its own model.",
-  "# `default` applies only to a role whose row is removed.",
+  "# `default` applies only to a role whose row is removed, except `assess`, which then inherits.",
   "# Changes apply to OpenCode sessions started afterwards.",
   "modelRoles:",
 ];

@@ -56,7 +56,7 @@ function collectOutput(sourceRoot, adapt) {
     }
   }
   output.set('us-check-code-quality/CODE_QUALITY.md', readFileSync(join(sourceRoot, 'us-check-code-quality', 'CODE_QUALITY.md'), 'utf8'));
-  if (names.length !== 21) throw new Error('Expected exactly 21 canonical skills');
+  if (names.length !== 22) throw new Error('Expected exactly 22 canonical skills');
   return output;
 }
 

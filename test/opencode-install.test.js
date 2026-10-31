@@ -7,7 +7,7 @@ import { installOpenCode } from "../opencode/install.js";
 import { inspectOpenCodeInstall } from "../opencode/install-status.js";
 import { createInstallSandbox, writeBundle } from "./helpers/opencode-install-fixture.js";
 
-const AGENTS = ["backend", "frontend", "general-purpose", "planner", "reviewer", "scout", "security-reviewer"];
+const AGENTS = ["backend", "frontend", "general-purpose", "planner", "release-assessor", "reviewer", "scout", "security-reviewer"];
 
 function setup(t, bundleOptions) {
   const box = createInstallSandbox();
@@ -303,7 +303,7 @@ test("the status report describes a healthy, a modified and a missing install", 
   const healthy = status();
   assert.match(healthy, /Useful Skills 1\.0\.0/);
   assert.match(healthy, /0 modified, 0 missing/);
-  assert.match(healthy, /Agents: 7 of 7/);
+  assert.match(healthy, /Agents: 8 of 8/);
   assert.match(healthy, /has mcp\.harness-useful-skills, as installed/);
   assert.match(healthy, /present, mode 700/);
 

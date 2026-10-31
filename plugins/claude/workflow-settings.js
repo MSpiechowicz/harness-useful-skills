@@ -7,7 +7,7 @@ import { migrateDataDirectory } from "./data-migration.js";
 import { DATA_DIRECTORY } from "./names.js";
 
 export const STAGES = Object.freeze([
-  "research", "plan", "review", "security-review", "backend-memory", "code-graph",
+  "research", "plan", "review", "security-review", "release-assessment", "backend-memory", "code-graph",
 ]);
 // Setting files from before the Graphify retirement: read only while the current file is missing.
 const LEGACY_KEYS = Object.freeze({ "code-graph": "graphify-memory" });

@@ -78,12 +78,13 @@ describe('useful-skills command with arguments', () => {
       CLAUDE_PLUGIN_OPTION_PLAN: 'true',
       CLAUDE_PLUGIN_OPTION_REVIEW: 'true',
       CLAUDE_PLUGIN_OPTION_SECURITY_REVIEW: 'true',
+      CLAUDE_PLUGIN_OPTION_RELEASE_ASSESSMENT: 'true',
       CLAUDE_PLUGIN_OPTION_BACKEND_MEMORY: 'true',
       CLAUDE_PLUGIN_OPTION_GRAPHIFY_MEMORY: 'true',
     })
   })
 
-  test('maps configured false options to "false"', { options: { workflow: false, security_review: false } }, async ($, on) => {
+  test('maps configured false options to "false"', { options: { workflow: false, security_review: false, release_assessment: false } }, async ($, on) => {
     const calls = fakeCli(on, () => ({ stdout: 'ok' }))
 
     await runCommand($, 'status')
@@ -91,6 +92,7 @@ describe('useful-skills command with arguments', () => {
     expect(calls[0]!.env).toMatchObject({
       CLAUDE_PLUGIN_OPTION_WORKFLOW: 'false',
       CLAUDE_PLUGIN_OPTION_SECURITY_REVIEW: 'false',
+      CLAUDE_PLUGIN_OPTION_RELEASE_ASSESSMENT: 'false',
     })
   })
 
@@ -112,18 +114,55 @@ describe('useful-skills command with arguments', () => {
 })
 
 describe('useful-skills interactive menu', () => {
-  test('walks Settings, Stages 1/2, Plan, Disabled to the stage command', async ($, on) => {
+  test('walks Settings, Stages…, Stages 1/3, Plan, Disabled to the stage command', async ($, on) => {
     const calls = fakeCli(on, tokens => ({ stdout: tokens[0] === 'status' ? STATUS_JSON : 'Plan stage: disabled.' }))
-    const asked = fakeUser(on, ['Settings', 'Stages 1/2', 'Plan (disabled)', 'Disabled'])
+    const asked = fakeUser(on, ['Settings', 'Stages…', 'Stages 1/3', 'Plan (disabled)', 'Disabled'])
 
     const result = await runCommand($, '')
 
     expect(result.text).toBe('Plan stage: disabled.')
     expect(calls.map(call => call.argv.slice(2))).toEqual([['status', '--json'], ['stage', 'plan', 'disabled']])
     expect(asked[0]!.options).toEqual(['Settings', 'Status', 'Browse', 'Help'])
-    expect(asked[1]!.options).toEqual(['Repository workflow (enabled)', 'Stages 1/2', 'Stages 2/2', 'Back'])
-    expect(asked[2]!.options).toEqual(['Research (enabled)', 'Plan (disabled)', 'Review (unknown)', 'Back'])
-    expect(asked[3]!.options).toEqual(['Enabled', 'Disabled', 'Back'])
+    expect(asked[1]!.options).toEqual(['Repository workflow (enabled)', 'Stages…', 'Back'])
+    expect(asked[2]!.options).toEqual(['Stages 1/3', 'Stages 2/3', 'Stages 3/3', 'Back'])
+    expect(asked[3]!.options).toEqual(['Research (enabled)', 'Plan (disabled)', 'Review (unknown)', 'Back'])
+    expect(asked[4]!.options).toEqual(['Enabled', 'Disabled', 'Back'])
+  })
+
+  test('walks Settings, Stages…, Stages 2/3, Release assessment, Enabled to the stage command', async ($, on) => {
+    const calls = fakeCli(on, tokens => ({ stdout: tokens[0] === 'status' ? STATUS_JSON : 'Release assessment stage: enabled.' }))
+    const asked = fakeUser(on, ['Settings', 'Stages…', 'Stages 2/3', 'Release assessment (unknown)', 'Enabled'])
+
+    const result = await runCommand($, '')
+
+    expect(result.text).toBe('Release assessment stage: enabled.')
+    expect(calls.map(call => call.argv.slice(2))).toEqual([['status', '--json'], ['stage', 'release-assessment', 'enabled']])
+    expect(asked[3]!.options).toEqual(['Security review (unknown)', 'Release assessment (unknown)', 'Back'])
+    expect(asked[4]!.options).toEqual(['Enabled', 'Disabled', 'Back'])
+  })
+
+  test('Stages 3/3 lists Backend memory and Code graph', async ($, on) => {
+    const calls = fakeCli(on, tokens => ({ stdout: tokens[0] === 'status' ? STATUS_JSON : 'Code graph stage: disabled.' }))
+    const asked = fakeUser(on, ['Settings', 'Stages…', 'Stages 3/3', 'Code graph (unknown)', 'Disabled'])
+
+    await runCommand($, '')
+
+    expect(asked[3]!.options).toEqual(['Backend memory (unknown)', 'Code graph (unknown)', 'Back'])
+    expect(calls.at(-1)!.argv.slice(2)).toEqual(['stage', 'code-graph', 'disabled'])
+  })
+
+  test('Back walks from a stage list through Stages… to Settings and the main menu', async ($, on) => {
+    const calls = fakeCli(on, tokens => ({ stdout: tokens[0] === 'status' ? STATUS_JSON : 'help text' }))
+    const asked = fakeUser(on, ['Settings', 'Stages…', 'Stages 2/3', 'Back', 'Back', 'Back', 'Help'])
+
+    const result = await runCommand($, '')
+
+    expect(result.text).toBe('help text')
+    expect(asked.map(question => question.options[0])).toEqual([
+      'Settings', 'Repository workflow (enabled)', 'Stages 1/3', 'Security review (unknown)',
+      'Stages 1/3', 'Repository workflow (enabled)', 'Settings',
+    ])
+    expect(calls.at(-1)!.argv.slice(2)).toEqual(['help'])
   })
 
   test('Back returns to the parent menu', async ($, on) => {

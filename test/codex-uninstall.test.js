@@ -27,7 +27,7 @@ test("uninstall unregisters everything it added, removes its files and record, a
 
   const message = box.uninstall();
 
-  assert.match(message, /Uninstalled Useful Skills 0\.3\.11 from Codex .*: 18 files removed\./);
+  assert.match(message, /Uninstalled Useful Skills 0\.3\.11 from Codex .*: 20 files removed\./);
   assert.match(message, /Removed MCP server harness-useful-skills\.\nRemoved plugin harness-useful-skills@harness-useful-skills\.\nRemoved marketplace harness-useful-skills\./);
   assert.match(message, /Kept the data directory .*harness-useful-skills\/data/);
   assert.deepEqual(changes(box.calls()), ["mcp remove harness-useful-skills", "plugin remove harness-useful-skills@harness-useful-skills", "plugin marketplace remove harness-useful-skills"]);
@@ -44,7 +44,7 @@ test("uninstall keeps files edited since the install and says so", async (t) => 
 
   const message = box.uninstall();
 
-  assert.match(message, /16 files removed/);
+  assert.match(message, /18 files removed/);
   assert.match(message, /Left in place for you to review or delete:\n {2}.*agents\/us-planner\.toml \(modified since it was installed\)\n {2}.*runtime\/memory\.js \(modified since it was installed\)/);
   assert.equal(readFileSync(box.at("agents", "us-planner.toml"), "utf8"), "mine\n");
   assert.equal(existsSync(box.at("agents", "us-scout.toml")), false);
@@ -91,7 +91,7 @@ test("a failing Codex command stops the uninstall before files are removed; runn
   assert.ok(existsSync(box.at("agents", "us-planner.toml")));
 
   const message = box.uninstall();
-  assert.match(message, /18 files removed/);
+  assert.match(message, /20 files removed/);
   assert.doesNotMatch(message, /MCP server/);
   assert.deepEqual(box.state().marketplaces, []);
 });

@@ -41,9 +41,9 @@ test("invalid core frontmatter is not presented as a callable skill", async (t) 
 
 test("package core agents resolve from omp/agents while explicit roots keep <root>/agents", async (t) => {
   const agents = await listResources("agents");
-  assert.deepEqual(agents.map(x => x.name), ["backend", "frontend", "planner"]);
+  assert.deepEqual(agents.map(x => x.name), ["backend", "frontend", "planner", "release-assessor"]);
   assert.ok(agents.every(agent => agent.path.startsWith("omp/agents/")));
-  assert.equal((await resourceInventory()).agents, 3);
+  assert.equal((await resourceInventory()).agents, 4);
 
   const { root } = await fixture(t);
   await mkdir(path.join(root, "agents"));

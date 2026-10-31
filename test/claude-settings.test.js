@@ -145,6 +145,26 @@ test("legacy graphify_memory applies while code_graph is unset, and an explicit 
   assert.equal(enabled.values["code-graph"], true);
 });
 
+test("plugin.json declares release_assessment as a boolean that defaults to enabled, after security_review", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const manifest = JSON.parse(await readFile(new URL("../.claude-plugin/plugin.json", import.meta.url), "utf8"));
+  const keys = Object.keys(manifest.userConfig);
+  assert.equal(manifest.userConfig.release_assessment.type, "boolean");
+  assert.equal(manifest.userConfig.release_assessment.default, true);
+  assert.equal(keys.indexOf("release_assessment"), keys.indexOf("security_review") + 1);
+});
+
+test("a release_assessment plugin option gates only the release-assessment stage", async t => {
+  const f = await fixture(t);
+  const read = environment => readClaudeWorkflow({ environment: f.environment(environment), cwd: f.repo });
+
+  const off = await read({ CLAUDE_PLUGIN_OPTION_RELEASE_ASSESSMENT: "false" });
+  assert.equal(off.values["release-assessment"], false);
+  assert.equal(off.values["security-review"], true, "other stages keep their default");
+  const on = await read({ CLAUDE_PLUGIN_OPTION_RELEASE_ASSESSMENT: "true" });
+  assert.equal(on.values["release-assessment"], true);
+});
+
 test("plugin.json gives code_graph no default", async () => {
   const { readFile } = await import("node:fs/promises");
   const manifest = JSON.parse(await readFile(new URL("../.claude-plugin/plugin.json", import.meta.url), "utf8"));

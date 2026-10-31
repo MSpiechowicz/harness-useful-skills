@@ -20,7 +20,8 @@
     "./claude/agents/backend.md",
     "./claude/agents/general-purpose.md",
     "./claude/agents/reviewer.md",
-    "./claude/agents/security-reviewer.md"
+    "./claude/agents/security-reviewer.md",
+    "./claude/agents/release-assessor.md"
   ],
   "mcpServers": {
     "harness-useful-skills": {
@@ -57,6 +58,12 @@
       "type": "boolean",
       "title": "Security review stage",
       "description": "Review authorized changes for security issues. A saved /useful-skills setting overrides this.",
+      "default": true
+    },
+    "release_assessment": {
+      "type": "boolean",
+      "title": "Release assessment stage",
+      "description": "Rate the review tier and release confidence of finished changes. A saved /useful-skills setting overrides this.",
       "default": true
     },
     "backend_memory": {

@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { handleHook } from "../claude/hooks.js";
-import { modelRoutingContext, modelsConfigPath, parseModelsConfig, syncRoleAgents } from "../claude/models.js";
+import { modelRoutingContext, modelsConfigPath, parseModelsConfig, renderAgent, syncRoleAgents } from "../claude/models.js";
+import { ROLE_AGENTS } from "../model-roles.js";
 import { readClaudeWorkflow } from "../claude/settings.js";
 
 async function configDir(t) {
@@ -30,12 +31,14 @@ test("first session creates the default model config and one role agent per plug
   const config = await readFile(result.configFile, "utf8");
   assert.match(config, /^ {2}default: claude-opus-5-5:medium$/m);
   assert.match(config, /^ {2}review: claude-sonnet-5-5:medium$/m);
+  assert.match(config, /^ {2}assess: inherit$/m);
 
   assert.deepEqual((await readdir(path.join(directory, "agents"))).sort(), [
     "harness-useful-skills-backend.md",
     "harness-useful-skills-frontend.md",
     "harness-useful-skills-general-purpose.md",
     "harness-useful-skills-planner.md",
+    "harness-useful-skills-release-assessor.md",
     "harness-useful-skills-reviewer.md",
     "harness-useful-skills-scout.md",
     "harness-useful-skills-security-reviewer.md",
@@ -48,7 +51,41 @@ test("first session creates the default model config and one role agent per plug
   assert.doesNotMatch(backend, /the plugin's `claude\//);
   const general = await readFile(agentPath(directory, "general-purpose"), "utf8");
   assert.match(general, /^model: claude-sonnet-5-5$/m);
+  const assessor = await readFile(agentPath(directory, "release-assessor"), "utf8");
+  assert.match(assessor, /^name: us-release-assessor$/m);
+  assert.match(assessor, /^model: inherit$/m);
+  assert.doesNotMatch(assessor, /^effort:/m);
   assert.ok(Object.values(result.agents).every(agent => agent.state === "created"));
+});
+
+test("a config with only a default row gives the release assessor the session model and every other role the default", async t => {
+  const directory = await configDir(t);
+  await mkdir(path.dirname(modelsConfigPath(directory)), { recursive: true });
+  await writeFile(modelsConfigPath(directory), "modelRoles:\n  default: claude-opus-5-5:medium\n");
+
+  const result = syncRoleAgents({ configDir: directory });
+
+  assert.equal(result.error, undefined);
+  assert.deepEqual(result.agents["release-assessor"].selection, { model: "inherit" });
+  const assessor = await readFile(agentPath(directory, "release-assessor"), "utf8");
+  assert.match(assessor, /^model: inherit$/m);
+  assert.doesNotMatch(assessor, /^effort:/m);
+  const scout = await readFile(agentPath(directory, "scout"), "utf8");
+  assert.match(scout, /^model: claude-opus-5-5$/m);
+  assert.match(scout, /^effort: medium$/m);
+  assert.match(modelRoutingContext(result), /harness-useful-skills:release-assessor: dispatch `us-release-assessor` \(inherit\)/);
+  assert.equal(await readFile(modelsConfigPath(directory), "utf8"), "modelRoles:\n  default: claude-opus-5-5:medium\n", "the user's file is not rewritten");
+});
+
+test("an explicit assess row sets the release assessor model", async t => {
+  const directory = await configDir(t);
+  await mkdir(path.dirname(modelsConfigPath(directory)), { recursive: true });
+  await writeFile(modelsConfigPath(directory), "modelRoles:\n  default: sonnet\n  assess: claude-opus-5-5:high\n");
+
+  const result = syncRoleAgents({ configDir: directory });
+
+  assert.deepEqual(result.agents["release-assessor"].selection, { model: "claude-opus-5-5", effort: "high" });
+  assert.match(await readFile(agentPath(directory, "release-assessor"), "utf8"), /^model: claude-opus-5-5$/m);
 });
 
 test("later sessions regenerate only changed agents and fall back to the default role", async t => {
@@ -144,4 +181,22 @@ test("a symlinked useful-skills directory is not followed or made private", asyn
 
   syncRoleAgents({ configDir: directory });
   assert.equal(await permissions(target), 0o755);
+});
+
+test("generated role agents name plugin files by absolute path, never relative to the checkout", () => {
+  for (const agent of Object.keys(ROLE_AGENTS)) {
+    const text = renderAgent(agent, { model: "inherit" }, { pluginRoot: process.cwd(), configFile: "models.yml" });
+    assert.doesNotMatch(text, /`claude\/skills\//, agent);
+  }
+});
+
+test("agent descriptions are plain YAML scalars on every host", async () => {
+  for (const dir of ["claude/agents", "opencode/agents", "omp/agents"]) {
+    for (const file of await readdir(dir)) {
+      const text = await readFile(path.join(dir, file), "utf8");
+      const description = /^description: (.*)$/m.exec(text)?.[1];
+      assert.ok(description, `${dir}/${file}`);
+      assert.doesNotMatch(description, /: |:$/, `${dir}/${file}`);
+    }
+  }
 });

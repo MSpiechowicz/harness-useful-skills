@@ -22,13 +22,13 @@ test("repository guidance refreshes across sessions, cwd changes and instances, 
   assert.equal(defaults.length, 3 + STAGES.length);
   assert.equal(await f.events.get("before_agent_start")({ systemPrompt: defaults }, f.ctx), undefined);
 
-  for (const stage of ["plan", "security-review", "backend-memory"]) {
+  for (const stage of ["plan", "security-review", "release-assessment", "backend-memory"]) {
     await handler(`stage ${stage} disabled`, f.ctx);
   }
   const selective = await request(f, defaults, "Document /skill:us-ignore-workflow for users.");
   assert.equal(selective[0], external);
   assert.equal(selective.length, defaults.length);
-  assert.equal(selective.filter((line, index) => line !== defaults[index]).length, 3);
+  assert.equal(selective.filter((line, index) => line !== defaults[index]).length, 4);
   assert.deepEqual(await request(f, selective, "fix an import"), selective, "prompt text does not classify the lane");
 
   await handler("workflow disabled", f.ctx);

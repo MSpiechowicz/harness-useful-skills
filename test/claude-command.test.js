@@ -139,6 +139,11 @@ test("a saved stage overrides its plugin option and underscore aliases name hyph
   assert.deepEqual(alias, { text: "Useful Skills security-review disabled for this Claude profile.", exitCode: 0 });
   assert.equal(await readFile(path.join(f.stageDirectory, "security-review.json"), "utf8"), "false");
 
+  const assessment = await f.run(["stage", "release_assessment", "disabled"]);
+  assert.deepEqual(assessment, { text: "Useful Skills release-assessment disabled for this Claude profile.", exitCode: 0 });
+  assert.equal(await readFile(path.join(f.stageDirectory, "release-assessment.json"), "utf8"), "false");
+  assert.equal((await statusJson(f)).stages["release-assessment"].effective, "disabled");
+
   const invalidOption = await statusJson(f, { options: { CLAUDE_PLUGIN_OPTION_REVIEW: "maybe" } });
   assert.equal(invalidOption.stages.review.source, "option");
   assert.equal(invalidOption.stages.review.saved, "unknown");

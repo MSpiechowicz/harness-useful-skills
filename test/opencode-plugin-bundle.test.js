@@ -87,16 +87,16 @@ test("the runtime manifest carries the package version", async () => {
   assert.equal(bundled.type, "module");
 });
 
-test("the bundle ships the 21 canonical skills, 7 agent templates and 2 commands", async () => {
+test("the bundle ships the 22 canonical skills, 8 agent templates and 2 commands", async () => {
   const canonical = (await readdir(path.join(ROOT, "skills"), { withFileTypes: true }))
     .filter(entry => entry.isDirectory() && entry.name.startsWith("us-")).map(entry => entry.name).sort();
   const skills = (await readdir(path.join(RUNTIME, "opencode", "skills"))).sort();
-  assert.equal(skills.length, 21);
+  assert.equal(skills.length, 22);
   assert.deepEqual(skills, canonical);
   for (const skill of skills) assert.ok(await exists(path.join(RUNTIME, "opencode", "skills", skill, "SKILL.md")), skill);
 
   const agents = await readdir(path.join(RUNTIME, "opencode", "agents"));
-  assert.deepEqual(agents.sort(), ["backend", "frontend", "general-purpose", "planner", "reviewer", "scout", "security-reviewer"].map(name => `${name}.md`));
+  assert.deepEqual(agents.sort(), ["backend", "frontend", "general-purpose", "planner", "release-assessor", "reviewer", "scout", "security-reviewer"].map(name => `${name}.md`));
   assert.deepEqual((await readdir(path.join(RUNTIME, "opencode", "commands"))).sort(), ["us-ignore-workflow.md", "useful-skills.md"]);
 });
 
@@ -123,11 +123,11 @@ test("the entry module carries one definition both OpenCode plugin APIs accept w
   assert.equal(typeof entry.default.setup, "function");
 });
 
-test("the bundled command lists the 21 shipped skills", async t => {
+test("the bundled command lists the 22 shipped skills", async t => {
   const { cwd, env } = await isolated(t);
   const result = await execute(process.execPath, [path.join(RUNTIME, "opencode", "command.js"), "list"], { cwd, env });
   const names = [...result.stdout.matchAll(/^\s+(us-[a-z-]+)/gm)].map(match => match[1]);
-  assert.equal(names.length, 21);
+  assert.equal(names.length, 22);
   assert.ok(!names.includes("us-library"));
 });
 

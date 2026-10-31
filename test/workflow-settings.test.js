@@ -37,7 +37,7 @@ test("reads defaults without creating state and persists repository master and p
   await writeWorkflowSetting({ ...f.options, key: "workflow", enabled: true });
   const resumed = await readWorkflowSettings(f.options);
   assert.deepEqual(resumed.values, { workflow: true, research: false, plan: true, review: false,
-    "security-review": true, "backend-memory": true, "code-graph": true });
+    "security-review": true, "release-assessment": true, "backend-memory": true, "code-graph": true });
   assert.deepEqual(resumed.errors, {});
   assert.deepEqual((await readWorkflowSettings({ agentDir: f.otherProfile, cwd: f.cwd })).values,
     Object.fromEntries(keys.map(key => [key, true])));
@@ -191,7 +191,7 @@ test("sources report whether each value came from a saved file, a missing file, 
   await writeFile(path.join(f.directory, "review.json"), "not json", { mode: 0o600 });
   const saved = await readWorkflowSettings(f.options);
   assert.deepEqual(saved.sources, { workflow: "file", research: "default", plan: "file", review: "error",
-    "security-review": "default", "backend-memory": "default", "code-graph": "default" });
+    "security-review": "default", "release-assessment": "default", "backend-memory": "default", "code-graph": "default" });
 
   const unscoped = await readWorkflowSettings({ agentDir: f.agentDir });
   assert.equal(unscoped.sources.workflow, "error");

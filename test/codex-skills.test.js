@@ -24,7 +24,7 @@ test("rendered Codex skills match the canonical sources", async () => {
 
 test("every Codex skill has only name and description in its frontmatter", async () => {
   const folders = (await readdir(SKILLS, { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => entry.name);
-  assert.equal(folders.length, 21);
+  assert.equal(folders.length, 22);
 
   for (const folder of folders) {
     const rows = frontmatterOf(await readFile(path.join(SKILLS, folder, "SKILL.md"), "utf8"));

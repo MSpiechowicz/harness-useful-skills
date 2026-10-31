@@ -36,6 +36,7 @@ const DOCTOR_BUDGET_MS = 540_000;
 const MODES = Object.freeze(["enabled", "disabled"]);
 const STAGE_ALIASES = Object.freeze({
   security_review: "security-review",
+  release_assessment: "release-assessment",
   backend_memory: "backend-memory",
   code_graph: "code-graph",
   // Names from before the Graphify retirement keep working.
@@ -47,6 +48,7 @@ const STAGE_LABELS = Object.freeze({
   plan: "Plan",
   review: "Review",
   "security-review": "Security review",
+  "release-assessment": "Release assessment",
   "backend-memory": "Backend memory",
   "code-graph": "Code graph",
 });

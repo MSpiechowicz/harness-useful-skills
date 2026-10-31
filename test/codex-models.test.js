@@ -10,7 +10,7 @@ import { applyCodexModels, formatApplied } from "../codex/apply-models.js";
 import { AGENT_ROLES } from "../codex/agents.js";
 import { installCodex } from "../codex/install.js";
 import { inspectCodexInstall } from "../codex/install-status.js";
-import { DEFAULT_MODELS, parseCodexSelector, readCodexModels, renderCodexAgent } from "../codex/models.js";
+import { DEFAULT_MODELS, parseCodexSelector, readCodexModels, renderCodexAgent, selectionFor } from "../codex/models.js";
 import { readCodexRecord } from "../codex/paths.js";
 import { parseModelsConfig } from "../model-roles.js";
 import { sha256 } from "../opencode/install-files.js";
@@ -51,7 +51,7 @@ test("selectors: a model with an optional effort, inherit, and inherit with an e
 
 test("the default file lists every role as inherit and parses with the shared schema", () => {
   const roles = parseModelsConfig(DEFAULT_MODELS, parseCodexSelector);
-  assert.deepEqual(Object.keys(roles).sort(), ["backend", "default", "frontend", "implementation", "plan", "research", "review", "security"]);
+  assert.deepEqual(Object.keys(roles).sort(), ["assess", "backend", "default", "frontend", "implementation", "plan", "research", "review", "security"]);
   assert.ok(Object.values(roles).every(({ model, effort }) => model === null && effort === undefined));
 });
 
@@ -94,6 +94,23 @@ test("the installer writes the configured model of each role, falling back to de
 
   const record = box.record();
   assert.equal(record.files["agents/us-reviewer.toml"], sha256(readFileSync(box.at("agents", "us-reviewer.toml"))));
+});
+
+test("a models file with only a default row gives the release assessor the Codex setting and the other roles the default", async t => {
+  const box = setup(t);
+  box.writeModels("modelRoles:\n  default: gpt-5.4:low\n");
+
+  await box.install();
+
+  assert.doesNotMatch(box.agent("release-assessor"), /^model(_reasoning_effort)? =/m, "an absent assess row inherits");
+  assert.match(box.agent("scout"), /^model = "gpt-5\.4"\nmodel_reasoning_effort = "low"$/m);
+  assert.deepEqual(selectionFor("release-assessor", readCodexModels(box.codexHome).roles), { model: null, effort: undefined });
+  assert.equal(readFileSync(box.modelsFile, "utf8"), "modelRoles:\n  default: gpt-5.4:low\n", "the user's file is not rewritten");
+
+  box.writeModels("modelRoles:\n  default: gpt-5.4:low\n  assess: gpt-5.5:high\n");
+  await box.apply();
+
+  assert.match(box.agent("release-assessor"), /^model = "gpt-5\.5"\nmodel_reasoning_effort = "high"$/m);
 });
 
 test("an install over an install applies a changed models file to the agents", async t => {

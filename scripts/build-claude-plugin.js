@@ -30,7 +30,7 @@ const FILES = [
   'claude/settings.js', 'claude/context.js', 'claude/host-context.js',
   'claude/agents/backend.md', 'claude/agents/frontend.md', 'claude/agents/general-purpose.md',
   'claude/agents/planner.md', 'claude/agents/reviewer.md', 'claude/agents/scout.md',
-  'claude/agents/security-reviewer.md',
+  'claude/agents/security-reviewer.md', 'claude/agents/release-assessor.md',
   // Hook registration.
   'hooks/hooks.json', 'hooks/register.ts',
   // Licenses: claude/skills carries text derived from every upstream below, so all of them ship.

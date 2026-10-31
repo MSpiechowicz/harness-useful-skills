@@ -24,6 +24,7 @@ const STAGE_LABELS = Object.freeze({
   plan: "Plan",
   review: "Review",
   "security-review": "Security review",
+  "release-assessment": "Release assessment",
   "backend-memory": "Backend memory",
   "code-graph": "Code graph",
 });
@@ -46,13 +47,13 @@ const OWNED_GUIDANCE = new Set([
   ...STAGES.map(stage => `Useful Skills profile: automatic ${stage} stage enabled when the development workflow applies. Follow the relevant us-* skill's requirements for this stage; this setting is not evidence that the stage ran or permission to bypass other controls.`),
   ...STAGES.flatMap(stage => Object.values(STAGE_GUIDANCE[stage])),
 ]);
-const STAGE_ALIASES = Object.freeze({ "graphify-memory": "code-graph", graphify_memory: "code-graph", code_graph: "code-graph" });
+const STAGE_ALIASES = Object.freeze({ "graphify-memory": "code-graph", graphify_memory: "code-graph", code_graph: "code-graph", release_assessment: "release-assessment" });
 const HELP = [
   "Useful Skills for Oh My Pi",
   "/skill:us-<name> — load an owned skill; natural requests also select skills by description.",
   "/useful-skills list [query] — browse owned skills.",
   "/useful-skills workflow enabled|disabled — set the development workflow for this repository/checkout (default: enabled); outside Git, scoped to the canonical workspace.",
-  "/useful-skills stage <research|plan|review|security-review|backend-memory|code-graph> enabled|disabled — set an independent automatic stage for this profile.",
+  "/useful-skills stage <research|plan|review|security-review|release-assessment|backend-memory|code-graph> enabled|disabled — set an independent automatic stage for this profile.",
   "/useful-skills status — read repository master and profile stage settings, paths, and errors.",
   "/skill:us-ignore-workflow — use the fast lane for one explicit request without changing saved settings.",
   "/useful-skills doctor — inspect resources and memory availability without setup.",
@@ -271,7 +272,7 @@ export default function usefulSkills(pi, { memoryAction = executeMemory, codeHin
         const mode = tokens[stageCommand ? 2 : 1];
         if (tokens.length !== (stageCommand ? 3 : 2) || (stageCommand && !STAGES.includes(key)) || !["enabled", "disabled"].includes(mode)) {
           const usage = stageCommand
-            ? "stage <research|plan|review|security-review|backend-memory|code-graph> enabled|disabled"
+            ? "stage <research|plan|review|security-review|release-assessment|backend-memory|code-graph> enabled|disabled"
             : "workflow enabled|disabled";
           return notify(ctx, `Expected /useful-skills ${usage}.\n${status(snapshot)}`, "warning");
         }

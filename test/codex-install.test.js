@@ -72,7 +72,7 @@ test("a fresh install copies the runtime and agents, records them, and registers
   assert.deepEqual(record.mcp, { name: "harness-useful-skills", command: "node", args: [server], env: { USEFUL_SKILLS_DATA: dataDir } });
   assert.match(record.files["agents/us-planner.toml"], /^[0-9a-f]{64}$/);
   assert.match(record.files["harness-useful-skills/runtime/codex/mcp-server.js"], /^[0-9a-f]{64}$/);
-  assert.equal(Object.keys(record.files).length, 7 + 11);
+  assert.equal(Object.keys(record.files).length, 8 + 12);
 });
 
 test("--local adds the package root as the marketplace, without a ref", async (t) => {
@@ -208,7 +208,7 @@ test("a failure at plugin add leaves a truthful record, and running again comple
   const box = setup(t);
   await assert.rejects(box.install({ environment: { ...box.environment, FAKE_CODEX_FAIL: "plugin add" } }), (error) => {
     assert.match(error.message, /`codex plugin add harness-useful-skills@harness-useful-skills --json` failed \(exit 1\): Error: injected failure/);
-    assert.match(error.message, /stopped while installing the plugin\. Done: 18 files in place, marketplace ready\./);
+    assert.match(error.message, /stopped while installing the plugin\. Done: 20 files in place, marketplace ready\./);
     assert.match(error.message, /\.\/useful-skills install --host codex` \(or the install script\) again/);
     return true;
   });
@@ -217,7 +217,7 @@ test("a failure at plugin add leaves a truthful record, and running again comple
   assert.equal(partial.pluginId, null);
   assert.equal(partial.pluginVersion, null);
   assert.equal(partial.mcp, null);
-  assert.equal(Object.keys(partial.files).length, 18);
+  assert.equal(Object.keys(partial.files).length, 20);
   box.clearCalls();
 
   await box.install();
@@ -264,7 +264,7 @@ test("doctor reports a missing codex, an empty home, a full install, a marketpla
   const empty = doctor();
   assert.match(empty, /Codex CLI: codex-cli 0\.154\.0/);
   assert.match(empty, /Install record: none at /);
-  assert.match(empty, /Agents: none of the 7/);
+  assert.match(empty, /Agents: none of the 8/);
   assert.match(empty, /Plugin harness-useful-skills@harness-useful-skills: not installed\./);
   assert.match(empty, /MCP server harness-useful-skills: not registered\./);
   assert.match(empty, /tool_timeout_sec under \[mcp_servers\.harness-useful-skills\]/);
@@ -278,8 +278,8 @@ test("doctor reports a missing codex, an empty home, a full install, a marketpla
   writeFileSync(box.at("agents", "us-scout.toml"), "edited\n");
   const full = doctor();
   assert.match(full, /Install record: Useful Skills 0\.3\.11\./);
-  assert.match(full, /Files: 17 ok, 1 modified, 0 missing\./);
-  assert.match(full, /Agents: 6 of 7 ok .*\n {2}us-scout\.toml: modified/);
+  assert.match(full, /Files: 19 ok, 1 modified, 0 missing\./);
+  assert.match(full, /Agents: 7 of 8 ok .*\n {2}us-scout\.toml: modified/);
   assert.match(full, /installed, enabled, version 0\.3\.11 \(matches the install record\)/);
   assert.match(full, /Marketplace harness-useful-skills: added from https:\/\/github\.com\/MSpiechowicz\/harness-useful-skills\.git at v0\.3\.11\./);
   assert.match(full, /MCP server harness-useful-skills: registered as installed\./);
@@ -327,7 +327,7 @@ test("the CLI installs the repository's own bundle with --local, and doctor read
 
   const doctor = await cli(["doctor", "--host", "codex"], box.environment);
   assert.equal(doctor.code, 0);
-  assert.match(doctor.stdout, /Agents: 7 of 7 ok/);
+  assert.match(doctor.stdout, /Agents: 8 of 8 ok/);
   assert.match(doctor.stdout, /MCP server harness-useful-skills: registered as installed\./);
 });
 
@@ -366,7 +366,7 @@ test("with the record lost, identical files are adopted, and differing runtime f
   rmSync(box.at("harness-useful-skills", "install-record.json"));
 
   await box.install();
-  assert.equal(Object.keys(box.record().files).length, 18);
+  assert.equal(Object.keys(box.record().files).length, 20);
 
   rmSync(box.at("harness-useful-skills", "install-record.json"));
   writePackage(box.packageRoot, { version: "0.3.12" });
