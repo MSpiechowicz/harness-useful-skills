@@ -654,7 +654,7 @@ node --check extension.js
 ./useful-skills doctor
 ```
 
-Use Node 22 in CI and at least 80% line/function/branch coverage for changed helpers. Keep authored source/test files at or below [500 physical lines](.agents/CODE_QUALITY.md).
+Use Node 26 in CI and at least 80% line/function/branch coverage for changed helpers. Keep authored source/test files at or below [500 physical lines](.agents/CODE_QUALITY.md).
 
 `memory-paths.js` owns the per-workspace memory paths and private storage (`workspaceMemoryPaths`, `prepareStorage`) and calls `graphify-retirement.js` once per start to delete data the retired Graphify integration left behind and to carry a saved `graphify-memory` stage switch over to `code-graph`. `memory.js` serves the `us_memory` actions and `mcp-memory-server.js` the MCP tools. Both integrations use `path-boundary.js` for the shared path-containment predicate; their distinct error and symlink policies remain local.
 
