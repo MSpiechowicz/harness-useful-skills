@@ -13,5 +13,8 @@
   },
   "omp": {
     "extensions": ["./extension.js"]
+  },
+  "pi": {
+    "skills": ["./pi/skills"]
   }
 }

@@ -50,6 +50,8 @@ jobs:
         run: node scripts/build-codex-plugin.js --check
       - name: Check generated Codex skills
         run: node scripts/render-codex-skills.js --check
+      - name: Check generated Pi skills
+        run: node scripts/render-pi-skills.js --check
       - name: Run Node tests with coverage gate
         run: node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-exclude='plugins/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 'test/**/*.test.js'
       - name: Run Python release tests

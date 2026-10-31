@@ -25,6 +25,33 @@ export function section(text, heading, nextHeading, body) {
   return text.slice(0, start) + heading + '\n\n' + body + '\n\n' + text.slice(end);
 }
 
+const NAME_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+// Only name and description are portable; anything else must be a deliberate decision.
+export function frontmatter(file, text) {
+  const match = /^---\n([\s\S]*?)\n---\n/.exec(text);
+  if (!match) throw new Error(`Missing frontmatter in ${file}`);
+  const fields = new Map();
+  for (const row of match[1].split('\n')) {
+    const field = /^([a-z-]+): (.*)$/.exec(row);
+    if (!field || !['name', 'description'].includes(field[1]) || fields.has(field[1])) {
+      throw new Error(`Unexpected frontmatter row in ${file}: ${row.slice(0, 60)}`);
+    }
+    fields.set(field[1], field[2]);
+  }
+  const name = fields.get('name');
+  const description = fields.get('description');
+  if (name !== file.split('/')[0] || !NAME_PATTERN.test(name)) throw new Error(`Invalid skill name ${name} in ${file}`);
+  if (!description || description.length > 1024) throw new Error(`Invalid description length in ${file}`);
+  return { name, description, body: text.slice(match[0].length) };
+}
+
+// Like replace, but for a phrase that must occur at least once and is rewritten everywhere.
+export function every(text, before, after) {
+  if (!text.includes(before)) throw new Error(`Expected ${JSON.stringify(before.slice(0, 90))}`);
+  return text.replaceAll(before, after);
+}
+
 export function filesUnder(directory, prefix = '') {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const path = prefix ? `${prefix}/${entry.name}` : entry.name;

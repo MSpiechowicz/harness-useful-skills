@@ -5,11 +5,11 @@
   </picture>
 </p>
 
-# Harness Skills for Oh My Pi, Claude Code, OpenCode, and Codex
+# Harness Skills for Oh My Pi, Claude Code, OpenCode, Codex, and Pi
 
 **From a natural-language request to reviewed, verified work.**
 
-Owned `us-*` skills for development, focused audits, delivery, and project memory. Oh My Pi (OMP), Claude Code, OpenCode, and Codex discover their descriptions; the model follows the relevant instructions using native tools and workers.
+Owned `us-*` skills for development, focused audits, delivery, and project memory. Oh My Pi (OMP), Claude Code, OpenCode, Codex, and Pi discover their descriptions; the model follows the relevant instructions using native tools and workers.
 
 https://github.com/user-attachments/assets/86bc6cf3-b61e-4ade-9ebd-5e48b27fac38
 
@@ -19,7 +19,7 @@ https://github.com/user-attachments/assets/86bc6cf3-b61e-4ade-9ebd-5e48b27fac38
 | --- | --- | --- | --- |
 | Clarify, research, approve, implement, review | Focused security, performance, and quality audits | Explicitly authorized feature-branch PR delivery | Durable facts alongside code relationships |
 
-**Start here:** [Installation](#installation) · [Claude Code](#claude-code) · [OpenCode](#opencode) · [Codex](#codex) · [Workflow & skills](#skill-led-development) · [Model configuration](#native-model-configuration) · [Memory](#agent-invoked-memory)
+**Start here:** [Installation](#installation) · [Claude Code](#claude-code) · [OpenCode](#opencode) · [Codex](#codex) · [Pi](#pi) · [Workflow & skills](#skill-led-development) · [Model configuration](#native-model-configuration) · [Memory](#agent-invoked-memory)
 
 **Reference:** [Management](#management) · [Audits & delivery](#focused-audits-and-delivery) · [Updates](#updates-and-releases) · [Development](#development-and-verification) · [Attribution](#attribution)
 
@@ -247,6 +247,25 @@ Limits:
 - Read-only agents (such as `us-scout` and the reviewers) are read-only by instruction only: Codex subagents inherit the parent's sandbox, so the sandbox, not the agent file, is the enforcement.
 - Models are per agent only through `models.yml`; a role set to `inherit` (the default) uses Codex's own model and reasoning effort.
 - Plugin-only installs have no `us-*` agents, so `us-run-workflow` reports the missing agent types.
+
+### Pi
+
+Install the skills as a Pi package. It needs only the `pi` CLI:
+
+```bash
+pi install git:github.com/MSpiechowicz/harness-useful-skills
+```
+
+Pi loads only the skills listed in the `pi` key of `package.json`, which points at the generated `pi/skills/` copy of the 22 skills, not the OMP-flavoured `skills/` folder. Regenerate it with `node scripts/render-pi-skills.js`. Behaviour on Pi:
+
+- Workflow stages are static guidance and always enabled. Pi has no Useful Skills settings command or `/useful-skills` command. To skip the workflow for one request, invoke `/skill:us-ignore-workflow` directly.
+- Pi has no worker tool, so planner, scout, and implementation work run inline in the main session and are reported as "ran inline (Pi has no worker tool)". Plan approval is still required before edits.
+- Correctness review, security review, and release assessment run as a fresh read-only child `pi` process with only the `read`, `grep`, `find`, and `ls` tools, no extensions, skills, or context files, and the brief and diff attached. The role prompts are in `pi/agents/`. The child cannot run commands, so a security reviewer describes any reproduction and the main session runs it. A child that fails or prints nothing is reported as a stage that could not be met.
+- The child is started by `pi/bin/run-child.sh <role> <base-ref> <brief-file> [--ui]` (POSIX `sh`). It attaches the role, the diff (untracked files by name only), and the brief, runs with `--offline --no-extensions --no-mcp --no-skills --no-approve` and no `--model`, and deletes its temporary files. `PI_CHILD_TIMEOUT` (seconds, default 1800) sets the time limit, enforced only where the `timeout` command exists (not on stock macOS). Pass the pull request base for committed branch work and `HEAD` only for uncommitted-only work.
+- Pi loads no Useful Skills extension, so there is no catastrophic-command guard or output redaction. Pi's own permissions apply.
+- The tool allowlist enforces the read-only limit (no bash, edit, or write). Staying inside the repository is a prompt rule only, because the read tools can reach any path. Check the child's output for secrets before reusing it.
+- Models are never configured here. The child process uses your own Pi default model, which may come from a different provider than the main session.
+- Memory comes from the Harness Memory MCP tools (`note_*`, `code_*`) when Pi lists them. There is no Useful Skills memory tool on Pi.
 
 ## Skill-led development
 
@@ -626,6 +645,7 @@ node scripts/render-opencode-skills.js --check
 node scripts/build-opencode-plugin.js --check
 node scripts/render-codex-skills.js --check
 node scripts/build-codex-plugin.js --check
+node scripts/render-pi-skills.js --check
 node --test 'test/**/*.test.js'
 node --test --experimental-test-coverage --test-coverage-exclude='test/**' --test-coverage-exclude='plugins/**' --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 'test/**/*.test.js'
 python -m unittest discover -s test -p 'test_*.py'

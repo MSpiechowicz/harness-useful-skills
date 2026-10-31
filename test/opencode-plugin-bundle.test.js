@@ -14,7 +14,7 @@ const RUNTIME = path.join(BUNDLE, "harness-useful-skills");
 const BUILD = path.join(ROOT, "scripts", "build-opencode-plugin.js");
 // Matched against paths relative to the runtime tree.
 const FORBIDDEN = [
-  /^(claude|omp|hooks|test|scripts|docs)(\/|$)/,
+  /^(claude|omp|pi|hooks|test|scripts|docs)(\/|$)/,
   /^extension\.js$/,
   /^updater\.js$/,
   /^useful-skills$/,

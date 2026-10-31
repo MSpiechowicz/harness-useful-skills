@@ -14,7 +14,7 @@ const RUNTIME = path.join(ROOT, "plugins", "codex-runtime", "harness-useful-skil
 const BUILD = path.join(ROOT, "scripts", "build-codex-plugin.js");
 // Matched against paths relative to either bundle.
 const FORBIDDEN = [
-  /^(claude|opencode|omp|hooks|test|scripts|docs)(\/|$)/,
+  /^(claude|opencode|omp|pi|hooks|test|scripts|docs)(\/|$)/,
   /^extension\.js$/,
   /^updater\.js$/,
   /^useful-skills$/,
