@@ -13,8 +13,8 @@ function fakeServices({ codeGraph = "available" } = {}) {
   const calls = { probe: 0 };
   const outcomes = {
     available: { outcome: "available", state: "ok" },
-    old: { outcome: "not available", state: "ok", detail: "update Harness Memory for the code index" },
-    missing: { outcome: "harness-memory not found", state: "ok", detail: "install Harness Memory for the code_map, code_symbol, code_impact and code_path tools" },
+    old: { outcome: "not available", state: "ok", detail: "update Harness Code for the code index" },
+    missing: { outcome: "harness-code not found", state: "ok", detail: "install Harness Code for the code_map, code_symbol, code_impact and code_path tools" },
   };
 
   const services = {

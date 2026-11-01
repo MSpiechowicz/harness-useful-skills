@@ -55,7 +55,7 @@ function runtimeBox(t) {
   mkdirSync(project);
   const calls = [];
   const services = {
-    resolve: () => "/fake/harness-memory",
+    resolve: () => "/fake/harness-code",
     execFile: (file, args, options, done) => { calls.push(args); done(null, JSON.stringify({ hint: `use code_symbol for ${args[args.indexOf("--query") + 1]}` })); },
   };
   const locations = { codexHome, dataDir: path.join(codexHome, "harness-useful-skills", "data") };
@@ -95,8 +95,8 @@ test("the hook process prints only additionalContext, and nothing on bad input o
   const box = runtimeBox(t);
   const bin = path.join(box.root, "bin");
   mkdirSync(bin);
-  writeFileSync(path.join(bin, "harness-memory"), '#!/bin/sh\necho \'{"hint":"try code_symbol for it"}\'\n');
-  chmodSync(path.join(bin, "harness-memory"), 0o755);
+  writeFileSync(path.join(bin, "harness-code"), '#!/bin/sh\necho \'{"hint":"try code_symbol for it"}\'\n');
+  chmodSync(path.join(bin, "harness-code"), 0o755);
   const env = { PATH: bin, HOME: path.join(box.root, "home"), CODEX_HOME: box.codexHome, USEFUL_SKILLS_DATA: box.locations.dataDir };
   const run = (input, raw) => spawnSync(process.execPath, [HOOK], { input: raw ?? JSON.stringify(input), encoding: "utf8", env });
 

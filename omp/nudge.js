@@ -3,11 +3,11 @@ import os from "node:os";
 import path from "node:path";
 
 import { tokenize } from "../code-hint.js";
-import { resolveHarnessMemory } from "../doctor-setup.js";
+import { resolveHarnessCode } from "../doctor-setup.js";
 import { within } from "./hook-input.js";
 
-const CODE_TOOL_PREFIX = "xd://mcp__harness_memory_code_";
-const MINTED_TOOL_PREFIX = "mcp__harness_memory_code_";
+const CODE_TOOL_PREFIX = "xd://mcp__harness_code_code_";
+const MINTED_TOOL_PREFIX = "mcp__harness_code_code_";
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".rs", ".go", ".py", ".svelte", ".vue", ".astro"]);
 const SOURCE_FOLDERS = new Set(["src", "lib", "app", "apps", "crates", "packages", "source", "components", "ui", "server", "client", "pkg", "cmd", "internal"]);
 const READS_BEFORE_NUDGE = 3;
@@ -19,7 +19,7 @@ export const NUDGE_INDEXED =
 export const NUDGE_NONE =
   "This repository is not in the code index yet. The first `code_map` call builds it and then shows its key files and signatures in one call, `code_symbol` shows where a name is defined and who uses it, `code_path` how one part reaches another. Use them before reading more files.";
 
-/** Whether a tool event is a call of a harness-memory code tool: a `read` or `write` of an `xd://` path, or the minted MCP tool name. */
+/** Whether a tool event is a call of a harness-code code tool: a `read` or `write` of an `xd://` path, or the minted MCP tool name. */
 export function isCodeToolUse(event) {
   const where = event?.input?.path;
   return (typeof event?.toolName === "string" && event.toolName.startsWith(MINTED_TOOL_PREFIX)) || (event?.toolName === "read" || event?.toolName === "write") && typeof where === "string" && where.startsWith(CODE_TOOL_PREFIX);
@@ -111,11 +111,11 @@ export function createNudgeTracker() {
 export function repoNudge(project, { env = process.env, services = {} } = {}) {
   return new Promise(resolve => {
     try {
-      const binary = (services.resolve ?? resolveHarnessMemory)({ cwd: project, env });
+      const binary = (services.resolve ?? resolveHarnessCode)({ cwd: project, env });
       if (!binary) return resolve(undefined);
       (services.execFile ?? execFile)(
         binary,
-        ["code", "repo", "--project", project, "--json"],
+        ["repo", "--project", project, "--json"],
         { cwd: os.tmpdir(), timeout: REPO_TIMEOUT_MS, killSignal: "SIGKILL", maxBuffer: 16 * 1024, windowsHide: true },
         (error, stdout) => {
           if (error) return resolve(undefined);

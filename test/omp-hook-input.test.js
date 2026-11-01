@@ -28,12 +28,12 @@ test("a search of another folder, or a command left running in the background, g
 });
 
 test("code tool calls are the read or write of an xd code path", () => {
-  assert.equal(isCodeToolUse({ toolName: "read", input: { path: "xd://mcp__harness_memory_code_map" } }), true);
-  assert.equal(isCodeToolUse({ toolName: "write", input: { path: "xd://mcp__harness_memory_code_symbol" } }), true);
-  assert.equal(isCodeToolUse({ toolName: "mcp__harness_memory_code_map", input: {} }), true);
+  assert.equal(isCodeToolUse({ toolName: "read", input: { path: "xd://mcp__harness_code_code_map" } }), true);
+  assert.equal(isCodeToolUse({ toolName: "write", input: { path: "xd://mcp__harness_code_code_symbol" } }), true);
+  assert.equal(isCodeToolUse({ toolName: "mcp__harness_code_code_map", input: {} }), true);
   assert.equal(isCodeToolUse({ toolName: "mcp__harness_memory_note_search", input: {} }), false);
   assert.equal(isCodeToolUse({ toolName: "read", input: { path: "xd://other" } }), false);
-  assert.equal(isCodeToolUse({ toolName: "bash", input: { path: "xd://mcp__harness_memory_code_map" } }), false);
+  assert.equal(isCodeToolUse({ toolName: "bash", input: { path: "xd://mcp__harness_code_code_map" } }), false);
 });
 
 test("exploration commands are recognised without running anything", () => {

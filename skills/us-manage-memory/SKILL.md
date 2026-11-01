@@ -9,7 +9,7 @@ Load `skill://us-write-concisely`. Use the agent-callable `us_memory` tool direc
 
 When the Harness Memory tools `note_search` and `note_save` are available, durable facts belong there (Harness Desktop → Memory): search and save them with `skill://us-use-harness-memory`, and make no memory search or save call through this skill, automatic or for "remember this". Write those notes in English with 3-5 lowercase tags including synonyms, and search with a few English keywords. This skill then covers only the code graph.
 
-The code graph is the Harness Memory code index, offered through the `harness-memory` tools `code_map`, `code_symbol`, `code_impact`, and `code_path`. Each takes `project_path`, the absolute git root of the repository. Without those tools there is no code graph: read the source instead, and do not ask the user to set one up.
+The code graph is the code index of Harness Code (`harness-code`), a separate product, offered through its tools `code_map`, `code_symbol`, `code_impact`, and `code_path`. Each takes `project_path`, the absolute git root of the repository. Without those tools there is no code graph: read the source instead, and do not ask the user to set one up.
 
 Apply pre-composition lane selection in `skill://us-run-workflow`, including on direct loading. Enabled memory switches alone do not require calls for an eligible focused repair. Select each eligible automatic action only for concrete memory/relationship impact; normal composition still uses its applicable effective memory stages. Disabled/unknown actions remain unselected automatically; explicit memory or code graph requests remain independent. This skill never forces new research, planning, delegation, or reviews.
 

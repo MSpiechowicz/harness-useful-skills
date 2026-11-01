@@ -211,7 +211,7 @@ test("a session start that cannot write the agents still starts, and doctor repo
 function hintFixture(t, { fail = false } = {}) {
   const calls = [];
   const services = {
-    resolve: () => "/fake/harness-memory",
+    resolve: () => "/fake/harness-code",
     execFile: (binary, args, options, done) => {
       calls.push(args);
       if (fail) {
@@ -240,7 +240,7 @@ test("an identifier grep result gets the code hint appended after the matches an
   assert.equal(calls[0][calls[0].indexOf("--project") + 1], f.root);
   const again = await f.events.get("tool_result")(grepResult("grep", { pattern: "alphaName" }), f.ctx);
   assert.equal(again, undefined, "the same term is hinted once per session");
-  assert.match(calls[0].join(" "), /code hint/);
+  assert.match(calls[0].join(" "), /^hint --project /);
 });
 
 test("a bash rg or grep command for an identifier gets the hint too", async t => {
@@ -271,7 +271,7 @@ test("non-identifier patterns, other tools, errors, an off stage and a failing b
 test("several names in one grep pattern are tried in order until one has a hint", async t => {
   const calls = [];
   const services = {
-    resolve: () => "/fake/harness-memory",
+    resolve: () => "/fake/harness-code",
     execFile: (binary, args, options, done) => {
       const term = args[args.indexOf("--query") + 1];
       calls.push(term);
@@ -287,7 +287,7 @@ test("several names in one grep pattern are tried in order until one has a hint"
 function nudgeFixture(t, state = "indexed") {
   const calls = [];
   const services = {
-    resolve: () => "/fake/harness-memory",
+    resolve: () => "/fake/harness-code",
     execFile: (binary, args, options, done) => {
       calls.push({ args, options });
       if (state === "error") done(new Error("boom"));
@@ -311,7 +311,7 @@ test("an exploration command gets the indexed nudge once, asking the read-only r
   const { f, calls, run } = await nudgeSetup(t);
   const result = await run(toolEvent("bash", { command: "find src -name '*.ts' | head" }));
   assert.deepEqual(result.content.map(block => block.text), ["output", INDEXED_TEXT]);
-  assert.deepEqual(calls[0].args, ["code", "repo", "--project", f.root, "--json"]);
+  assert.deepEqual(calls[0].args, ["repo", "--project", f.root, "--json"]);
   assert.equal(calls[0].options.timeout, 1000);
   assert.equal(await run(toolEvent("bash", { command: "find src" })), undefined);
   assert.equal(calls.length, 1);
@@ -340,10 +340,10 @@ test("ls needs a recursive flag or a source folder, and a recursive ls is an exp
 
 test("no nudge after a code tool call, for other reads, outside the project, with the stage off or for other states", async t => {
   const used = await nudgeSetup(t);
-  await used.f.events.get("tool_call")({ toolName: "read", input: { path: "xd://mcp__harness_memory_code_map" } }, used.f.ctx);
+  await used.f.events.get("tool_call")({ toolName: "read", input: { path: "xd://mcp__harness_code_code_map" } }, used.f.ctx);
   assert.equal(await used.run(toolEvent("bash", { command: "find src" })), undefined);
   const viaResult = await nudgeSetup(t);
-  await viaResult.run(toolEvent("write", { path: "xd://mcp__harness_memory_code_symbol" }));
+  await viaResult.run(toolEvent("write", { path: "xd://mcp__harness_code_code_symbol" }));
   assert.equal(await viaResult.run(toolEvent("bash", { command: "find src" })), undefined);
   assert.equal(used.calls.length + viaResult.calls.length, 0);
 
@@ -372,7 +372,7 @@ test("a nudge that could not be sent gives the claim back so a later trigger can
   let state = "failed";
   const calls = [];
   const services = {
-    resolve: () => "/fake/harness-memory",
+    resolve: () => "/fake/harness-code",
     execFile: (binary, args, options, done) => { calls.push(args); done(null, JSON.stringify({ state })); },
   };
   const f = await fixture(t, true, undefined, undefined, { codeHintServices: services });
@@ -393,6 +393,6 @@ test("two parallel exploration results carry one nudge", async t => {
 
 test("a minted MCP code tool call stops the nudge", async t => {
   const { f, run } = await nudgeSetup(t);
-  await f.events.get("tool_call")({ toolName: "mcp__harness_memory_code_map", input: {} }, f.ctx);
+  await f.events.get("tool_call")({ toolName: "mcp__harness_code_code_map", input: {} }, f.ctx);
   assert.equal(await run(toolEvent("bash", { command: "find src" })), undefined);
 });

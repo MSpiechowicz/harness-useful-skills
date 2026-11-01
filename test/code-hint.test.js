@@ -67,7 +67,7 @@ async function fixture(t) {
   await mkdir(project);
   const calls = [];
   const services = {
-    resolve: () => "/fake/harness-memory",
+    resolve: () => "/fake/harness-code",
     execFile: (file, args, options, done) => {
       calls.push({ file, args, options });
       done(null, JSON.stringify({ hint: `use code_symbol for ${args[args.indexOf("--query") + 1]}` }));
@@ -81,7 +81,7 @@ test("hint flow calls the CLI with the documented arguments and dedupes per term
   const f = await fixture(t);
   const hint = await codeHint(f.input("alphaName"), { dataDir: f.dataDir, services: f.services });
   assert.equal(hint, "use code_symbol for alphaName");
-  assert.deepEqual(f.calls[0].args, ["code", "hint", "--project", f.project, "--query", "alphaName", "--json"]);
+  assert.deepEqual(f.calls[0].args, ["hint", "--project", f.project, "--query", "alphaName", "--json"]);
   assert.equal(f.calls[0].options.timeout, 1000);
   assert.equal(f.calls[0].options.killSignal, "SIGKILL");
   assert.equal(f.calls[0].options.cwd, os.tmpdir());
@@ -132,7 +132,7 @@ test("hook emits only additionalContext, honours the code-graph switch, and igno
   const f = await fixture(t);
   const bin = path.join(f.root, "bin");
   await mkdir(bin);
-  const stub = path.join(bin, "harness-memory");
+  const stub = path.join(bin, "harness-code");
   await writeFile(stub, '#!/bin/sh\necho \'{"hint":"try code_symbol for it"}\'\n');
   await chmod(stub, 0o755);
   const configDir = path.join(f.root, "claude");

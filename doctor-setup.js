@@ -39,7 +39,7 @@ const PROBE_KILL_MS = 3000;
 const PROBE_GIVE_UP_MS = 3300;
 
 function notFound() {
-  return step("harness-memory not found", "ok", "install Harness Memory for the code_map, code_symbol, code_impact and code_path tools");
+  return step("harness-code not found", "ok", "install Harness Code for the code_map, code_symbol, code_impact and code_path tools");
 }
 
 function usableFile(file, platform) {
@@ -75,18 +75,18 @@ function inside(root, file, platform) {
 }
 
 /**
- * Real path of `harness-memory`, or undefined. Only absolute PATH entries count, and a candidate whose real path lies
+ * Real path of `harness-code`, or undefined. Only absolute PATH entries count, and a candidate whose real path lies
  * in the checkout around `cwd` is skipped, so neither an empty or relative entry nor a binary planted in the repository
  * (directly, through a symbolic link or a differently cased alias) is ever executed. The standard install locations are
  * tried after PATH.
  */
-export function resolveHarnessMemory({ cwd, env = process.env, platform = process.platform, home = os.homedir() } = {}) {
+export function resolveHarnessCode({ cwd, env = process.env, platform = process.platform, home = os.homedir() } = {}) {
   const windows = platform === "win32";
-  const names = windows ? ["harness-memory.exe"] : ["harness-memory"];
+  const names = windows ? ["harness-code.exe"] : ["harness-code"];
   const pathValue = env.PATH ?? env.Path ?? "";
   const directories = pathValue.split(windows ? ";" : ":").filter(entry => entry && path.isAbsolute(entry));
   if (windows) {
-    if (env.LOCALAPPDATA && path.isAbsolute(env.LOCALAPPDATA)) directories.push(path.join(env.LOCALAPPDATA, "Programs", "harness-memory"));
+    if (env.LOCALAPPDATA && path.isAbsolute(env.LOCALAPPDATA)) directories.push(path.join(env.LOCALAPPDATA, "Programs", "harness-code"));
   } else if (home && path.isAbsolute(home)) {
     directories.push(path.join(home, ".local", "bin"));
   }
@@ -105,7 +105,7 @@ export function resolveHarnessMemory({ cwd, env = process.env, platform = proces
 }
 
 /**
- * Informational only: whether the installed `harness-memory` lists the `code-index` feature. A missing binary or an
+ * Informational only: whether the installed `harness-code` lists the `code-index` feature. A missing binary or an
  * older build is reported, never a failure. The binary runs from an absolute path in a neutral directory and is
  * stopped (SIGTERM, then SIGKILL) within about 3.5 seconds.
  */
@@ -128,7 +128,7 @@ export function probeCodeGraph(execute = execFile, { cwd, signal, env, platform,
     }
 
     try {
-      const file = resolveHarnessMemory({ cwd, env, platform, home });
+      const file = resolveHarnessCode({ cwd, env, platform, home });
       if (!file || signal?.aborted) {
         finish(notFound());
         return;
@@ -144,7 +144,7 @@ export function probeCodeGraph(execute = execFile, { cwd, signal, env, platform,
         const features = String(stdout).split(/\r?\n/).map(line => line.trim());
         finish(features.includes("code-index")
           ? step("available")
-          : step("not available", "ok", "update Harness Memory for the code index"));
+          : step("not available", "ok", "update Harness Code for the code index"));
       });
       timers.push(setTimeout(() => stop("SIGTERM"), PROBE_TERM_MS));
       timers.push(setTimeout(() => stop("SIGKILL"), PROBE_KILL_MS));
@@ -161,7 +161,7 @@ async function codeGraphStep({ services, cwd, signal }) {
 
 /**
  * Doctor memory setup shared by host adapters. `check` inspects only; otherwise it creates the private facts store.
- * The "Code graph" line only reports whether Harness Memory offers the code index and never fails doctor. Returns
+ * The "Code graph" line only reports whether Harness Code offers the code index and never fails doctor. Returns
  * per-step outcomes, the resulting memory status, whether everything is ready, and whether the time budget cut
  * setup short.
  */

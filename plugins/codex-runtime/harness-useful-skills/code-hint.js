@@ -4,7 +4,7 @@ import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "n
 import os from "node:os";
 import path from "node:path";
 
-import { resolveHarnessMemory } from "./doctor-setup.js";
+import { resolveHarnessCode } from "./doctor-setup.js";
 
 const IDENTIFIER = /^[A-Za-z_$][\w$]*(?:::|\.)?[\w$]*$/;
 const MIN_TERM = 3;
@@ -269,7 +269,7 @@ function askHint(binary, project, term, execute) {
     try {
       execute(
         binary,
-        ["code", "hint", "--project", project, "--query", term, "--json"],
+        ["hint", "--project", project, "--query", term, "--json"],
         { cwd: os.tmpdir(), timeout: HINT_TIMEOUT_MS, killSignal: "SIGKILL", maxBuffer: 16 * 1024, windowsHide: true },
         (error, stdout) => {
           if (error) return resolve(null);
@@ -312,7 +312,7 @@ export async function codeHint(input, { enabled = true, dataDir, env = process.e
     const candidates = terms.filter(term => !session.seen.includes(term)).slice(0, MAX_NAMES_PER_SEARCH);
     if (session.hints >= MAX_HINTS_PER_SESSION || lookups >= MAX_LOOKUPS_PER_SESSION || !candidates.length) return undefined;
 
-    const binary = (services.resolve ?? resolveHarnessMemory)({ cwd: project, env });
+    const binary = (services.resolve ?? resolveHarnessCode)({ cwd: project, env });
     if (!binary) return undefined;
     let hint = null;
     for (const term of candidates) {
