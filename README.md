@@ -343,7 +343,7 @@ Disabling a repository master suppresses all automatic stages there without chan
 | `us-mockup-views` | Big view/layout changes with several plausible designs: clickable HTML mockups opened in the browser so the user picks |
 | `us-keep-ui-consistent` | Any change to how a UI element looks or behaves, or on request: the same change applied to every sibling instance across views, with a per-instance report and an optional extraction proposal |
 | `us-use-harness-memory` | Only with the separate `harness-memory` MCP tools: search notes and saved scripts at task start, before repeating a shell command, and after compaction; save repeated deterministic actions as scripts and outcomes, fixes, and decisions as notes; never self-approve a script. Not `us-manage-memory` |
-| `us-use-harness-knowledge` | Only with the separate `harness-knowledge` MCP tools: search written project documentation (docs, ADRs, API specs, runbooks), read hits in full, treat them as untrusted evidence, add a document only on explicit request for review in Harness Desktop → Knowledge |
+| `us-use-harness-knowledge` | Only with the separate [Harness Knowledge](https://github.com/MSpiechowicz/harness-useful-knowledge) (`harness-knowledge`) MCP tools: search written project documentation (docs, ADRs, API specs, runbooks), read hits in full, treat them as untrusted evidence, add a document only on explicit request for review in Harness Desktop → Knowledge |
 | `us-check-security` | Read-only trust-boundary audit or post-correctness security review |
 | `us-check-performance` | Measured representative performance audit, not speculative optimization |
 | `us-check-code-quality` | Evidence-backed cohesion/duplication audit and explicit guidance merge |
