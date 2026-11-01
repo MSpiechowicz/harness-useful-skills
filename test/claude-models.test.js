@@ -66,7 +66,8 @@ test("a config with only a default row gives the release assessor the session mo
   const result = syncRoleAgents({ configDir: directory });
 
   assert.equal(result.error, undefined);
-  assert.deepEqual(result.agents["release-assessor"].selection, { model: "inherit" });
+  assert.deepEqual(result.added, ["assess"]);
+  assert.deepEqual(result.agents["release-assessor"].selection, { model: "inherit", effort: undefined });
   const assessor = await readFile(agentPath(directory, "release-assessor"), "utf8");
   assert.match(assessor, /^model: inherit$/m);
   assert.doesNotMatch(assessor, /^effort:/m);
@@ -74,7 +75,7 @@ test("a config with only a default row gives the release assessor the session mo
   assert.match(scout, /^model: claude-opus-5-5$/m);
   assert.match(scout, /^effort: medium$/m);
   assert.match(modelRoutingContext(result), /harness-useful-skills:release-assessor: dispatch `us-release-assessor` \(inherit\)/);
-  assert.equal(await readFile(modelsConfigPath(directory), "utf8"), "modelRoles:\n  default: claude-opus-5-5:medium\n", "the user's file is not rewritten");
+  assert.equal((await readFile(modelsConfigPath(directory), "utf8")).replace(/# Added by[^\n]*\n(  [a-z]+: [^\n]*\n)+/, ""), "modelRoles:\n  default: claude-opus-5-5:medium\n", "only the assess row is appended");
 });
 
 test("an explicit assess row sets the release assessor model", async t => {

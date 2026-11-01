@@ -42,7 +42,7 @@ test("the first session moves the models file and saved settings from the earlie
 
   assert.equal(result.created, false, "the edited models file is not replaced by defaults");
   assert.equal(existsSync(legacy), false);
-  assert.equal(readFileSync(modelsConfigPath(configDir), "utf8"), "modelRoles:\n  default: claude-haiku-5-5:low\n");
+  assert.equal(readFileSync(modelsConfigPath(configDir), "utf8").replace(/# Added by[^\n]*\n(  [a-z]+: [^\n]*\n)+/, ""), "modelRoles:\n  default: claude-haiku-5-5:low\n", "only the new role is appended");
   assert.equal(readFileSync(path.join(configDir, "harness-useful-skills", "workflow-settings", "plan.json"), "utf8"), "false\n");
   assert.equal(result.agents.planner.selection.model, "claude-haiku-5-5");
 });
@@ -101,7 +101,7 @@ test("a models file edited in both folders keeps the new one and leaves the old 
 
   syncRoleAgents({ configDir, pluginRoot: PLUGIN_ROOT });
 
-  assert.equal(readFileSync(modelsConfigPath(configDir), "utf8"), "modelRoles:\n  default: claude-opus-5-5:high\n");
+  assert.equal(readFileSync(modelsConfigPath(configDir), "utf8").replace(/# Added by[^\n]*\n(  [a-z]+: [^\n]*\n)+/, ""), "modelRoles:\n  default: claude-opus-5-5:high\n");
   assert.equal(readFileSync(path.join(legacy, "models.yml"), "utf8"), "modelRoles:\n  default: claude-haiku-5-5:low\n");
   assert.match(claudeLegacyNotes({ CLAUDE_CONFIG_DIR: configDir }).join("\n"), /still holds files that were not moved/);
 });

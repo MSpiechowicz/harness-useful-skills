@@ -3,7 +3,9 @@
  * schema as the Claude and OpenCode files, and the `model` and `model_reasoning_effort` lines it adds to the generated
  * `agents/us-<role>.toml`. Runs in the installer and in the installed runtime (apply-models.js).
  */
-import { ROLE_AGENTS, ROLES, parseModelsConfig, readConfigText, roleSelection, writeAtomic } from "../model-roles.js";
+import path from "node:path";
+
+import { ROLE_AGENTS, ROLES, appendRoles, missingRoles, parseModelsConfig, readConfigText, roleSelection, writeAtomic, writeRoleCatalogue } from "../model-roles.js";
 import { directoryProblem, lstatOrNull } from "../opencode/paths.js";
 import { MODELS_REL, atHome } from "./paths.js";
 
@@ -50,7 +52,8 @@ export function parseCodexSelector(role, raw) {
 
 /**
  * Read the models file of a Codex home without writing anything. Returns `{ configFile, exists, roles }`, or
- * `{ configFile, exists, error }` when the file cannot be used. A missing file reads as the defaults.
+ * `{ configFile, exists, error }` when the file cannot be used. A missing file reads as the defaults. In an existing
+ * file, a role it lacks reads as `inherit` and is listed in `missing`, which ensureCodexModels then appends.
  */
 export function readCodexModels(codexHome) {
   const configFile = atHome(codexHome, MODELS_REL);
@@ -67,20 +70,36 @@ export function readCodexModels(codexHome) {
 
   try {
     const text = found ? readConfigText(configFile) : DEFAULT_MODELS;
-    return { configFile, exists: Boolean(found), roles: parseModelsConfig(text, parseCodexSelector) };
+    const roles = parseModelsConfig(text, parseCodexSelector);
+    const missing = found ? missingRoles(roles) : [];
+    for (const role of missing) roles[role] = INHERIT;
+    return { configFile, exists: Boolean(found), roles, missing };
   } catch (error) {
     return { configFile, exists: Boolean(found), error: error.message };
   }
 }
 
-/** Create the models file with the defaults when it does not exist; an existing file is never rewritten. */
+/**
+ * Create the models file with the defaults when it does not exist. An existing file only gets rows appended for the
+ * roles it lacks (`models.missing`), as `inherit`; nothing else in it changes. Returns true when the file was created.
+ */
 export function ensureCodexModels(models) {
-  if (models.exists || models.error) {
+  if (models.error) {
     return false;
   }
 
-  writeAtomic(models.configFile, DEFAULT_MODELS);
-  return true;
+  let created = false;
+  if (!models.exists) {
+    writeAtomic(models.configFile, DEFAULT_MODELS);
+    created = true;
+  } else if (models.missing?.length) {
+    const text = readConfigText(models.configFile);
+    writeAtomic(models.configFile, appendRoles(text, models.missing, () => "inherit"));
+    models.added = models.missing;
+  }
+
+  writeRoleCatalogue(path.dirname(models.configFile));
+  return created;
 }
 
 /** The selection for a plugin agent (`planner`): its role's row, else `default`, else inherit. A missing `assess` row inherits. */

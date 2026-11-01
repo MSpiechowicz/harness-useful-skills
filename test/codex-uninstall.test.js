@@ -31,7 +31,7 @@ test("uninstall unregisters everything it added, removes its files and record, a
   assert.match(message, /Removed MCP server harness-useful-skills\.\nRemoved plugin harness-useful-skills@harness-useful-skills\.\nRemoved marketplace harness-useful-skills\./);
   assert.match(message, /Kept the data directory .*harness-useful-skills\/data/);
   assert.deepEqual(changes(box.calls()), ["mcp remove harness-useful-skills", "plugin remove harness-useful-skills@harness-useful-skills", "plugin marketplace remove harness-useful-skills"]);
-  assert.deepEqual(listTree(box.codexHome), ["harness-useful-skills", "harness-useful-skills/data", "harness-useful-skills/data/memory.db", "harness-useful-skills/models.yml"]);
+  assert.deepEqual(listTree(box.codexHome), ["harness-useful-skills", "harness-useful-skills/data", "harness-useful-skills/data/memory.db", "harness-useful-skills/models.yml", "harness-useful-skills/roles.json"]);
   assert.deepEqual(box.state(), { marketplaces: [], plugins: [], mcp: {} });
 
   assert.match(box.uninstall(), /not installed for Codex: no install record at .*Nothing was removed\./);

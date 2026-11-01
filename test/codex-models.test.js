@@ -105,7 +105,7 @@ test("a models file with only a default row gives the release assessor the Codex
   assert.doesNotMatch(box.agent("release-assessor"), /^model(_reasoning_effort)? =/m, "an absent assess row inherits");
   assert.match(box.agent("scout"), /^model = "gpt-5\.4"\nmodel_reasoning_effort = "low"$/m);
   assert.deepEqual(selectionFor("release-assessor", readCodexModels(box.codexHome).roles), { model: null, effort: undefined });
-  assert.equal(readFileSync(box.modelsFile, "utf8"), "modelRoles:\n  default: gpt-5.4:low\n", "the user's file is not rewritten");
+  assert.equal(readFileSync(box.modelsFile, "utf8").replace(/# Added by[^\n]*\n(  [a-z]+: [^\n]*\n)+/, ""), "modelRoles:\n  default: gpt-5.4:low\n", "only the assess row is appended");
 
   box.writeModels("modelRoles:\n  default: gpt-5.4:low\n  assess: gpt-5.5:high\n");
   await box.apply();

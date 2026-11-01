@@ -106,6 +106,7 @@ export function syncRoleAgents({ configDir = claudeConfigDir(), pluginRoot = PLU
     configFile,
     agentFile: agent => agentFile(configDir, agent),
     defaultConfig: defaultConfig(),
+    defaultRole: role => DEFAULT_ROLES[role],
     parseSelector,
     render: (agent, selection) => renderAgent(agent, selection, { pluginRoot, configFile }),
     fallback: { model: "inherit" },
@@ -143,6 +144,9 @@ function describe({ model, effort }) {
 /** Session context naming which agent to dispatch for each plugin role. */
 export function modelRoutingContext(result) {
   const lines = [`Useful Skills model roles are configured in ${result.configFile}${result.created ? " (created with defaults this session)" : ""}.`];
+  if (result.added?.length) {
+    lines.push(`New roles were added to that file: ${result.added.join(", ")}. Tell the user once.`);
+  }
   if (result.error) {
     lines.push(`That file is invalid: ${result.error} Role agents were not regenerated; previously generated \`us-*\` agents keep their earlier models. Tell the user once so they can fix the file.`);
   }

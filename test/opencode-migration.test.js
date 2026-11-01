@@ -108,7 +108,7 @@ test("the earlier data, settings and models file move to the new names without l
   assert.equal(readFileSync(path.join(box.dataDir, "harness-useful-skills", "memory", "abc", "notes.md"), "utf8"), "remembered\n");
   assert.equal(existsSync(path.join(box.dataDir, "harness-useful-skills", "dependencies")), false, "the environment cache is rebuilt, not moved");
   assert.equal(existsSync(box.at(LEGACY_DATA_DIRECTORY)), false);
-  assert.equal(readFileSync(box.at("harness-useful-skills", "models.yml"), "utf8"), "modelRoles:\n  review: anthropic/claude-sonnet-5-5:high\n");
+  assert.equal(readFileSync(box.at("harness-useful-skills", "models.yml"), "utf8").replace(/# Added by[^\n]*\n(  [a-z]+: [^\n]*\n)+/, ""), "modelRoles:\n  review: anthropic/claude-sonnet-5-5:high\n");
   assert.equal(readFileSync(box.at("harness-useful-skills", "workflow-settings", "plan.json"), "utf8"), "false\n");
   assert.equal(box.json(box.at("plugins", "harness-useful-skills", "install-record.json")).dataDir, box.dataDir);
 
@@ -164,7 +164,7 @@ test("a models file edited in both places keeps both and says so", t => {
 
   const result = box.install();
 
-  assert.equal(readFileSync(box.at("harness-useful-skills", "models.yml"), "utf8"), "modelRoles:\n  default: inherit\n");
+  assert.equal(readFileSync(box.at("harness-useful-skills", "models.yml"), "utf8").replace(/# Added by[^\n]*\n(  [a-z]+: [^\n]*\n)+/, ""), "modelRoles:\n  default: inherit\n");
   assert.equal(readFileSync(box.at(LEGACY_DATA_DIRECTORY, "models.yml"), "utf8"), "modelRoles:\n  review: anthropic/claude-sonnet-5-5:high\n");
   assert.match(result.message, /Left .*useful-skills\/models\.yml in place: it differs from the file at the new location/);
 });

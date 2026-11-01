@@ -148,6 +148,7 @@ export function syncOpenCodeAgents({ scopeRoot, templatesDir = path.join(RUNTIME
     configFile,
     agentFile: agent => generatedAgentPath(scopeRoot, agent),
     defaultConfig: DEFAULT_CONFIG,
+    defaultRole: () => "inherit",
     parseSelector: parseOpenCodeSelector,
     render: (agent, selection) => renderOpenCodeAgent(agent, selection, { templatesDir, configFile }),
     fallback: { model: null, variant: undefined },
@@ -165,6 +166,9 @@ function describe({ model, variant }) {
 /** Session context naming the configured model of each `us-*` agent and any file that needs attention. */
 export function openCodeRoutingContext(result) {
   const lines = [`Useful Skills model roles for OpenCode are configured in ${result.configFile}${result.created ? " (created this session; every agent inherits the session model)" : ""}.`];
+  if (result.added?.length) {
+    lines.push(`New roles were added to that file: ${result.added.join(", ")}. Tell the user once.`);
+  }
   if (result.blocked) {
     lines.push(`Role agents were not generated or updated: ${result.blocked}. Previously generated \`us-*\` agents keep their earlier models. Tell the user once so they can fix it.`);
     return lines.join("\n");

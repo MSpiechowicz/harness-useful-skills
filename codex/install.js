@@ -305,6 +305,7 @@ function hookLines(codexHome) {
 /** Lines naming the model of each role that does not inherit, then where the models file is. */
 function modelLines(models, created) {
   const lines = [`Model roles: ${models.configFile}${created ? " (created; every role inherits)" : ""}.`];
+  if (models.added?.length) lines.push(`Added new roles to it: ${models.added.join(", ")}.`);
   for (const rel of AGENT_RELS) {
     const role = path.basename(rel, ".toml").slice("us-".length);
     const selection = selectionFor(role, models.roles ?? {});

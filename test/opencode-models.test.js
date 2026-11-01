@@ -100,7 +100,7 @@ test("a config with only a default row gives the release assessor the session mo
   assert.ok(scout.includes("model: \"anthropic/claude-sonnet-4-5\""));
   assert.ok(scout.includes("variant: high"));
   assert.match(openCodeRoutingContext(result), /`us-release-assessor`: inherits the session model/);
-  assert.equal(await readFile(modelsConfigPath(root), "utf8"), "modelRoles:\n  default: anthropic/claude-sonnet-4-5:high\n", "the user's file is not rewritten");
+  assert.equal((await readFile(modelsConfigPath(root), "utf8")).replace(/# Added by[^\n]*\n(  [a-z]+: [^\n]*\n)+/, ""), "modelRoles:\n  default: anthropic/claude-sonnet-4-5:high\n", "only the assess row is appended");
 });
 
 test("an explicit assess row sets the release assessor model", async t => {
@@ -192,5 +192,5 @@ test("an untouched role-less file from an earlier release is upgraded, an edited
   const edited = `${legacy}  review: openai/gpt-5:high\n`;
   await writeFile(modelsConfigPath(root), edited);
   syncOpenCodeAgents({ scopeRoot: root });
-  assert.equal(await readFile(modelsConfigPath(root), "utf8"), edited, "an edited file is never rewritten");
+  assert.equal((await readFile(modelsConfigPath(root), "utf8")).replace(/# Added by[^\n]*\n(  [a-z]+: [^\n]*\n)+/, ""), edited, "an edited file keeps every line and only gets new roles appended");
 });

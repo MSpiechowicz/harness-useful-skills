@@ -1,6 +1,8 @@
 import path from "node:path";
 import { formatDoctor } from "./doctor.js";
 import { syncOmpAgents } from "./omp/agents-sync.js";
+import { unmappedOmpRoles } from "./omp-roles.js";
+import { writeRoleCatalogue } from "./model-roles.js";
 import { runUpdate } from "./updater.js";
 import { readWorkflowSettings, STAGES, writeWorkflowSetting } from "./workflow-settings.js";
 import { backendMemoryGuidance } from "./workflow-context.js";
@@ -129,7 +131,9 @@ export default function usefulSkills(pi, { memoryAction = executeMemory, codeHin
 
       const report = await runUpdate(action, { cwd: ctx.cwd, profile: process.env.OMP_PROFILE });
       if (report.updated) {
-        notify(ctx, `Useful Skills updated to ${report.currentVersion}. Restart OMP to load the update.`);
+        const unmapped = unmappedRoles();
+        const roles = unmapped.length ? ` New or unmapped model roles: ${unmapped.map(({ role }) => role).join(", ")}. Run /useful-skills doctor for the lines to add.` : "";
+        notify(ctx, `Useful Skills updated to ${report.currentVersion}. Restart OMP to load the update.${roles}`);
       } else if (report.updateAvailable) {
         notify(ctx, `Useful Skills update available: ${report.currentVersion} → ${report.latestVersion}. Run /useful-skills update install.`, "warning");
       } else if (!quiet) {
@@ -147,9 +151,21 @@ export default function usefulSkills(pi, { memoryAction = executeMemory, codeHin
   /** OMP's task tool reads agents only from `<agentDir>/agents`, so every session copies the bundled ones there. */
   function ompAgents() {
     try {
-      return syncOmpAgents({ agentDir: pi.pi.getAgentDir() });
+      const agentDir = pi.pi.getAgentDir();
+      // The desktop reads the catalogue from the data directory when that exists; this never creates it.
+      writeRoleCatalogue(path.join(agentDir, DATA_DIRECTORY));
+      return syncOmpAgents({ agentDir });
     } catch (error) {
       return { error: error instanceof Error ? error.message : String(error), agents: {} };
+    }
+  }
+
+  /** Roles the active OMP profile does not map yet; read-only. */
+  function unmappedRoles() {
+    try {
+      return unmappedOmpRoles(pi.pi.getAgentDir());
+    } catch {
+      return [];
     }
   }
 
@@ -158,7 +174,7 @@ export default function usefulSkills(pi, { memoryAction = executeMemory, codeHin
       resourceInventory(),
       memoryAction({ action: "status" }, { cwd: ctx.cwd, agentDir: pi.pi.getAgentDir(), memory: ctx.memory }),
     ]);
-    notify(ctx, formatDoctor({ core, safety: safetyEnabled(), memory, ompAgents: ompAgents() }));
+    notify(ctx, formatDoctor({ core, safety: safetyEnabled(), memory, ompAgents: ompAgents(), ompRoles: unmappedRoles() }));
   }
 
   async function workbench(args, ctx) {

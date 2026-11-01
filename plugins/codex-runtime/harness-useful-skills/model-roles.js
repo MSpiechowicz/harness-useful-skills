@@ -83,6 +83,70 @@ export function parseModelsConfig(text, parseSelector) {
   return roles;
 }
 
+/** The role catalogue the desktop reads from `<data dir>/roles.json`. */
+export function roleCatalogueText() {
+  return `${JSON.stringify({
+    version: 1,
+    roles: ROLES.filter(role => role !== "default"),
+    agents: ROLE_AGENTS,
+    inheritWhenAbsent: [...INHERIT_WHEN_ABSENT],
+  }, null, 2)}\n`;
+}
+
+/**
+ * Publish the role catalogue in an existing data directory; rewritten only when its content changes.
+ * Best effort: an unwritable directory must not break a session start. Returns true when the file was written.
+ */
+export function writeRoleCatalogue(dataDir) {
+  try {
+    if (!lstatSync(dataDir, { throwIfNoEntry: false })?.isDirectory()) return false;
+    const file = path.join(dataDir, "roles.json");
+    const text = roleCatalogueText();
+    if (readOptional(file) === text) return false;
+    writeAtomic(file, text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The Useful Skills version from the package.json beside this module, or undefined when the bundle has none. */
+function skillsVersion() {
+  try {
+    const version = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version;
+    return typeof version === "string" && /^\d+\.\d+\.\d+/.test(version) ? version : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Roles of ROLES that a parsed config does not list and that need a row. A role that falls back to a `default` row the
+ * file has is left out: that is how the file chooses it. A role that inherits when absent always gets a row.
+ */
+export function missingRoles(roles) {
+  return ROLES.filter(role => !Object.hasOwn(roles, role) && (INHERIT_WHEN_ABSENT.has(role) || !Object.hasOwn(roles, "default")));
+}
+
+/**
+ * Append rows for `missing` roles at the end of the `modelRoles:` block, after a comment line. Every existing line
+ * is kept as is. `defaultFor(role)` is the selector text of a row. `version` null omits the version. Expects text that already parsed.
+ */
+export function appendRoles(text, missing, defaultFor, version = skillsVersion()) {
+  version ||= undefined;
+  const newline = text.includes("\r\n") ? "\r\n" : "\n";
+  const lines = text.split(/\r?\n/);
+  const trailing = lines.at(-1) === "" ? lines.pop() : undefined;
+  let at = lines.findLastIndex(row => /^\s+[a-z]+:\s/.test(row) && !row.trimStart().startsWith("#"));
+  if (at < 0) at = lines.indexOf("modelRoles:");
+  const added = [
+    `# Added by Useful Skills${version ? ` ${version}` : ""}: ${missing.join(", ")}`,
+    ...missing.map(role => `  ${role}: ${defaultFor(role)}`),
+  ];
+  lines.splice(at + 1, 0, ...added);
+  return lines.join(newline) + (trailing === undefined ? "" : newline);
+}
+
 /** Read a model config, refusing one larger than 16 KiB. */
 export function readConfigText(file) {
   const text = readFileSync(file, "utf8");
@@ -155,15 +219,17 @@ export function readOptional(file) {
  *   data directory saved under the name used before the rename is moved to it first.
  * - `agentFile(agent)`: where the generated agent for a plugin agent name lives.
  * - `defaultConfig`: text written when `configFile` does not exist.
+ * - `defaultRole(role)`: optional; the host's default selector text. An existing config that parses gets rows for
+ *   roles it lacks appended (see appendRoles) and the result lists them in `added`.
  * - `parseSelector(role, raw)`: the host's selector syntax (see parseModelsConfig).
  * - `render(agent, selection)`: the full generated agent text.
  * - `fallback`: the selection when neither the agent's role nor `default` is configured, and for a role in
  *   INHERIT_WHEN_ABSENT whose row is missing.
  *
- * Returns `{ configFile, created, agents }` where each agent maps to `{ state, file, selection }` and state is
+ * Returns `{ configFile, created, added, agents }` where each agent maps to `{ state, file, selection }` and state is
  * created, updated, ready, or conflict; an invalid config instead returns `{ configFile, created, error, agents: {} }`.
  */
-export function syncRoleAgents({ configFile, agentFile, defaultConfig, parseSelector, render, fallback }) {
+export function syncRoleAgents({ configFile, agentFile, defaultConfig, defaultRole, parseSelector, render, fallback }) {
   migrateDataDirectory(path.dirname(path.dirname(configFile)));
   ensurePrivateDirectory(path.dirname(configFile));
 
@@ -174,11 +240,21 @@ export function syncRoleAgents({ configFile, agentFile, defaultConfig, parseSele
   }
 
   let roles;
+  let added = [];
   try {
-    roles = parseModelsConfig(readConfigText(configFile), parseSelector);
+    const text = readConfigText(configFile);
+    roles = parseModelsConfig(text, parseSelector);
+    const missing = defaultRole && !created ? missingRoles(roles) : [];
+    if (missing.length) {
+      const next = appendRoles(text, missing, defaultRole);
+      roles = parseModelsConfig(next, parseSelector);
+      writeAtomic(configFile, next);
+      added = missing;
+    }
   } catch (error) {
     return { configFile, created, error: error.message, agents: {} };
   }
+  writeRoleCatalogue(path.dirname(configFile));
 
   const agents = {};
   for (const [agent, role] of Object.entries(ROLE_AGENTS)) {
@@ -198,5 +274,5 @@ export function syncRoleAgents({ configFile, agentFile, defaultConfig, parseSele
       agents[agent] = { state: existing === undefined ? "created" : "updated", file, selection };
     }
   }
-  return { configFile, created, agents };
+  return { configFile, created, added, agents };
 }

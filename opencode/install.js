@@ -73,7 +73,8 @@ function agentLines(sync) {
     if (state === "conflict") lines.push(`Left ${file} alone: Useful Skills did not generate it.`);
   }
   const summary = Object.entries(counts).map(([state, count]) => `${count} ${state}`).join(", ");
-  return [`Agents: ${summary}.`, ...lines];
+  const added = sync.added?.length ? [`Added new roles to ${sync.configFile}: ${sync.added.join(", ")}.`] : [];
+  return [`Agents: ${summary}.`, ...added, ...lines];
 }
 
 /**

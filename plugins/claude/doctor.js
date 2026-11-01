@@ -119,6 +119,16 @@ function ompAgentsSection(ompAgents) {
   return lines;
 }
 
+/** Report lines for unmapped roles: what to add to the profile's config.yml. Empty when every role is mapped. */
+function unmappedRoleLines(unmapped) {
+  if (!unmapped?.length) return [];
+  return [
+    `OMP roles not mapped: ${unmapped.map(({ role }) => role).join(", ")}`,
+    "  Add to config.yml in your OMP agent directory (never changed by Useful Skills):",
+    ...unmapped.flatMap(({ role, agent }) => [`    modelRoles: ${role}: <selector>`, `    task.agentModelOverrides: ${agent}: "@${role}"`]),
+  ];
+}
+
 function closingLine(setup) {
   if (!setup) {
     return "Read-only: no setup, installation, or build.";
@@ -144,14 +154,16 @@ function closingLine(setup) {
  * Without `setup` the report is passive (OMP and terminal); with `setup` ({ steps, settings, mode,
  * ok, timedOut?, unavailable? }) it adds the Claude setup outcome and saved workflow settings.
  * `ompAgents` (a `syncOmpAgents` result, OMP only) adds the line for the agents OMP's task tool can offer.
+ * `ompRoles` (`unmappedOmpRoles`, OMP only) lists roles the profile's config.yml does not map yet.
  */
-export function formatDoctor({ core, safety, memory, setup, ompAgents } = {}) {
+export function formatDoctor({ core, safety, memory, setup, ompAgents, ompRoles } = {}) {
   return [
     "Useful Skills doctor",
     "Resources",
     inventory("Core", core),
     `Safety: ${safety === true ? "Enabled" : "Disabled"}`,
     ...ompAgentsSection(ompAgents),
+    ...unmappedRoleLines(ompRoles),
     ...(setup ? setupSection(setup) : []),
     ...memorySection(memory, setup),
     ...(setup ? settingsSection(setup) : []),

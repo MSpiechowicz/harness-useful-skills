@@ -74,12 +74,13 @@ export async function applyCodexModels({ environment = process.env } = {}) {
   }
 
   writeAtomic(recordFile, recordText({ ...record, files: sortedFiles({ ...record.files, ...agentRecord }) }));
-  return { configFile: models.configFile, created, agents };
+  return { configFile: models.configFile, created, added: models.added ?? [], agents };
 }
 
 /** The lines `apply` prints: where the models file is, then each agent and what it uses. */
-export function formatApplied({ configFile, created, agents }) {
+export function formatApplied({ configFile, created, added = [], agents }) {
   const lines = [`Model roles from ${configFile}${created ? " (created with defaults)" : ""}.`];
+  if (added.length) lines.push(`Added new roles to the models file: ${added.join(", ")}.`);
   for (const [role, { state, file, selection }] of Object.entries(agents)) {
     if (state === "conflict") {
       lines.push(`us-${role}: left alone, ${file} was edited since it was installed or is not a Useful Skills file.`);

@@ -428,6 +428,9 @@ Loading a skill or defining a role does not execute that role's model. With work
 After installation/restart the package advertises native agents and defaults to enabled repository masters and profile stage preferences unless saved otherwise. If a required agent is absent, routing cannot resolve, or stronger host policy prohibits dispatch, report the exact limitation rather than silently replacing it with parent work or claiming its model ran. Missing runtime metadata is not proof of a routing failure; report only observed metadata. Eligible focused inline repair remains allowed. A permitted fallback reports actual routing, not successful requested-role execution. See [Native model routing](skills/us-run-workflow/SKILL.md#native-model-routing); reading it does not launch the workflow.
 
 
+New roles are appended to existing `models.yml` files when Useful Skills updates, keeping every existing line (a role that falls back to your `default` row is left out). OMP users see unmapped roles in `/useful-skills doctor`. Useful Skills also publishes the role list as `roles.json` in its data directory.
+
+
 ### Claude Code model roles
 
 Claude Code does not read OMP's `config.yml`. Its role models live in a Claude-owned file, `~/.claude/harness-useful-skills/models.yml` (under `$CLAUDE_CONFIG_DIR` when set). The plugin's `SessionStart` hook creates it with these defaults the first time Claude Code starts after installation:
