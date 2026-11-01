@@ -68,5 +68,6 @@ test("an enabled backend-memory stage points at Harness Memory before Useful Ski
   const line = context.workflowContext(policy("enabled")).split("\n").find(text => text.startsWith("Automatic backend-memory"));
 
   assert.match(line, /Harness Memory: when its `note_search` and `note_save` tools are available, follow `host:us-use-harness-memory`/);
+  assert.match(line, /when the `knowledge_search` tool is available, follow `host:us-use-harness-knowledge`/);
   assert.match(line, /Only without those tools consult `host:us-manage-memory`/);
 });

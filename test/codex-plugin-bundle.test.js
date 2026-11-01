@@ -66,7 +66,7 @@ test("the committed Codex bundles match their generator", async () => {
   assert.match(stdout, /Checked \d+ Codex runtime bundle files/);
 });
 
-test("the plugin ships the manifest, the 22 canonical skills, and no MCP config or hooks", async () => {
+test("the plugin ships the manifest, the 23 canonical skills, and no MCP config or hooks", async () => {
   const files = await filesBelow(PLUGIN);
   assert.deepEqual(files.filter(file => FORBIDDEN.some(pattern => pattern.test(file))), []);
   assert.ok(files.includes("README.md"));
@@ -76,7 +76,7 @@ test("the plugin ships the manifest, the 22 canonical skills, and no MCP config 
   const canonical = (await readdir(path.join(ROOT, "skills"), { withFileTypes: true }))
     .filter(entry => entry.isDirectory() && entry.name.startsWith("us-")).map(entry => entry.name).sort();
   const skills = (await readdir(path.join(PLUGIN, "skills"))).sort();
-  assert.equal(skills.length, 22);
+  assert.equal(skills.length, 23);
   assert.deepEqual(skills, canonical);
   for (const skill of skills) assert.ok(await exists(path.join(PLUGIN, "skills", skill, "SKILL.md")), skill);
 });

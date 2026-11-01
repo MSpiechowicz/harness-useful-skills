@@ -78,9 +78,9 @@ test("both Claude manifests carry the package version", async () => {
   assert.equal(await version(path.join(BUNDLE, ".claude-plugin", "plugin.json")), expected);
 });
 
-test("the bundle manifest lists the 22 shipped skills and 8 agents", async () => {
+test("the bundle manifest lists the 23 shipped skills and 8 agents", async () => {
   const manifest = JSON.parse(await readFile(path.join(BUNDLE, ".claude-plugin", "plugin.json"), "utf8"));
-  assert.equal(manifest.skills.length, 22);
+  assert.equal(manifest.skills.length, 23);
   assert.ok(!manifest.skills.some(skill => skill.includes("us-library")));
   for (const skill of manifest.skills) assert.ok(await exists(path.join(BUNDLE, skill, "SKILL.md")), skill);
 
@@ -88,7 +88,7 @@ test("the bundle manifest lists the 22 shipped skills and 8 agents", async () =>
   for (const agent of manifest.agents) assert.ok(await exists(path.join(BUNDLE, agent)), agent);
 
   const folders = (await readdir(path.join(BUNDLE, "claude", "skills"))).filter(name => name.startsWith("us-"));
-  assert.equal(folders.length, 22);
+  assert.equal(folders.length, 23);
   assert.equal((await readdir(path.join(BUNDLE, "claude", "agents"))).length, 8);
   assert.match(manifest.repository, /^https:\/\/github\.com\/MSpiechowicz\/harness-useful-skills$/);
 });
@@ -108,13 +108,13 @@ test("every relative import and URL in the bundled modules resolves inside the b
   }
 });
 
-test("the bundled command lists the 22 shipped skills", async t => {
+test("the bundled command lists the 23 shipped skills", async t => {
   const { cwd, env } = await isolated(t);
   const command = path.join(BUNDLE, "claude", "command.js");
 
   const skills = await execute(process.execPath, [command, "list"], { cwd, env });
   const names = [...skills.stdout.matchAll(/^\s+(us-[a-z-]+)/gm)].map(match => match[1]);
-  assert.equal(names.length, 22);
+  assert.equal(names.length, 23);
   assert.ok(!names.includes("us-library"));
 });
 
