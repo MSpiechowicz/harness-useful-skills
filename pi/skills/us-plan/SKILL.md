@@ -15,7 +15,7 @@ Require the requested outcome, available source/research brief, repository conve
 
 ## Draft one actionable plan
 
-Draft the plan from the requested outcome, research brief, repository conventions, constraints, proposed work-package boundaries, and unresolved risks. Check the draft against current evidence, resolve factual conflicts, and integrate it into one complete plan. Turn open questions and unresolved user-owned choices into a round with the `us-grill-me` skill before presenting the plan, and present the plan only on settled choices.
+Draft the plan from the requested outcome, research brief, repository conventions, constraints, proposed work-package boundaries, and unresolved risks, using `references/planner-brief.md` relative to this skill's base directory as the checklist for the draft. Check the draft against current evidence, resolve factual conflicts, and integrate it into one complete plan. Turn open questions and unresolved user-owned choices into a round with the `us-grill-me` skill before presenting the plan, and present the plan only on settled choices.
 
 State:
 

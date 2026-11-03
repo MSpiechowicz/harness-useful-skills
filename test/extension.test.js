@@ -167,6 +167,8 @@ test("catastrophic protection and redaction are independent of selected workflow
   assert.equal(f.events.get("tool_call")({ toolName: "bash", input: { command: "rm -rf /" } }).block, true);
   assert.equal(f.events.get("tool_call")({ toolName: "bash", input: { command: "node --test" } }), undefined);
   assert.equal(f.events.get("tool_call")({ toolName: "read", input: { command: "rm -rf /" } }), undefined);
+  assert.deepEqual(f.events.get("tool_call")({ toolName: "task", input: { agent: "reviewer", task: "Check", model: [], sourceSession: "" } }), { input: { agent: "reviewer", task: "Check" } });
+  assert.equal(f.events.get("tool_call")({ toolName: "task", input: { agent: "reviewer", task: "Check" } }), undefined);
   const content = [{ type: "text", text: "token=" + "x".repeat(24) }];
   assert.equal(f.events.get("tool_result")({ content }).content[0].text, "token=[REDACTED]");
   await f.commands.get("useful-skills").handler("workflow disabled", f.ctx);

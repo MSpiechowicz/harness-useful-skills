@@ -11,6 +11,7 @@ import { executeMemory, MEMORY_PARAMETERS } from "./memory.js";
 import { codeHint, searchTerms } from "./code-hint.js";
 import { DATA_DIRECTORY } from "./names.js";
 import { ompSearchInput } from "./omp/hook-input.js";
+import { taskInputWithoutEmptyFields } from "./omp/task-input.js";
 import { createNudgeTracker, repoNudge } from "./omp/nudge.js";
 import {
   dangerousCommandReason, formatResources, listResources, parseCatalogArguments,
@@ -364,6 +365,11 @@ export default function usefulSkills(pi, { memoryAction = executeMemory, codeHin
 
   pi.on("tool_call", (event, ctx) => {
     nudges.noteToolUse(event, sessionIdOf(ctx));
+    if (event.toolName === "task") {
+      // OMP refuses a task call that carries an empty optional field (model, sourceSession, ...).
+      const input = taskInputWithoutEmptyFields(event.input);
+      return input ? { input } : undefined;
+    }
     if (!safetyEnabled() || event.toolName !== "bash") {
       return;
     }

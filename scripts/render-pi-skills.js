@@ -114,7 +114,7 @@ const RULES = {
   'us-plan'(text) {
     text = line(text, 'When planning is applicable and enabled', `When planning is applicable in normal composition, selected and eligible for focused work, or explicitly requested, read **Native model routing** in \`skill://us-run-workflow\` first. It does not launch the workflow. Pi has no worker tool: inspect source, then draft the plan inline in the parent, which owns scope, decomposition, and integration in the active workspace, and report it as ${INLINE}. Plan approval is still required before edits. Host permissions remain authoritative and cannot be bypassed.`);
     text = replace(text, '## Dispatch and integrate one actionable plan', '## Draft one actionable plan');
-    text = line(text, 'Give `planner` the requested outcome', 'Draft the plan from the requested outcome, research brief, repository conventions, constraints, proposed work-package boundaries, and unresolved risks. Check the draft against current evidence, resolve factual conflicts, and integrate it into one complete plan. Turn open questions and unresolved user-owned choices into a round with `skill://us-grill-me` before presenting the plan, and present the plan only on settled choices.');
+    text = line(text, 'Give `planner` the requested outcome', 'Draft the plan from the requested outcome, research brief, repository conventions, constraints, proposed work-package boundaries, and unresolved risks, using `references/planner-brief.md` ' + BASE + ' as the checklist for the draft. Check the draft against current evidence, resolve factual conflicts, and integrate it into one complete plan. Turn open questions and unresolved user-owned choices into a round with `skill://us-grill-me` before presenting the plan, and present the plan only on settled choices.');
     text = line(text, '- ordered work packages with ownership boundaries', '- ordered work packages with ownership boundaries and a frontend, backend, or genuinely neither classification to set order and ownership (Pi implements every package inline in the parent). Split mixed packages where coherent and keep dependencies serial;');
     text = line(text, 'Keep every package specific enough', 'Keep every package specific enough to implement: classification, names, inputs/outputs, acceptance, and evidence are concrete. Prefer existing repository patterns and avoid speculative abstractions. Keep a short task list in the conversation, not an external ledger, command family, scheduler, or workflow engine.');
     text = replace(text, 'After integrating a selected planner draft,', 'After drafting the selected plan,');
@@ -169,6 +169,9 @@ const RULES = {
     return replace(text, 'steps of `skill://us-keep-ui-consistent` without editing', 'steps of the attached `us-keep-ui-consistent` guidance without editing');
   },
   'us-research/references/scout-brief.md'(text) {
+    return replace(text, 'Use only native read/search/navigation tools.', 'Use only read-only inspection (reading files, searching, and listing).');
+  },
+  'us-plan/references/planner-brief.md'(text) {
     return replace(text, 'Use only native read/search/navigation tools.', 'Use only read-only inspection (reading files, searching, and listing).');
   },
   'us-check-security/references/security-reviewer-brief.md'(text) {

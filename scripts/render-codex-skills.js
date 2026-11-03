@@ -87,6 +87,7 @@ const RULES = {
   'us-plan'(text) {
     text = line(text, 'When planning is applicable and enabled', `When planning is applicable in normal composition, selected and eligible for focused work, or explicitly requested, read **Native model routing** in the \`us-run-workflow\` skill before dispatching; this does not launch the workflow. The parent inspects source and owns scope, decomposition, and integration in the active workspace. Obtain a bounded read-only draft by ${spawn('planner')}, without setting \`model\` or \`reasoning_effort\`. ${READ_ONLY} A configured model is not observed worker metadata. Do not edit configuration. Host permissions remain authoritative and cannot be bypassed.`);
     text = replace(text, 'Give `planner` the requested outcome', 'Give `us-planner` the requested outcome');
+    text = replace(text, 'filled into `skill://us-plan/references/planner-brief.md`.', `filled into \`references/planner-brief.md\` ${BASE}, passed as the \`message\`.`);
     text = line(text, '- ordered work packages with ownership boundaries', '- ordered work packages with ownership boundaries and a frontend, backend, or genuinely neither classification: frontend uses `us-frontend`, backend uses `us-backend`, and only genuinely neither work—such as documentation or tooling—uses `us-general-purpose`; split mixed packages where coherent, retain dependencies serial, and run only ready disjoint packages in parallel;');
     text = line(text, 'Keep every package specific enough', 'Keep every package specific enough for its selected implementation worker: classification, names, inputs/outputs, acceptance, and evidence are concrete. Prefer existing repository patterns and avoid speculative abstractions. Keep a short task list in the conversation, not an external ledger, command family, scheduler, or workflow engine.');
     text = replace(text, 'Prefer native approval; otherwise wait for explicit conversational approval.', 'Ask for approval with `request_user_input` (approve or request changes) when available; otherwise present the plan, ask for approval in plain text, and end the turn.');
@@ -123,6 +124,9 @@ const RULES = {
     return line(text, 'Load `skill://us-write-concisely` before responding. This brief assigns', 'Load `skill://us-write-concisely` before responding. This brief assigns one authorized classified package: `us-frontend`, `us-backend`, or `us-general-purpose` for genuinely neither. Authorization is the applicable approved plan, prior approval for in-scope repairs, or the bounded current request when no plan stage applies, including eligible focused work; the plan stage alone does not require a new plan/approval for focused repair. Independent approval requirements remain. Declarations do not prove the running model. The parent selects lane, classification, and worker; do not choose or claim a model. Perform only the assigned task. Do not launch a full workflow, delegate, publish, commit, push, merge, open a PR, or alter files outside the assignment.');
   },
   'us-research/references/scout-brief.md'(text) {
+    return replace(text, 'Use only native read/search/navigation tools.', 'Use only read-only inspection (reading files, searching, listing, and non-mutating shell commands).');
+  },
+  'us-plan/references/planner-brief.md'(text) {
     return replace(text, 'Use only native read/search/navigation tools.', 'Use only read-only inspection (reading files, searching, listing, and non-mutating shell commands).');
   },
   'us-check-security/references/security-reviewer-brief.md'(text) {
