@@ -27,6 +27,7 @@ Tools: `knowledge_search`, `knowledge_get`, `knowledge_list`, `knowledge_feedbac
 
 - Never write on your own initiative. Call `knowledge_add` only when the user explicitly asks to add a document.
 - `knowledge_add` sends a proposal. Tell the user to review it in Harness Desktop → Knowledge. It is not stored until they approve it.
+- If the user requests changes to a proposal you sent (a message from Harness Desktop names it `held:<id>` with their comment), make the change and call `knowledge_add` again with `revises: held:<id>`. It replaces the old proposal in the review queue. Never send a second, separate proposal for it.
 - If `knowledge_add` refuses with `a similar document exists`, ask the user whether to update that document or add a separate one. Retry with `replaces: <id>` to update or `distinct: true` to add separately. Never retry blindly or choose for them.
 - Never run `harness-knowledge docs import` or edit the store from a shell to bypass review.
 - Never put secrets, tokens, credentials, or personal data in a proposal.
