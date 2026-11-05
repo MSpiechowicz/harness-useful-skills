@@ -2,6 +2,8 @@
 
 Load the `us-write-concisely` skill before responding. Assess only. Do not edit, run a workflow, publish, or ask another worker to fix anything.
 
+When the Harness Code tools (`code_map`, `code_symbol`, `code_impact`, `code_path`) are available, call them before grep or file reads to find code and its callers, with `project_path` set to the absolute git root. Use grep and file reads for literal text and for lines they do not show.
+
 ## Objective
 
 `<Parent fills: base ref, exact head SHA, and the assessment question. Name the stage context, workflow stage or direct request.>`

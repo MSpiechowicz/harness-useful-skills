@@ -20,12 +20,16 @@ export function backendMemoryGuidance(skill) {
   return `Automatic backend-memory stage enabled when applicable. Keep durable facts in Harness Memory: when its \`note_search\` and \`note_save\` tools are available, follow \`${skill("us-use-harness-memory")}\` and do not search or save facts with Useful Skills memory. Only without those tools consult \`${skill("us-manage-memory")}\`. Write note titles and bodies in English and search with a few English keywords. Add 3-5 lowercase tags with synonyms someone might search for. For written project documentation (how something works, API contracts, architecture), when the \`knowledge_search\` tool is available, follow \`${skill("us-use-harness-knowledge")}\`.`;
 }
 
+/** The enabled code-graph line when the Harness Code binary is installed: an instruction, not a pointer to a skill. */
+export const CODE_GRAPH_GUIDANCE = "Harness Code is installed. Your first tool call on every message MUST be a Harness Code tool, before any grep, find, ls or file read, with `project_path` (the repository root): `code_map` for an area (`focus` = the path the request names), `code_symbol` when you know a name. Memory and knowledge searches go in that same first batch. Then use `code_impact` before changing a signature or behaviour and `code_path` for how A reaches B. Use grep and file reads only for literal text and for details the graph does not show.";
+
 /**
  * Prompt context for one host. `skill(name)` turns a bare `us-*` skill name into the name the host's model
- * invokes; `ignoreInvocation` names the attested one-request opt-out, as the subject of a sentence.
+ * invokes; `ignoreInvocation` names the attested one-request opt-out, as the subject of a sentence;
+ * `codeToolsInstalled()` says whether the Harness Code binary is on this machine.
  * Context is built only from validated settings, never from user prompt content.
  */
-export function createWorkflowContext({ skill, ignoreInvocation }) {
+export function createWorkflowContext({ skill, ignoreInvocation, codeToolsInstalled = () => false }) {
   function fastLaneContext() {
     return FAST_LANE;
   }
@@ -47,6 +51,8 @@ export function createWorkflowContext({ skill, ignoreInvocation }) {
       const state = policy.stages[stage].effective;
       if (state === "enabled" && stage === "backend-memory") {
         instructions.push(`${backendMemoryGuidance(skill)} This setting is not evidence the stage has run.`);
+      } else if (state === "enabled" && stage === "code-graph" && codeToolsInstalled()) {
+        instructions.push(`${CODE_GRAPH_GUIDANCE} This setting is not evidence the stage has run.`);
       } else if (state === "enabled") {
         instructions.push(`Automatic ${stage} stage enabled when applicable; consult \`${skill(STAGE_SKILLS[stage])}\`. This setting is not evidence the stage has run.`);
       } else if (state === "disabled") {

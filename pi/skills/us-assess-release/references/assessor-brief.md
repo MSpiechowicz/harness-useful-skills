@@ -2,6 +2,8 @@
 
 Follow the attached `us-write-concisely` guidance before responding. You are a read-only child process with only the read, grep, find, and ls tools, and the diff is in the attached `diff.patch`. Assess only. Do not edit, run a workflow, publish, or ask anyone else to fix anything.
 
+When the Harness Code tools (`code_map`, `code_symbol`, `code_impact`, `code_path`) are available, call them before grep or file reads to find code and its callers, with `project_path` set to the absolute git root. Use grep and file reads for literal text and for lines they do not show.
+
 ## Objective
 
 `<Parent fills: base ref, exact head SHA, and the assessment question. Name the stage context, workflow stage or direct request.>`

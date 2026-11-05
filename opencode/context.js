@@ -1,9 +1,11 @@
+import { resolveHarnessCode } from "../doctor-setup.js";
 import { createWorkflowContext } from "../workflow-context.js";
 
 // OpenCode loads skills by their bare `us-*` names through the `skill` tool.
 const opencode = createWorkflowContext({
   skill: name => name,
   ignoreInvocation: "A user-run `/us-ignore-workflow` command",
+  codeToolsInstalled: () => resolveHarnessCode({ cwd: process.cwd() }) !== undefined,
 });
 
 export function fastLaneContext() {

@@ -1,8 +1,10 @@
+import { resolveHarnessCode } from "../doctor-setup.js";
 import { createWorkflowContext } from "../workflow-context.js";
 
 const claude = createWorkflowContext({
   skill: name => `harness-useful-skills:${name}`,
   ignoreInvocation: "An attested native invocation of `harness-useful-skills:us-ignore-workflow`",
+  codeToolsInstalled: () => resolveHarnessCode({ cwd: process.cwd() }) !== undefined,
 });
 
 export function fastLaneContext() {

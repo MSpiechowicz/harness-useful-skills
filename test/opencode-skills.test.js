@@ -39,8 +39,8 @@ test("every OpenCode skill has OpenCode-valid frontmatter", async () => {
 });
 
 // Keys OpenCode v1.19 accepts under `permission:` (packages/core/src/v1/config/permission.ts) plus the "*" default.
-const PERMISSION_KEYS = new Set(["*", "read", "edit", "glob", "grep", "list", "bash", "task", "external_directory", "todowrite", "question", "webfetch", "websearch", "lsp", "doom_loop", "skill"]);
-const READ_ONLY = { "*": "deny", read: "object", grep: "allow", glob: "allow", list: "allow", lsp: "allow", skill: "allow" };
+const PERMISSION_KEYS = new Set(["*", "read", "edit", "glob", "grep", "list", "bash", "task", "external_directory", "todowrite", "question", "webfetch", "websearch", "lsp", "doom_loop", "skill", "harness-code_*"]);
+const READ_ONLY = { "*": "deny", read: "object", grep: "allow", glob: "allow", list: "allow", lsp: "allow", skill: "allow", "harness-code_*": "allow" };
 const EXPECTED_PERMISSIONS = {
   scout: READ_ONLY,
   planner: READ_ONLY,
@@ -61,7 +61,7 @@ function permissionsOf(rows) {
   const nested = new Map();
   let current;
   for (const row of rows.slice(start + 1)) {
-    const top = /^  ("\*"|[a-z_]+):(?: (allow|ask|deny))?$/.exec(row);
+    const top = /^  ("\*"|"harness-code_\*"|[a-z_]+):(?: (allow|ask|deny))?$/.exec(row);
     if (top) {
       current = top[1].replaceAll('"', "");
       assert.equal(permissions.has(current), false, `duplicate ${current}`);

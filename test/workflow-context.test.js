@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as claude from "../claude/context.js";
 import * as opencode from "../opencode/context.js";
-import { createWorkflowContext } from "../workflow-context.js";
+import { CODE_GRAPH_GUIDANCE, createWorkflowContext } from "../workflow-context.js";
 import { STAGES } from "../workflow-settings.js";
 
 const STATES = ["enabled", "disabled", "unknown"];
@@ -61,6 +61,16 @@ test("an enabled workflow gives one line per stage and points enabled stages at 
     assert.ok(line.startsWith(`Automatic ${stage} stage`));
     assert.equal(/`host:us-[a-z-]+`/.test(line), state === "enabled", line);
   }
+});
+
+test("an enabled code-graph stage is a direct instruction only when Harness Code is installed", () => {
+  const lineOf = (installed, state = "enabled") => createWorkflowContext({ skill: name => `host:${name}`, ignoreInvocation: "Opt-out", codeToolsInstalled: () => installed })
+    .workflowContext(policy("enabled", () => state)).split("\n").find(text => text.includes("code-graph") || text.startsWith("Harness Code is installed"));
+
+  assert.ok(lineOf(true).startsWith(CODE_GRAPH_GUIDANCE));
+  assert.match(lineOf(true), /first tool call on every message MUST be a Harness Code tool/);
+  assert.match(lineOf(false), /^Automatic code-graph stage enabled when applicable; consult `host:us-manage-memory`/);
+  assert.match(lineOf(true, "disabled"), /^Automatic code-graph stage disabled/);
 });
 
 test("an enabled backend-memory stage points at Harness Memory before Useful Skills memory", () => {

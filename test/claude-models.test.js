@@ -47,7 +47,7 @@ test("first session creates the default model config and one role agent per plug
   assert.match(backend, /^name: us-backend$/m);
   assert.match(backend, /^model: claude-opus-5-5$/m);
   assert.match(backend, /^effort: high$/m);
-  assert.match(backend, /^tools: Read, Grep, Glob, Edit, Write, Bash$/m);
+  assert.match(backend, /^tools: Read, Grep, Glob, Edit, Write, Bash, mcp__harness-code__code_map, mcp__harness-code__code_symbol, mcp__harness-code__code_impact, mcp__harness-code__code_path$/m);
   assert.doesNotMatch(backend, /the plugin's `claude\//);
   const general = await readFile(agentPath(directory, "general-purpose"), "utf8");
   assert.match(general, /^model: claude-sonnet-5-5$/m);

@@ -2,6 +2,8 @@
 
 Load the `us-write-concisely` skill before responding. This brief assigns one authorized classified package: `us-frontend`, `us-backend`, or `us-general-purpose` for genuinely neither. Authorization is the applicable approved plan, prior approval for in-scope repairs, or the bounded current request when no plan stage applies, including eligible focused work; the plan stage alone does not require a new plan/approval for focused repair. Independent approval requirements remain. Declarations do not prove the running model. The parent selects lane, classification, and worker; do not choose or claim a model. Perform only the assigned task. Do not launch a full workflow, delegate, publish, commit, push, merge, open a PR, or alter files outside the assignment.
 
+When the Harness Code tools (`code_map`, `code_symbol`, `code_impact`, `code_path`) are available, call them before grep or file reads to find code and its callers, with `project_path` set to the absolute git root. Use grep and file reads for literal text and for lines they do not show.
+
 ## Objective
 
 `<Parent fills: authorized task, observable acceptance, selected lane/required stages, and applicable plan excerpt, prior in-scope approval, or bounded current request.>`
