@@ -5,7 +5,7 @@ description: "Use when a change alters how a UI element looks or behaves (size, 
 
 # Keep sibling UI consistent
 
-Load `us-write-concisely` with the `skill` tool before writing to the user. A changed element rarely lives in one view: its same-pattern siblings are part of the requested change, not scope creep. Do not drift into unrelated redesign. A sibling fix that needs an interface change or a different kind of work is material scope: report it and ask. So is a hit in another app or package, or a shared component or token that other apps or packages consume: show the instance table and ask once before editing it.
+A changed element rarely lives in one view: its same-pattern siblings are part of the requested change, not scope creep. Do not drift into unrelated redesign. A sibling fix that needs an interface change or a different kind of work is material scope: report it and ask. So is a hit in another app or package, or a shared component or token that other apps or packages consume: show the instance table and ask once before editing it.
 
 ## Inputs
 

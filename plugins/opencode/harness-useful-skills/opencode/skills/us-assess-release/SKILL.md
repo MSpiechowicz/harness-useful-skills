@@ -5,7 +5,7 @@ description: "Use after the final review and security review, before a PR or the
 
 # Fresh release assessment
 
-Load `us-write-concisely` with the `skill` tool. Apply lane selection in the `us-run-workflow` skill when loaded directly. As a stage of an active workflow, keep that workflow's lane. This skill is read-only. It never edits, approves, or publishes, and never replaces correctness or security review. Disabled/unknown automatic assessment is not selected automatically. Explicit assessment requests remain binding.
+Apply lane selection in the `us-run-workflow` skill when loaded directly. As a stage of an active workflow, keep that workflow's lane. This skill is read-only. It never edits, approves, or publishes, and never replaces correctness or security review. Disabled/unknown automatic assessment is not selected automatically. Explicit assessment requests remain binding.
 
 ## Inputs
 

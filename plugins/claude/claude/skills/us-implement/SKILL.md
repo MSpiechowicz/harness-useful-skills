@@ -5,7 +5,7 @@ description: Use once a change is authorized: the user approves a plan ("go ahea
 
 # Implement the authorized change
 
-Load `/harness-useful-skills:us-write-concisely`. Apply the pre-composition lane selection in `/harness-useful-skills:us-run-workflow` even when loading this skill directly; loading guidance does not launch a full workflow. Read current source/callers, acceptance, available research, and the applicable authorization: approved plan for a selected plan stage, prior in-scope approval for its repairs, or the bounded current request when no plan stage applies (including an eligible focused repair). Enabled `plan` alone does not impose a new approval on focused work. Interrupted work may have drifted. Use available Claude task/plan tools to reflect work, but let current source and observed verification—not task status—determine completion.
+Apply the pre-composition lane selection in `/harness-useful-skills:us-run-workflow` even when loading this skill directly; loading guidance does not launch a full workflow. Read current source/callers, acceptance, available research, and the applicable authorization: approved plan for a selected plan stage, prior in-scope approval for its repairs, or the bounded current request when no plan stage applies (including an eligible focused repair). Enabled `plan` alone does not impose a new approval on focused work. Interrupted work may have drifted. Use available Claude task/plan tools to reflect work, but let current source and observed verification—not task status—determine completion.
 
 ## Inputs
 

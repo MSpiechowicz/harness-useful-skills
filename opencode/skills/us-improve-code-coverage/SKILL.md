@@ -5,7 +5,7 @@ description: "Use when the user asks to \"improve test coverage\", \"add missing
 
 # Improve code coverage without padding
 
-Load `us-write-concisely` with the `skill` tool before preparing context or findings. This skill improves confidence in consumer-observable behavior; a percentage is a diagnostic, not the goal. It does not install tooling, lower thresholds, add exclusions, change application code, or execute the development workflow by itself.
+This skill improves confidence in consumer-observable behavior; a percentage is a diagnostic, not the goal. It does not install tooling, lower thresholds, add exclusions, change application code, or execute the development workflow by itself.
 
 ## Inputs and authority
 

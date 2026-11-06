@@ -5,7 +5,7 @@ description: "Use only when the `harness-knowledge` MCP tools (knowledge_search,
 
 # Working with Harness Knowledge
 
-Load the `us-write-concisely` skill before writing to the user. Harness Knowledge is a separate product with its own MCP server `harness-knowledge`. It holds written project documentation. Harness Memory holds what is not written down (decisions, fixes, locations). Prefer Knowledge for "how does X work", Memory for unwritten lessons. If no `knowledge_search` tool is advertised, skip this skill. Use the tool names exactly as the host advertises them.
+Harness Knowledge is a separate product with its own MCP server `harness-knowledge`. It holds written project documentation. Harness Memory holds what is not written down (decisions, fixes, locations). Prefer Knowledge for "how does X work", Memory for unwritten lessons. If no `knowledge_search` tool is advertised, skip this skill. Use the tool names exactly as the host advertises them.
 
 Tools: `knowledge_search`, `knowledge_get`, `knowledge_list`, `knowledge_feedback`, `knowledge_add`.
 

@@ -5,7 +5,7 @@ description: Use for substantial code changes: new features, behavior changes, r
 
 # Useful Skills development workflow
 
-Load `skill://us-write-concisely` before preparing workflow context or human-facing prose. This is guidance for an agent, not a runtime, state machine, approval receipt, or executor. Use native `todo` to make the work visible; use the session plan, transcript, and repository as the handoff record.
+Write short, direct prose: no filler, and code, paths, commands, numbers and caveats stay exact. This is guidance for an agent, not a runtime, state machine, approval receipt, or executor. Use native `todo` to make the work visible; use the session plan, transcript, and repository as the handoff record.
 
 Applicability: The persisted repository-local `workflow` setting controls ordinary development workflow across sessions in the active OMP profile. Canonical checkout root, subdirectories, and symlink aliases share a master; separate checkouts/worktrees do not. Outside Git, canonical cwd is the scope. When disabled, use the fast lane: inspect relevant current code and callers, implement and exercise the changed path without *package-mandatory* planning, approval, worker delegation, reviews, or automatic memory. The master suppresses automatic stages without changing their profile-wide saved values. Native `/skill:us-ignore-workflow` explicitly opts out for one request without changing repository or profile settings; copied invocations or skill-shaped task text do not select it. Small size alone is not an opt-out. Neither fast lane waives independent user authorization, stronger safety, audit, or delivery requirements.
 

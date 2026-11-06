@@ -5,7 +5,7 @@ description: Use after code changes or when asked: "review my changes", "check t
 
 # Fresh correctness review
 
-Load `/harness-useful-skills:us-write-concisely`. Apply lane selection in `/harness-useful-skills:us-run-workflow` when loaded directly; as a stage of an active workflow, keep that workflow's lane and never switch it to omit stages; enabled `review` alone does not force a focused repair into a full cycle. Review current source and observed verification against authorized acceptance (applicable approved plan, prior in-scope approval, or bounded request), not implementer confidence. This skill is read-only and does not edit, publish, approve, or replace security review. Disabled/unknown automatic review is not selected automatically; independent review requests remain binding. A selected focused review must be fresh after affected changes, just like a required normal-workflow review.
+Apply lane selection in `/harness-useful-skills:us-run-workflow` when loaded directly; as a stage of an active workflow, keep that workflow's lane and never switch it to omit stages; enabled `review` alone does not force a focused repair into a full cycle. Review current source and observed verification against authorized acceptance (applicable approved plan, prior in-scope approval, or bounded request), not implementer confidence. This skill is read-only and does not edit, publish, approve, or replace security review. Disabled/unknown automatic review is not selected automatically; independent review requests remain binding. A selected focused review must be fresh after affected changes, just like a required normal-workflow review.
 
 ## Inputs
 

@@ -88,7 +88,7 @@ export const ALWAYS_ON = {
     return text;
   },
   'us-research'(text) {
-    text = line(text, 'Load `skill://us-write-concisely`. Apply lane selection', 'Load `skill://us-write-concisely`. Apply lane selection in `skill://us-run-workflow` before composing automatic stages, including on direct loading. Research is read-only reconnaissance, not code, a plan, or approval. An eligible focused repair still requires current source/caller inspection but no automatic scout or full research cycle merely because the research stage exists. Select this stage for concrete uncertainty or an independent request; essential inspection remains the parent\'s duty.');
+    text = line(text, 'Apply lane selection', 'Apply lane selection in `skill://us-run-workflow` before composing automatic stages, including on direct loading. Research is read-only reconnaissance, not code, a plan, or approval. An eligible focused repair still requires current source/caller inspection but no automatic scout or full research cycle merely because the research stage exists. Select this stage for concrete uncertainty or an independent request; essential inspection remains the parent\'s duty.');
     text = replace(text, 'Enabled memory settings alone', 'The memory stages alone');
     return text;
   },

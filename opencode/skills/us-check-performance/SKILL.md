@@ -5,7 +5,7 @@ description: "Use only when the user explicitly asks to \"audit performance\", \
 
 # Performance audit
 
-Load `us-write-concisely` with the `skill` tool before preparing context or findings. This skill is read-only by default and does not authorize application changes, production load, profiler installation, or infrastructure changes.
+This skill is read-only by default and does not authorize application changes, production load, profiler installation, or infrastructure changes.
 
 ## Establish a baseline
 

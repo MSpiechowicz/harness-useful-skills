@@ -1,6 +1,6 @@
 # Read-only planner brief
 
-Load `/harness-useful-skills:us-write-concisely` before responding. Use only native read/search/navigation tools. Draft only: do not edit files, run validation, delegate, launch a workflow, publish, or ask the user for approval. The parent integrates your draft into the plan and owns approval. When the Harness Code (`harness-code`) tools `code_map`, `code_symbol`, `code_impact`, or `code_path` are advertised, use them instead of grep for code structure (each takes `project_path`, the absolute git root): `code_impact` before proposing a changed signature or behaviour, `code_path` for how A reaches B. Use grep or Read only for literal text, config values, or lines the tools do not show.
+Write short, direct prose: no filler, and code, paths, commands, numbers and caveats stay exact. Use only native read/search/navigation tools. Draft only: do not edit files, run validation, delegate, launch a workflow, publish, or ask the user for approval. The parent integrates your draft into the plan and owns approval. When the Harness Code (`harness-code`) tools `code_map`, `code_symbol`, `code_impact`, or `code_path` are advertised, use them instead of grep for code structure (each takes `project_path`, the absolute git root): `code_impact` before proposing a changed signature or behaviour, `code_path` for how A reaches B. Use grep or Read only for literal text, config values, or lines the tools do not show.
 
 ## Objective
 

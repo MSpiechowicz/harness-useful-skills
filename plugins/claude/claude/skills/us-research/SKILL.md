@@ -5,7 +5,7 @@ description: Use before changing code when current code, callers, tests, or conv
 
 # Evidence before implementation planning
 
-Load `/harness-useful-skills:us-write-concisely`. Apply lane selection in `/harness-useful-skills:us-run-workflow` before composing automatic stages, including on direct loading. Research is read-only reconnaissance, not code, a plan, or approval. An eligible focused repair still requires current source/caller inspection but no automatic scout or full research cycle merely because `research` is enabled. Select this stage for concrete uncertainty or an independent request. Disabled/unknown research is not automatically selected; essential inspection remains the parent's duty.
+Apply lane selection in `/harness-useful-skills:us-run-workflow` before composing automatic stages, including on direct loading. Research is read-only reconnaissance, not code, a plan, or approval. An eligible focused repair still requires current source/caller inspection but no automatic scout or full research cycle merely because `research` is enabled. Select this stage for concrete uncertainty or an independent request. Disabled/unknown research is not automatically selected; essential inspection remains the parent's duty.
 
 ## Inputs
 

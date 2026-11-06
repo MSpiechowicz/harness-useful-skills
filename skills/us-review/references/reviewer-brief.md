@@ -1,6 +1,6 @@
 # Fresh correctness reviewer brief
 
-Load `skill://us-write-concisely` before responding. Review only; do not edit, run a workflow, publish, or ask another worker to fix findings.
+Write short, direct prose: no filler, and code, paths, commands, numbers and caveats stay exact. Review only; do not edit, run a workflow, publish, or ask another worker to fix findings.
 
 When the Harness Code tools (`code_map`, `code_symbol`, `code_impact`, `code_path`) are available, call them before grep or file reads to find code and its callers, with `project_path` set to the absolute git root. Use grep and file reads for literal text and for lines they do not show.
 

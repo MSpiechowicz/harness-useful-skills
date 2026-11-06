@@ -5,7 +5,7 @@ description: Use after the final review and security review, before a PR or the 
 
 # Fresh release assessment
 
-Load `/harness-useful-skills:us-write-concisely`. Apply lane selection in `/harness-useful-skills:us-run-workflow` when loaded directly. As a stage of an active workflow, keep that workflow's lane. This skill is read-only. It never edits, approves, or publishes, and never replaces correctness or security review. Disabled/unknown automatic assessment is not selected automatically. Explicit assessment requests remain binding.
+Apply lane selection in `/harness-useful-skills:us-run-workflow` when loaded directly. As a stage of an active workflow, keep that workflow's lane. This skill is read-only. It never edits, approves, or publishes, and never replaces correctness or security review. Disabled/unknown automatic assessment is not selected automatically. Explicit assessment requests remain binding.
 
 ## Inputs
 

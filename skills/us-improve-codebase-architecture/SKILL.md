@@ -5,7 +5,7 @@ description: Use when the user asks to "improve the architecture", "find refacto
 
 # Improve codebase architecture
 
-Load `skill://us-write-concisely` before preparing findings. This skill begins as a read-only architecture investigation. It surfaces candidates and does not authorize refactoring, code changes, documentation changes, publication, or a new workflow run.
+This skill begins as a read-only architecture investigation. It surfaces candidates and does not authorize refactoring, code changes, documentation changes, publication, or a new workflow run.
 
 ## Inputs and scope
 

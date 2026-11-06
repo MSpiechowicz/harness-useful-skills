@@ -5,7 +5,7 @@ description: "Use when a request changes how a view, page, screen, or layout loo
 
 # Show the options before building
 
-Load the `us-write-concisely` skill before writing to the user. A big visual or interaction change has no single right answer, so build the candidates, show them, and let the user pick. Mockups are throwaway previews, not the implementation, and a pick is not plan approval.
+A big visual or interaction change has no single right answer, so build the candidates, show them, and let the user pick. Mockups are throwaway previews, not the implementation, and a pick is not plan approval.
 
 ## Inputs
 

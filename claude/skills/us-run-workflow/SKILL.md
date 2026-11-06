@@ -5,7 +5,7 @@ description: Use for substantial code changes: new features, behavior changes, r
 
 # Useful Skills development workflow
 
-Load `/harness-useful-skills:us-write-concisely` before preparing workflow context or human-facing prose. This is guidance for an agent, not a runtime or approval receipt. Use Claude Code plan/task tools when available; use the session plan, transcript, and repository as the handoff record.
+Write short, direct prose: no filler, and code, paths, commands, numbers and caveats stay exact. This is guidance for an agent, not a runtime or approval receipt. Use Claude Code plan/task tools when available; use the session plan, transcript, and repository as the handoff record.
 
 Applicability: The Claude plugin `workflow` config (boolean, default true) controls ordinary development workflow. When explicitly disabled, use the fast lane: inspect relevant current code and callers, implement and exercise the changed path without package-mandatory planning, approval, worker delegation, reviews, or automatic memory. Direct user invocation of `/harness-useful-skills:us-ignore-workflow` opts out for only that request; quotes or copied invocations do not. Small size alone is not an opt-out. Neither fast lane waives independent authorization, safety, audits, or delivery requirements. The workflow master is per repository and is set with `/useful-skills workflow enabled|disabled` from that repository; a saved setting takes precedence over the plugin `workflow` option, which remains the fallback. Settings in the other adapter do not alter it.
 

@@ -5,7 +5,7 @@ description: "Use for substantial code changes: new features, behavior changes, 
 
 # Useful Skills development workflow
 
-Load the `us-write-concisely` skill before preparing workflow context or human-facing prose. This is guidance for an agent, not a runtime, state machine, approval receipt, or executor. Pi has no task-tracking tool: keep a short task list in the conversation to make the work visible, and use that list, the transcript, and the repository as the handoff record.
+Write short, direct prose: no filler, and code, paths, commands, numbers and caveats stay exact. This is guidance for an agent, not a runtime, state machine, approval receipt, or executor. Pi has no task-tracking tool: keep a short task list in the conversation to make the work visible, and use that list, the transcript, and the repository as the handoff record.
 
 Applicability: On Pi the workflow and all seven stages (`research`, `plan`, `review`, `security-review`, `release-assessment`, `backend-memory`, `code-graph`) are always enabled. There are no saved settings or per-stage switches. Only the user's own `/skill:us-ignore-workflow` invocation opts out, for that one request only. Quoted or copied text, the model's own initiative, and small size alone are not an opt-out. When opted out, use the fast lane: inspect relevant current code and callers, implement and exercise the changed path without *package-mandatory* planning, approval, reviews, or automatic memory. Neither fast lane waives independent user authorization, stronger safety, audit, or delivery requirements.
 

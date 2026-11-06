@@ -5,7 +5,7 @@ description: "Use for \"security audit\", \"security review\", \"check for vulne
 
 # Security review
 
-Load the `us-write-concisely` skill before preparing context or findings. This skill audits the current checkout; it does not authorize changes, deployment, publication, or testing against production. An ignore-workflow opt-out suppresses only the automatic workflow stage, not an explicit security audit or another independent requirement; never report a skipped stage as completed.
+This skill audits the current checkout; it does not authorize changes, deployment, publication, or testing against production. An ignore-workflow opt-out suppresses only the automatic workflow stage, not an explicit security audit or another independent requirement; never report a skipped stage as completed.
 
 Apply pre-composition lane selection in the `us-run-workflow` skill when loaded directly; as a stage of an active workflow, keep that workflow's lane and never switch it to omit stages. The `security-review` stage alone does not require an automatic audit for a clear low-risk focused correction. Actual security-sensitive changes require normal applicable stages and any independent security obligations, never a size-based exemption. A selected focused audit remains independent and fresh after affected changes; it does not trigger unrelated full-workflow stages.
 
