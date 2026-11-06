@@ -33,9 +33,9 @@ Report the Review guide block:
 3. Reasons: bullets with the evidence behind the tier and the confidence.
 4. `Check`: the paths or areas a human should check, each with why. Write `none` for T0–T1.
 5. When the tier is T4 or higher: `T4–T6 recommend a human check before merge`.
-6. Both rubric tables inside `<details><summary>Tier and confidence definitions</summary>…</details>`.
+6. A `Tier and confidence definitions` heading at the very end, followed by both rubric tables copied in full as plain Markdown tables, with every tier T0–T6 and every confidence level.
 
-In chat, report the same block. The tables may be omitted if you say they are defined in `references/rubric.md` in this skill's directory (the folder that contains this SKILL.md).
+Readers of a PR cannot open this skill, so the tables always appear in full. Never replace them with a skill path, a file path, or a link. In chat, report the same block.
 
 ## Completion evidence
 
