@@ -33,4 +33,4 @@ Return a fresh, evidence-backed tier and confidence that a human can check again
 
 ## Output
 
-Return the head SHA, `Tier: T<n> <Name> · Confidence: <Level>`, the matched tier row and confidence row quoted from the rubric, reasons as bullets with their evidence, a `Check` list of paths or areas with why (`none` for T0–T1), and the limitations. Note `T4–T6 recommend a human check before merge` when the tier is T4 or higher.
+Return the head SHA, `Tier: T<n> <Name> · Confidence: <Level>`, the matched tier row and confidence row quoted from the rubric, reasons as bullets with their evidence, a `Check` list of paths or areas with why (`none` for T0–T1), and the limitations. Note `T4–T6 recommend a human check before merge` when the tier is T4 or higher. Never point readers to a skill path or to the rubric file: they cannot open it, and the parent adds the full tables.
