@@ -104,7 +104,7 @@ claude plugin install harness-useful-skills@harness-useful-skills --scope user
 
 The Claude plugin ID is `harness-useful-skills@harness-useful-skills` in either case. Install through the marketplace, **not** `claude --plugin-dir .`: that loads the repository-root OMP `skills/` instead of the marketplace's selected Claude skills. Restart Claude Code after installation. The OMP installation, commands, and profile behavior above remain unchanged.
 
-Claude exposes 23 namespaced skills (for example, `/harness-useful-skills:us-run-workflow`) and eight native agents: `planner`, `scout`, `frontend`, `backend`, `general-purpose`, `reviewer`, `security-reviewer`, and `release-assessor`. All declare `model: inherit`; per-role models come from a Claude-owned config file instead (see [Claude Code model roles](#claude-code-model-roles)). Permissions and stronger host rules remain authoritative. Plugin `userConfig` has eight default-`true` booleans: `workflow`, `research`, `plan`, `review`, `security_review`, `release_assessment`, `backend_memory`, and `code_graph` (the older `graphify_memory` is deprecated and read only while `code_graph` is unset). Configure them in Claude Code's `/plugin` configure flow or at install time with repeatable `--config key=false` flags (for example, `--config workflow=false`). Disabling `workflow` suppresses automatic stages without changing the other saved values. A **direct** `/harness-useful-skills:us-ignore-workflow` invocation bypasses package-mandatory stages for one request only; quoted or copied text is not an opt-out. With a recent Claude Code that supports mods, `/useful-skills` is also available: without arguments it opens a menu (**Settings**, **Status**, **Browse**, **Help**); with arguments it runs the commands in [Management](#management). Saved settings mirror OMP's layout under the Claude config directory (`$CLAUDE_CONFIG_DIR` or `~/.claude`): the per-repository workflow master is `useful-skills/workflow-settings/repositories/<sha256(scopeRoot)>/workflow.json` (same repository scope rules as OMP) and the seven profile-wide stage switches are `useful-skills/workflow-settings/<stage>.json`, all private. For each setting a saved file wins, then the `/plugin` option, then enabled; an unreadable or unsafe saved file makes that setting unknown with no fallback. `/plugin` options remain fallbacks, and the only control on Claude Code versions without mods.
+Claude exposes 24 namespaced skills (for example, `/harness-useful-skills:us-run-workflow`) and eight native agents: `planner`, `scout`, `frontend`, `backend`, `general-purpose`, `reviewer`, `security-reviewer`, and `release-assessor`. All declare `model: inherit`; per-role models come from a Claude-owned config file instead (see [Claude Code model roles](#claude-code-model-roles)). Permissions and stronger host rules remain authoritative. Plugin `userConfig` has eight default-`true` booleans: `workflow`, `research`, `plan`, `review`, `security_review`, `release_assessment`, `backend_memory`, and `code_graph` (the older `graphify_memory` is deprecated and read only while `code_graph` is unset). Configure them in Claude Code's `/plugin` configure flow or at install time with repeatable `--config key=false` flags (for example, `--config workflow=false`). Disabling `workflow` suppresses automatic stages without changing the other saved values. A **direct** `/harness-useful-skills:us-ignore-workflow` invocation bypasses package-mandatory stages for one request only; quoted or copied text is not an opt-out. With a recent Claude Code that supports mods, `/useful-skills` is also available: without arguments it opens a menu (**Settings**, **Status**, **Browse**, **Help**); with arguments it runs the commands in [Management](#management). Saved settings mirror OMP's layout under the Claude config directory (`$CLAUDE_CONFIG_DIR` or `~/.claude`): the per-repository workflow master is `useful-skills/workflow-settings/repositories/<sha256(scopeRoot)>/workflow.json` (same repository scope rules as OMP) and the seven profile-wide stage switches are `useful-skills/workflow-settings/<stage>.json`, all private. For each setting a saved file wins, then the `/plugin` option, then enabled; an unreadable or unsafe saved file makes that setting unknown with no fallback. `/plugin` options remain fallbacks, and the only control on Claude Code versions without mods.
 
 The Claude plugin adds a **separate** local stdio MCP server with three tools: `memory_status`, `memory_search`, and `memory_save`. Facts are project-scoped private files under Claude plugin data, searched by literal text; they are **not** OMP's native Mnemopi facts and are not shared with them. The code graph comes from Harness Code's (`harness-code`) separate `code_map`, `code_symbol`, `code_impact`, and `code_path` tools, not from this server. Do not save credentials, personal data, transcripts, or tool dumps; secret detection is only a backstop. A Bash pre-tool guard denies recognized dangerous commands, and successful tool responses can be redacted by `PostToolUse`; failed third-party tool responses (`PostToolUseFailure`) cannot receive equivalent redaction. These protections are not a sandbox or a substitute for Claude's permissions, user approval, or publication controls.
 
@@ -153,7 +153,7 @@ Restart OpenCode afterwards. The default scope is `user`. Omitting `--host`, or 
 What it writes, all under the scope directory (`<config>/opencode` for `user`, where `<config>` is `$XDG_CONFIG_HOME` if absolute, else `~/.config`; `<cwd>/.opencode` for `project`):
 
 - `plugins/harness-useful-skills.js`, `plugins/harness-useful-skills/**`, and `plugins/harness-useful-skills/install-record.json` (version, scope, paths, and a SHA-256 for every owned file)
-- `skills/us-*` (23 skills), `commands/useful-skills.md`, and `commands/us-ignore-workflow.md`
+- `skills/us-*` (24 skills), `commands/useful-skills.md`, and `commands/us-ignore-workflow.md`
 - `agents/us-<agent>.md`, generated from the bundled templates with a `# Generated by Useful Skills` marker (see [OpenCode model roles](#opencode-model-roles))
 - `harness-useful-skills/models.yml` in the scope directory
 - an `mcp.harness-useful-skills` entry in `opencode.json` (below)
@@ -168,7 +168,7 @@ Outside the scope directory, the plugin keeps data at `${XDG_DATA_HOME:-~/.local
 
 **Uninstall.** `./useful-skills uninstall --host opencode [--scope user|project]` removes only owned files that still match their recorded hash, marker-owned agents, and the `mcp.harness-useful-skills` entry if it is unchanged. It keeps data, settings, and `models.yml`, and prints their paths. `./useful-skills doctor --host opencode` reports the installation from the terminal.
 
-OpenCode exposes the 23 skills by their plain `us-*` names through its `skill` tool and as `/us-*` slash commands. Workers are the eight `us-*` agents below, dispatched with the `task` tool. The memory MCP server adds `harness-useful-skills_memory_status`, `harness-useful-skills_memory_search`, and `harness-useful-skills_memory_save`: project-scoped private facts under the OpenCode data directory searched by literal text. They are not shared with OMP or Claude Code facts. A Bash pre-tool guard that denies recognized dangerous commands is always on, as in Claude Code, and successful tool output is redacted for common secret patterns.
+OpenCode exposes the 24 skills by their plain `us-*` names through its `skill` tool and as `/us-*` slash commands. Workers are the eight `us-*` agents below, dispatched with the `task` tool. The memory MCP server adds `harness-useful-skills_memory_status`, `harness-useful-skills_memory_search`, and `harness-useful-skills_memory_save`: project-scoped private facts under the OpenCode data directory searched by literal text. They are not shared with OMP or Claude Code facts. A Bash pre-tool guard that denies recognized dangerous commands is always on, as in Claude Code, and successful tool output is redacted for common secret patterns.
 
 Limits:
 
@@ -201,7 +201,7 @@ OpenCode 2.x has no command hook. The plugin registers `useful-skills` and `us-i
 
 ### Codex
 
-The Codex adapter needs Node.js **22+** and the `codex` CLI. Installing only the plugin gives you the 23 skills, as `harness-useful-skills:us-*`, but no agents and no memory tools:
+The Codex adapter needs Node.js **22+** and the `codex` CLI. Installing only the plugin gives you the 24 skills, as `harness-useful-skills:us-*`, but no agents and no memory tools:
 
 ```bash
 codex plugin marketplace add MSpiechowicz/harness-useful-skills
@@ -256,7 +256,7 @@ Install the skills as a Pi package. It needs only the `pi` CLI:
 pi install git:github.com/MSpiechowicz/harness-useful-skills
 ```
 
-Pi loads only the skills listed in the `pi` key of `package.json`, which points at the generated `pi/skills/` copy of the 23 skills, not the OMP-flavoured `skills/` folder. Regenerate it with `node scripts/render-pi-skills.js`. Behaviour on Pi:
+Pi loads only the skills listed in the `pi` key of `package.json`, which points at the generated `pi/skills/` copy of the 24 skills, not the OMP-flavoured `skills/` folder. Regenerate it with `node scripts/render-pi-skills.js`. Behaviour on Pi:
 
 - Workflow stages are static guidance and always enabled. Pi has no Useful Skills settings command or `/useful-skills` command. To skip the workflow for one request, invoke `/skill:us-ignore-workflow` directly.
 - Pi has no worker tool, so planner, scout, and implementation work run inline in the main session and are reported as "ran inline (Pi has no worker tool)". Plan approval is still required before edits.
@@ -350,6 +350,7 @@ Disabling a repository master suppresses all automatic stages there without chan
 | `us-improve-codebase-architecture` | Read-only architectural opportunities, then approved focused refactoring |
 | `us-improve-code-coverage` | Measured coverage gaps, then approved behavior-focused test improvements |
 | `us-ship-backlog-item` | One item, isolated feature branch, reviewed linked PR, and Done only after confirmed merge |
+| `us-ship-backlog-batch` | N items shipped one after another straight to the default branch, each with the full workflow, a green CI/release run, and Done |
 | `us-open-pr` | Explicitly authorized reviewed feature-branch PR delivery |
 | `us-approve-work` | Explicitly authorized approved-only commit and safe feature-branch PR against the verified GitHub default branch; commit-only stays local |
 
@@ -363,6 +364,7 @@ Direct invocation uses OMP's actual syntax:
 /skill:us-improve-codebase-architecture
 /skill:us-improve-code-coverage
 /skill:us-ship-backlog-item
+/skill:us-ship-backlog-batch 3
 /skill:us-open-pr
 /skill:us-approve-work
 ```
@@ -627,6 +629,8 @@ Both skills reuse the owned implementation, correctness/security review, and mem
 `us-ship-backlog-item` distinguishes read-only selection from explicit shipment. A request to ship an item (or an explicit skill invocation without narrower limits) authorizes the reviewed feature-branch/PR delivery and that item's status updates, but still requires implementation-plan approval. It creates a safely isolated branch before edits, tracks **In progress → In review**, and hands reviewed delivery to `us-open-pr` without asking for the same PR authorization twice. Requests only to inspect/select or implement an item do not implicitly authorize publication.
 
 The linked PR uses `Closes #N` when it fully resolves the issue and targets the default branch; other cases retain a non-closing reference and an explicit completion limitation. **Done requires confirmed merge of the correct PR**, not PR creation, green CI, or closure without merge. Existing project automation may complete tracking; otherwise a later invocation verifies the merge and updates the selected issue/item. Skills do not run after a session ends, configure automation, merge PRs, or silently overwrite conflicting human status changes. Missing project access or status mappings are reported, not treated as success. Local-only backlog entries receive no fabricated GitHub issue.
+
+`us-ship-backlog-batch` ships N items one after another and, unlike the PR flow, pushes directly to the default branch for the approved items only. It takes one upfront approval that serves as each item's plan approval, runs the full workflow per item, and watches the CI and release runs for each pushed commit with a 3-fix cap per item and bounded waits. On any stop condition it reports and stops with no revert or force-push. Items are set to Done after green runs; there is no In review state. In Claude Code it is user-invoked only.
 
 `us-open-pr` inspects all outgoing history/diffs, preserves unrelated staged/worktree changes, pushes the reviewed feature head, creates or reuses the exact head/base PR, and verifies URL and head SHA. It never silently rebases, force-pushes, changes destination, or merges.
 

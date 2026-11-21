@@ -38,6 +38,7 @@
     "./claude/skills/us-plan/",
     "./claude/skills/us-run-workflow/",
     "./claude/skills/us-ship-backlog-item/",
+    "./claude/skills/us-ship-backlog-batch/",
     "./claude/skills/us-improve-codebase-architecture/",
     "./claude/skills/us-improve-code-coverage/",
     "./claude/skills/us-manage-memory/",

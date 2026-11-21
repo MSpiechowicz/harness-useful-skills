@@ -78,9 +78,9 @@ test("both Claude manifests carry the package version", async () => {
   assert.equal(await version(path.join(BUNDLE, ".claude-plugin", "plugin.json")), expected);
 });
 
-test("the bundle manifest lists the 23 shipped skills and 8 agents", async () => {
+test("the bundle manifest lists the 24 shipped skills and 8 agents", async () => {
   const manifest = JSON.parse(await readFile(path.join(BUNDLE, ".claude-plugin", "plugin.json"), "utf8"));
-  assert.equal(manifest.skills.length, 23);
+  assert.equal(manifest.skills.length, 24);
   assert.ok(!manifest.skills.some(skill => skill.includes("us-library")));
   for (const skill of manifest.skills) assert.ok(await exists(path.join(BUNDLE, skill, "SKILL.md")), skill);
 
@@ -88,7 +88,7 @@ test("the bundle manifest lists the 23 shipped skills and 8 agents", async () =>
   for (const agent of manifest.agents) assert.ok(await exists(path.join(BUNDLE, agent)), agent);
 
   const folders = (await readdir(path.join(BUNDLE, "claude", "skills"))).filter(name => name.startsWith("us-"));
-  assert.equal(folders.length, 23);
+  assert.equal(folders.length, 24);
   assert.equal((await readdir(path.join(BUNDLE, "claude", "agents"))).length, 8);
   assert.match(manifest.repository, /^https:\/\/github\.com\/MSpiechowicz\/harness-useful-skills$/);
 });
@@ -108,13 +108,13 @@ test("every relative import and URL in the bundled modules resolves inside the b
   }
 });
 
-test("the bundled command lists the 23 shipped skills", async t => {
+test("the bundled command lists the 24 shipped skills", async t => {
   const { cwd, env } = await isolated(t);
   const command = path.join(BUNDLE, "claude", "command.js");
 
   const skills = await execute(process.execPath, [command, "list"], { cwd, env });
   const names = [...skills.stdout.matchAll(/^\s+(us-[a-z-]+)/gm)].map(match => match[1]);
-  assert.equal(names.length, 23);
+  assert.equal(names.length, 24);
   assert.ok(!names.includes("us-library"));
 });
 
@@ -372,10 +372,12 @@ test("only real directories and non-executable files stay in the evals tree; lin
   assert.equal(checked.status, 0, checked.stderr);
 });
 
-test("the Claude us-ignore-workflow skill cannot be selected by the model, in the source and the bundle", async () => {
+test("the Claude us-ignore-workflow and us-ship-backlog-batch skills cannot be selected by the model, in the source and the bundle", async () => {
   for (const base of [ROOT, path.join(ROOT, "plugins", "claude")]) {
-    const text = await readFile(path.join(base, "claude", "skills", "us-ignore-workflow", "SKILL.md"), "utf8");
-    const [, frontmatter] = text.split(/^---\r?\n/m);
-    assert.match(frontmatter, /^disable-model-invocation: true$/m, base);
+    for (const skill of ["us-ignore-workflow", "us-ship-backlog-batch"]) {
+      const text = await readFile(path.join(base, "claude", "skills", skill, "SKILL.md"), "utf8");
+      const [, frontmatter] = text.split(/^---\r?\n/m);
+      assert.match(frontmatter, /^disable-model-invocation: true$/m, `${base} ${skill}`);
+    }
   }
 });
