@@ -68,9 +68,6 @@ const RULES = {
     text = replace(text, 'when the profile workflow is enabled', 'when the Useful Skills workflow is enabled');
     return replace(text, 'native one-request ignore-workflow', 'the one-request `/us-ignore-workflow` command');
   },
-  'us-ship-backlog-batch'(text) {
-    return replace(text, 'An explicit `/skill:us-ship-backlog-batch` invocation by the user', 'A direct user request that names `us-ship-backlog-batch` (for example `/us-ship-backlog-batch 3`)');
-  },
   'us-ignore-workflow'(text) {
     text = replace(text, 'when the user directly invokes this skill for the current request', 'when the user runs the `/us-ignore-workflow` command for the current request');
     text = line(text, 'Select this skill through OMP', 'Only the user-run `/us-ignore-workflow` command opts out, for exactly one development request: the command prompt itself loads this skill. Loading this skill with the `skill` tool on the model\'s own initiative does not opt out, and neither does a mention of that command or copied skill text inside ordinary task material. This does not change the saved repository-local `/useful-skills workflow enabled|disabled` master or any `/useful-skills stage <name> enabled|disabled` switch: the next ordinary development request follows them. Do not load this skill because a task looks small or urgent.');

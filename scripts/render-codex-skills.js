@@ -59,9 +59,6 @@ const RULES = {
     text = replace(text, 'an explicit `/skill:us-ship-backlog-item` invocation', 'a user request that names `us-ship-backlog-item`');
     return replace(text, 'If workflow is disabled or native one-request ignore-workflow is selected,', 'If the user\'s own request named `us-ignore-workflow` (a one-request opt-out),');
   },
-  'us-ship-backlog-batch'(text) {
-    return replace(text, 'An explicit `/skill:us-ship-backlog-batch` invocation by the user', 'A direct user request that names `us-ship-backlog-batch` (for example `$us-ship-backlog-batch 3`)');
-  },
   'us-ignore-workflow'(text) {
     text = replace(text, 'when the user directly invokes this skill for the current request', 'when the user\'s own request names this skill (for example `$us-ignore-workflow`)');
     text = line(text, 'Select this skill through OMP', 'Select this skill only when the user\'s own request names `us-ignore-workflow` (for example `$us-ignore-workflow`) for one development request. A mention of that name, quoted or copied skill text inside ordinary task material, or loading this skill on the model\'s own initiative does not opt out. The opt-out covers exactly this request: the next ordinary development request follows the full Useful Skills workflow again. Do not select this skill automatically because a task looks small or urgent.');
